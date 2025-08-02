@@ -5,6 +5,9 @@ const rateLimit = require('express-rate-limit');
 const dotenv = require('dotenv');
 const authRoutes = require('./routes/auth');
 const userRoutes = require('./routes/users');
+const gymRoutes = require('./routes/gyms');
+const amenityRoutes = require('./routes/amenities');
+const gymImageRoutes = require('./routes/gymImages');
 const { errorHandler, notFoundHandler } = require('./middleware/errorHandler');
 const { specs, swaggerUi, swaggerOptions } = require('./config/swagger');
 const { testConnection, syncDatabase } = require('./models');
@@ -19,6 +22,9 @@ app.use(cors());
 app.use(helmet());
 app.use(express.json({ limit: '10mb' }));
 app.use(express.urlencoded({ extended: true }));
+
+// Serve static files (for uploaded images)
+app.use('/uploads', express.static('uploads'));
 
 // Rate limiter
 const limiter = rateLimit({
@@ -80,6 +86,9 @@ app.get('/health', (req, res) => {
 // Routes
 app.use('/api/auth', authRoutes);
 app.use('/api/users', userRoutes);
+app.use('/api/gyms', gymRoutes);
+app.use('/api/amenities', amenityRoutes);
+app.use('/api/gym-images', gymImageRoutes);
 
 // 404 handler
 app.use(notFoundHandler);

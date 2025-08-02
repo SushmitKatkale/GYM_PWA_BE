@@ -257,6 +257,355 @@ const options = {
               description: 'Response timestamp'
             }
           }
+        },
+        Gym: {
+          type: 'object',
+          properties: {
+            id: {
+              type: 'integer',
+              description: 'Gym ID'
+            },
+            name: {
+              type: 'string',
+              description: 'Gym name'
+            },
+            capacity: {
+              type: 'integer',
+              description: 'Maximum capacity of the gym'
+            },
+            address: {
+              type: 'string',
+              description: 'Gym address'
+            },
+            description: {
+              type: 'string',
+              description: 'Gym description'
+            },
+            openingTime: {
+              type: 'string',
+              format: 'time',
+              description: 'Opening time (HH:MM format)'
+            },
+            closingTime: {
+              type: 'string',
+              format: 'time',
+              description: 'Closing time (HH:MM format)'
+            },
+            activeStatus: {
+              type: 'boolean',
+              description: 'Active status of the gym'
+            },
+            createTimestamp: {
+              type: 'string',
+              format: 'date-time',
+              description: 'Creation timestamp'
+            },
+            createdBy: {
+              type: 'string',
+              description: 'User who created the gym'
+            },
+            updateTimestamp: {
+              type: 'string',
+              format: 'date-time',
+              description: 'Last update timestamp'
+            },
+            updatedBy: {
+              type: 'string',
+              description: 'User who last updated the gym'
+            },
+            amenities: {
+              type: 'array',
+              items: {
+                $ref: '#/components/schemas/Amenity'
+              },
+              description: 'List of gym amenities'
+            },
+            images: {
+              type: 'array',
+              items: {
+                $ref: '#/components/schemas/GymImage'
+              },
+              description: 'List of gym images'
+            }
+          }
+        },
+        CreateGym: {
+          type: 'object',
+          required: ['name', 'capacity', 'address', 'openingTime', 'closingTime'],
+          properties: {
+            name: {
+              type: 'string',
+              minLength: 2,
+              maxLength: 100,
+              description: 'Gym name'
+            },
+            capacity: {
+              type: 'integer',
+              minimum: 1,
+              maximum: 10000,
+              description: 'Maximum capacity of the gym'
+            },
+            address: {
+              type: 'string',
+              minLength: 10,
+              maxLength: 500,
+              description: 'Gym address'
+            },
+            description: {
+              type: 'string',
+              maxLength: 1000,
+              description: 'Gym description'
+            },
+            openingTime: {
+              type: 'string',
+              pattern: '^([01]?[0-9]|2[0-3]):[0-5][0-9]$',
+              description: 'Opening time (HH:MM format, 24-hour)'
+            },
+            closingTime: {
+              type: 'string',
+              pattern: '^([01]?[0-9]|2[0-3]):[0-5][0-9]$',
+              description: 'Closing time (HH:MM format, 24-hour)'
+            },
+            createdBy: {
+              type: 'string',
+              description: 'User who is creating the gym'
+            }
+          }
+        },
+        UpdateGym: {
+          type: 'object',
+          properties: {
+            name: {
+              type: 'string',
+              minLength: 2,
+              maxLength: 100,
+              description: 'Gym name'
+            },
+            capacity: {
+              type: 'integer',
+              minimum: 1,
+              maximum: 10000,
+              description: 'Maximum capacity of the gym'
+            },
+            address: {
+              type: 'string',
+              minLength: 10,
+              maxLength: 500,
+              description: 'Gym address'
+            },
+            description: {
+              type: 'string',
+              maxLength: 1000,
+              description: 'Gym description'
+            },
+            openingTime: {
+              type: 'string',
+              pattern: '^([01]?[0-9]|2[0-3]):[0-5][0-9]$',
+              description: 'Opening time (HH:MM format, 24-hour)'
+            },
+            closingTime: {
+              type: 'string',
+              pattern: '^([01]?[0-9]|2[0-3]):[0-5][0-9]$',
+              description: 'Closing time (HH:MM format, 24-hour)'
+            },
+            updatedBy: {
+              type: 'string',
+              description: 'User who is updating the gym'
+            }
+          }
+        },
+        Amenity: {
+          type: 'object',
+          properties: {
+            id: {
+              type: 'integer',
+              description: 'Amenity ID'
+            },
+            name: {
+              type: 'string',
+              description: 'Amenity name'
+            },
+            description: {
+              type: 'string',
+              description: 'Amenity description'
+            },
+            gymId: {
+              type: 'integer',
+              description: 'ID of the gym this amenity belongs to'
+            },
+            activeStatus: {
+              type: 'boolean',
+              description: 'Active status of the amenity'
+            },
+            createTimestamp: {
+              type: 'string',
+              format: 'date-time',
+              description: 'Creation timestamp'
+            },
+            createdBy: {
+              type: 'string',
+              description: 'User who created the amenity'
+            },
+            updateTimestamp: {
+              type: 'string',
+              format: 'date-time',
+              description: 'Last update timestamp'
+            },
+            updatedBy: {
+              type: 'string',
+              description: 'User who last updated the amenity'
+            },
+            gym: {
+              type: 'object',
+              properties: {
+                id: {
+                  type: 'integer'
+                },
+                name: {
+                  type: 'string'
+                }
+              },
+              description: 'Associated gym details'
+            }
+          }
+        },
+        CreateAmenity: {
+          type: 'object',
+          required: ['name', 'gymId'],
+          properties: {
+            name: {
+              type: 'string',
+              minLength: 2,
+              maxLength: 100,
+              description: 'Amenity name'
+            },
+            description: {
+              type: 'string',
+              maxLength: 500,
+              description: 'Amenity description'
+            },
+            gymId: {
+              type: 'integer',
+              description: 'ID of the gym this amenity belongs to'
+            },
+            createdBy: {
+              type: 'string',
+              description: 'User who is creating the amenity'
+            }
+          }
+        },
+        UpdateAmenity: {
+          type: 'object',
+          properties: {
+            name: {
+              type: 'string',
+              minLength: 2,
+              maxLength: 100,
+              description: 'Amenity name'
+            },
+            description: {
+              type: 'string',
+              maxLength: 500,
+              description: 'Amenity description'
+            },
+            updatedBy: {
+              type: 'string',
+              description: 'User who is updating the amenity'
+            }
+          }
+        },
+        GymImage: {
+          type: 'object',
+          properties: {
+            id: {
+              type: 'integer',
+              description: 'Image ID'
+            },
+            title: {
+              type: 'string',
+              description: 'Image title'
+            },
+            path: {
+              type: 'string',
+              description: 'Image file path'
+            },
+            fullUrl: {
+              type: 'string',
+              description: 'Full URL to access the image'
+            },
+            gymId: {
+              type: 'integer',
+              description: 'ID of the gym this image belongs to'
+            },
+            activeStatus: {
+              type: 'boolean',
+              description: 'Active status of the image'
+            },
+            createTimestamp: {
+              type: 'string',
+              format: 'date-time',
+              description: 'Creation timestamp'
+            },
+            createdBy: {
+              type: 'string',
+              description: 'User who uploaded the image'
+            },
+            updateTimestamp: {
+              type: 'string',
+              format: 'date-time',
+              description: 'Last update timestamp'
+            },
+            updatedBy: {
+              type: 'string',
+              description: 'User who last updated the image'
+            },
+            gym: {
+              type: 'object',
+              properties: {
+                id: {
+                  type: 'integer'
+                },
+                name: {
+                  type: 'string'
+                }
+              },
+              description: 'Associated gym details'
+            }
+          }
+        },
+        UpdateGymImage: {
+          type: 'object',
+          properties: {
+            title: {
+              type: 'string',
+              description: 'Image title'
+            },
+            updatedBy: {
+              type: 'string',
+              description: 'User who is updating the image'
+            }
+          }
+        },
+        PaginationResponse: {
+          type: 'object',
+          properties: {
+            currentPage: {
+              type: 'integer',
+              description: 'Current page number'
+            },
+            totalPages: {
+              type: 'integer',
+              description: 'Total number of pages'
+            },
+            totalItems: {
+              type: 'integer',
+              description: 'Total number of items'
+            },
+            itemsPerPage: {
+              type: 'integer',
+              description: 'Number of items per page'
+            }
+          }
         }
       }
     },
@@ -268,6 +617,18 @@ const options = {
       {
         name: 'Users',
         description: 'User management endpoints'
+      },
+      {
+        name: 'Gyms',
+        description: 'Gym management endpoints'
+      },
+      {
+        name: 'Amenities',
+        description: 'Gym amenities management endpoints'
+      },
+      {
+        name: 'Gym Images',
+        description: 'Gym image upload and management endpoints'
       },
       {
         name: 'Health',

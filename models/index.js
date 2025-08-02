@@ -26,18 +26,40 @@ User.belongsTo(User, {
   as: 'updater',
   constraints: false
 });
+const Gym = require('./Gym');
+const Amenity = require('./Amenity');
+const GymImage = require('./GymImage');
+
+// Define relationships
+Gym.hasMany(Amenity, {
+  foreignKey: 'gymId',
+  as: 'amenities',
+  onDelete: 'CASCADE',
+});
+
+Amenity.belongsTo(Gym, {
+  foreignKey: 'gymId',
+  as: 'gym',
+});
+
+Gym.hasMany(GymImage, {
+  foreignKey: 'gymId',
+  as: 'images',
+  onDelete: 'CASCADE',
+});
+
+GymImage.belongsTo(Gym, {
+  foreignKey: 'gymId',
+  as: 'gym',
+});
 
 // Sync models with database (in development)
 const syncDatabase = async () => {
   try {
-    if (process.env.NODE_ENV === 'development') {
-      // Force sync to recreate tables with new schema
-      await sequelize.sync({ force: true });
-      console.log('✅ Database models synchronized successfully (tables recreated).');
-      
-      // Create a default admin user
-      await createDefaultAdmin();
-    }
+    await sequelize.sync({ alter: true });
+    console.log('✅ Database models synchronized successfully.');
+    // Create a default admin user
+    await createDefaultAdmin();
   } catch (error) {
     console.error('❌ Error synchronizing database models:', error.message);
     console.error('Full error:', error);
@@ -71,6 +93,9 @@ module.exports = {
   sequelize,
   User,
   RefreshToken,
+  Gym,
+  Amenity,
+  GymImage,
   syncDatabase,
   testConnection,
 };
