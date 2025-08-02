@@ -606,6 +606,280 @@ const options = {
               description: 'Number of items per page'
             }
           }
+        },
+        Subscription: {
+          type: 'object',
+          properties: {
+            id: {
+              type: 'integer',
+              description: 'Subscription ID'
+            },
+            title: {
+              type: 'string',
+              description: 'Subscription title'
+            },
+            validityDays: {
+              type: 'integer',
+              description: 'Subscription validity in days'
+            },
+            price: {
+              type: 'number',
+              format: 'decimal',
+              description: 'Subscription price'
+            },
+            discountedPrice: {
+              type: 'number',
+              format: 'decimal',
+              description: 'Discounted price (optional)'
+            },
+            gymId: {
+              type: 'integer',
+              description: 'ID of the gym this subscription belongs to'
+            },
+            isMostPopular: {
+              type: 'boolean',
+              description: 'Whether this is the most popular subscription'
+            },
+            isCheapest: {
+              type: 'boolean',
+              description: 'Whether this is the cheapest subscription'
+            },
+            activeStatus: {
+              type: 'boolean',
+              description: 'Active status of the subscription'
+            },
+            createTimestamp: {
+              type: 'string',
+              format: 'date-time',
+              description: 'Creation timestamp'
+            },
+            createdBy: {
+              type: 'string',
+              description: 'User who created the subscription'
+            },
+            updateTimestamp: {
+              type: 'string',
+              format: 'date-time',
+              description: 'Last update timestamp'
+            },
+            updatedBy: {
+              type: 'string',
+              description: 'User who last updated the subscription'
+            },
+            gym: {
+              type: 'object',
+              properties: {
+                id: {
+                  type: 'integer'
+                },
+                name: {
+                  type: 'string'
+                }
+              },
+              description: 'Associated gym details'
+            },
+            features: {
+              type: 'array',
+              items: {
+                $ref: '#/components/schemas/SubscriptionFeature'
+              },
+              description: 'List of subscription features'
+            }
+          }
+        },
+        CreateSubscription: {
+          type: 'object',
+          required: ['title', 'validityDays', 'price', 'gymId'],
+          properties: {
+            title: {
+              type: 'string',
+              minLength: 2,
+              maxLength: 100,
+              description: 'Subscription title'
+            },
+            validityDays: {
+              type: 'integer',
+              minimum: 1,
+              description: 'Subscription validity in days'
+            },
+            price: {
+              type: 'number',
+              format: 'decimal',
+              minimum: 0,
+              description: 'Subscription price'
+            },
+            discountedPrice: {
+              type: 'number',
+              format: 'decimal',
+              minimum: 0,
+              description: 'Discounted price (optional)'
+            },
+            gymId: {
+              type: 'integer',
+              description: 'ID of the gym this subscription belongs to'
+            },
+            isMostPopular: {
+              type: 'boolean',
+              description: 'Whether this is the most popular subscription'
+            },
+            isCheapest: {
+              type: 'boolean',
+              description: 'Whether this is the cheapest subscription'
+            },
+            createdBy: {
+              type: 'string',
+              description: 'User who is creating the subscription'
+            }
+          }
+        },
+        UpdateSubscription: {
+          type: 'object',
+          properties: {
+            title: {
+              type: 'string',
+              minLength: 2,
+              maxLength: 100,
+              description: 'Subscription title'
+            },
+            validityDays: {
+              type: 'integer',
+              minimum: 1,
+              description: 'Subscription validity in days'
+            },
+            price: {
+              type: 'number',
+              format: 'decimal',
+              minimum: 0,
+              description: 'Subscription price'
+            },
+            discountedPrice: {
+              type: 'number',
+              format: 'decimal',
+              minimum: 0,
+              description: 'Discounted price (optional)'
+            },
+            isMostPopular: {
+              type: 'boolean',
+              description: 'Whether this is the most popular subscription'
+            },
+            isCheapest: {
+              type: 'boolean',
+              description: 'Whether this is the cheapest subscription'
+            },
+            updatedBy: {
+              type: 'string',
+              description: 'User who is updating the subscription'
+            }
+          }
+        },
+        SubscriptionFeature: {
+          type: 'object',
+          properties: {
+            id: {
+              type: 'integer',
+              description: 'Feature ID'
+            },
+            title: {
+              type: 'string',
+              description: 'Feature title'
+            },
+            subscriptionId: {
+              type: 'integer',
+              description: 'ID of the subscription this feature belongs to'
+            },
+            isHighlighted: {
+              type: 'boolean',
+              description: 'Whether this feature is highlighted'
+            },
+            activeStatus: {
+              type: 'boolean',
+              description: 'Active status of the feature'
+            },
+            createTimestamp: {
+              type: 'string',
+              format: 'date-time',
+              description: 'Creation timestamp'
+            },
+            createdBy: {
+              type: 'string',
+              description: 'User who created the feature'
+            },
+            updateTimestamp: {
+              type: 'string',
+              format: 'date-time',
+              description: 'Last update timestamp'
+            },
+            updatedBy: {
+              type: 'string',
+              description: 'User who last updated the feature'
+            },
+            subscription: {
+              type: 'object',
+              properties: {
+                id: {
+                  type: 'integer'
+                },
+                title: {
+                  type: 'string'
+                },
+                gym: {
+                  type: 'object',
+                  properties: {
+                    id: {
+                      type: 'integer'
+                    },
+                    name: {
+                      type: 'string'
+                    }
+                  }
+                }
+              },
+              description: 'Associated subscription details'
+            }
+          }
+        },
+        CreateSubscriptionFeature: {
+          type: 'object',
+          required: ['title', 'subscriptionId'],
+          properties: {
+            title: {
+              type: 'string',
+              minLength: 2,
+              maxLength: 100,
+              description: 'Feature title'
+            },
+            subscriptionId: {
+              type: 'integer',
+              description: 'ID of the subscription this feature belongs to'
+            },
+            isHighlighted: {
+              type: 'boolean',
+              description: 'Whether this feature is highlighted'
+            },
+            createdBy: {
+              type: 'string',
+              description: 'User who is creating the feature'
+            }
+          }
+        },
+        UpdateSubscriptionFeature: {
+          type: 'object',
+          properties: {
+            title: {
+              type: 'string',
+              minLength: 2,
+              maxLength: 100,
+              description: 'Feature title'
+            },
+            isHighlighted: {
+              type: 'boolean',
+              description: 'Whether this feature is highlighted'
+            },
+            updatedBy: {
+              type: 'string',
+              description: 'User who is updating the feature'
+            }
+          }
         }
       }
     },
@@ -629,6 +903,14 @@ const options = {
       {
         name: 'Gym Images',
         description: 'Gym image upload and management endpoints'
+      },
+      {
+        name: 'Subscriptions',
+        description: 'Gym subscription plans management endpoints'
+      },
+      {
+        name: 'Subscription Features',
+        description: 'Subscription feature management endpoints'
       },
       {
         name: 'Health',

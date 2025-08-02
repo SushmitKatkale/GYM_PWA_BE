@@ -29,6 +29,8 @@ User.belongsTo(User, {
 const Gym = require('./Gym');
 const Amenity = require('./Amenity');
 const GymImage = require('./GymImage');
+const Subscription = require('./Subscription');
+const SubscriptionFeature = require('./SubscriptionFeature');
 
 // Define relationships
 Gym.hasMany(Amenity, {
@@ -51,6 +53,29 @@ Gym.hasMany(GymImage, {
 GymImage.belongsTo(Gym, {
   foreignKey: 'gymId',
   as: 'gym',
+});
+
+// Subscription relationships
+Gym.hasMany(Subscription, {
+  foreignKey: 'gymId',
+  as: 'subscriptions',
+  onDelete: 'CASCADE',
+});
+
+Subscription.belongsTo(Gym, {
+  foreignKey: 'gymId',
+  as: 'gym',
+});
+
+Subscription.hasMany(SubscriptionFeature, {
+  foreignKey: 'subscriptionId',
+  as: 'features',
+  onDelete: 'CASCADE',
+});
+
+SubscriptionFeature.belongsTo(Subscription, {
+  foreignKey: 'subscriptionId',
+  as: 'subscription',
 });
 
 // Sync models with database (in development)
@@ -96,6 +121,8 @@ module.exports = {
   Gym,
   Amenity,
   GymImage,
+  Subscription,
+  SubscriptionFeature,
   syncDatabase,
   testConnection,
 };

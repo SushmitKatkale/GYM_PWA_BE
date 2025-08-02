@@ -1,0 +1,277 @@
+const express = require('express');
+const router = express.Router();
+const {
+  createSubscriptionFeature,
+  getAllSubscriptionFeatures,
+  getFeaturesBySubscription,
+  getSubscriptionFeatureById,
+  updateSubscriptionFeature,
+  deleteSubscriptionFeature
+} = require('../controllers/subscriptionFeatureController');
+const { authenticate } = require('../middleware/auth');
+
+/**
+ * @swagger
+ * /api/subscription-features:
+ *   post:
+ *     tags: [Subscription Features]
+ *     summary: Create a new subscription feature
+ *     description: Create a new feature for a specific subscription plan.
+ *     security:
+ *       - bearerAuth: []
+ *     requestBody:
+ *       required: true
+ *       content:
+ *         application/json:
+ *           schema:
+ *             $ref: '#/components/schemas/CreateSubscriptionFeature'
+ *     responses:
+ *       201:
+ *         description: Subscription feature created successfully
+ *         content:
+ *           application/json:
+ *             schema:
+ *               $ref: '#/components/schemas/SuccessResponse'
+ *       400:
+ *         description: Invalid input
+ *         content:
+ *           application/json:
+ *             schema:
+ *               $ref: '#/components/schemas/ErrorResponse'
+ *       404:
+ *         description: Subscription not found
+ *         content:
+ *           application/json:
+ *             schema:
+ *               $ref: '#/components/schemas/ErrorResponse'
+ *       500:
+ *         description: Server error
+ *         content:
+ *           application/json:
+ *             schema:
+ *               $ref: '#/components/schemas/ErrorResponse'
+ */
+router.post('/', authenticate, createSubscriptionFeature);
+
+/**
+ * @swagger
+ * /api/subscription-features:
+ *   get:
+ *     tags: [Subscription Features]
+ *     summary: Get all subscription features
+ *     description: Retrieve a paginated list of subscription features with optional search and filters.
+ *     parameters:
+ *       - in: query
+ *         name: page
+ *         schema:
+ *           type: integer
+ *           default: 1
+ *         description: Page number
+ *       - in: query
+ *         name: limit
+ *         schema:
+ *           type: integer
+ *           default: 10
+ *         description: Items per page
+ *       - in: query
+ *         name: search
+ *         schema:
+ *           type: string
+ *         description: Search string
+ *       - in: query
+ *         name: subscriptionId
+ *         schema:
+ *           type: integer
+ *         description: Filter by subscription ID
+ *       - in: query
+ *         name: activeOnly
+ *         schema:
+ *           type: boolean
+ *           default: true
+ *         description: Filter active features only
+ *     responses:
+ *       200:
+ *         description: A list of subscription features
+ *         content:
+ *           application/json:
+ *             schema:
+ *               type: object
+ *               properties:
+ *                 features:
+ *                   type: array
+ *                   items:
+ *                     $ref: '#/components/schemas/SubscriptionFeature'
+ *                 pagination:
+ *                   $ref: '#/components/schemas/PaginationResponse'
+ *       500:
+ *         description: Server error
+ *         content:
+ *           application/json:
+ *             schema:
+ *               $ref: '#/components/schemas/ErrorResponse'
+ */
+router.get('/', getAllSubscriptionFeatures);
+
+/**
+ * @swagger
+ * /api/subscription-features/subscription/{subscriptionId}:
+ *   get:
+ *     tags: [Subscription Features]
+ *     summary: Get features by subscription ID
+ *     description: Retrieve all features for a specific subscription.
+ *     parameters:
+ *       - in: path
+ *         name: subscriptionId
+ *         required: true
+ *         schema:
+ *           type: integer
+ *         description: Subscription ID
+ *       - in: query
+ *         name: activeOnly
+ *         schema:
+ *           type: boolean
+ *           default: true
+ *         description: Filter active features only
+ *     responses:
+ *       200:
+ *         description: A list of features for the subscription
+ *         content:
+ *           application/json:
+ *             schema:
+ *               type: array
+ *               items:
+ *                 $ref: '#/components/schemas/SubscriptionFeature'
+ *       500:
+ *         description: Server error
+ *         content:
+ *           application/json:
+ *             schema:
+ *               $ref: '#/components/schemas/ErrorResponse'
+ */
+router.get('/subscription/:subscriptionId', getFeaturesBySubscription);
+
+/**
+ * @swagger
+ * /api/subscription-features/{id}:
+ *   get:
+ *     tags: [Subscription Features]
+ *     summary: Get subscription feature by ID
+ *     description: Retrieve a specific subscription feature by its ID.
+ *     parameters:
+ *       - in: path
+ *         name: id
+ *         required: true
+ *         schema:
+ *           type: integer
+ *         description: Feature ID
+ *     responses:
+ *       200:
+ *         description: Feature details
+ *         content:
+ *           application/json:
+ *             schema:
+ *               $ref: '#/components/schemas/SubscriptionFeature'
+ *       404:
+ *         description: Feature not found
+ *         content:
+ *           application/json:
+ *             schema:
+ *               $ref: '#/components/schemas/ErrorResponse'
+ *       500:
+ *         description: Server error
+ *         content:
+ *           application/json:
+ *             schema:
+ *               $ref: '#/components/schemas/ErrorResponse'
+ */
+router.get('/:id', getSubscriptionFeatureById);
+
+/**
+ * @swagger
+ * /api/subscription-features/{id}:
+ *   put:
+ *     tags: [Subscription Features]
+ *     summary: Update subscription feature
+ *     description: Update subscription feature details.
+ *     security:
+ *       - bearerAuth: []
+ *     parameters:
+ *       - in: path
+ *         name: id
+ *         required: true
+ *         schema:
+ *           type: integer
+ *         description: Feature ID
+ *     requestBody:
+ *       required: true
+ *       content:
+ *         application/json:
+ *           schema:
+ *             $ref: '#/components/schemas/UpdateSubscriptionFeature'
+ *     responses:
+ *       200:
+ *         description: Feature updated successfully
+ *         content:
+ *           application/json:
+ *             schema:
+ *               $ref: '#/components/schemas/SuccessResponse'
+ *       400:
+ *         description: Invalid input
+ *         content:
+ *           application/json:
+ *             schema:
+ *               $ref: '#/components/schemas/ErrorResponse'
+ *       404:
+ *         description: Feature not found
+ *         content:
+ *           application/json:
+ *             schema:
+ *               $ref: '#/components/schemas/ErrorResponse'
+ *       500:
+ *         description: Server error
+ *         content:
+ *           application/json:
+ *             schema:
+ *               $ref: '#/components/schemas/ErrorResponse'
+ */
+router.put('/:id', authenticate, updateSubscriptionFeature);
+
+/**
+ * @swagger
+ * /api/subscription-features/{id}:
+ *   delete:
+ *     tags: [Subscription Features]
+ *     summary: Delete subscription feature
+ *     description: Soft delete subscription feature by setting active status to false.
+ *     security:
+ *       - bearerAuth: []
+ *     parameters:
+ *       - in: path
+ *         name: id
+ *         required: true
+ *         schema:
+ *           type: integer
+ *         description: Feature ID
+ *     responses:
+ *       200:
+ *         description: Feature deleted successfully
+ *         content:
+ *           application/json:
+ *             schema:
+ *               $ref: '#/components/schemas/SuccessResponse'
+ *       404:
+ *         description: Feature not found
+ *         content:
+ *           application/json:
+ *             schema:
+ *               $ref: '#/components/schemas/ErrorResponse'
+ *       500:
+ *         description: Server error
+ *         content:
+ *           application/json:
+ *             schema:
+ *               $ref: '#/components/schemas/ErrorResponse'
+ */
+router.delete('/:id', authenticate, deleteSubscriptionFeature);
+
+module.exports = router;

@@ -8,6 +8,8 @@ const userRoutes = require('./routes/users');
 const gymRoutes = require('./routes/gyms');
 const amenityRoutes = require('./routes/amenities');
 const gymImageRoutes = require('./routes/gymImages');
+const subscriptionRoutes = require('./routes/subscriptions');
+const subscriptionFeatureRoutes = require('./routes/subscriptionFeatures');
 const { errorHandler, notFoundHandler } = require('./middleware/errorHandler');
 const { specs, swaggerUi, swaggerOptions } = require('./config/swagger');
 const { testConnection, syncDatabase } = require('./models');
@@ -89,6 +91,8 @@ app.use('/api/users', userRoutes);
 app.use('/api/gyms', gymRoutes);
 app.use('/api/amenities', amenityRoutes);
 app.use('/api/gym-images', gymImageRoutes);
+app.use('/api/subscriptions', subscriptionRoutes);
+app.use('/api/subscription-features', subscriptionFeatureRoutes);
 
 // 404 handler
 app.use(notFoundHandler);
