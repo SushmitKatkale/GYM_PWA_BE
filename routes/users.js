@@ -1,27 +1,129 @@
 const express = require('express');
-const { User } = require('../models');
-const ResponseUtil = require('../utils/response');
-const { authenticate, authorize } = require('../middleware/auth');
 const { 
+  createUserSchema, 
   updateUserSchema, 
   changePasswordSchema, 
-  validate 
-} = require('../utils/validation');
+  toggleStatusSchema, 
+  queryParamsSchema, 
+  validate, 
+  validateQuery 
+} = require('../validation/userValidation');
+const UserController = require('../controllers/userController');
+const { authenticate, authorize } = require('../middleware/auth');
 
 const userRouter = express.Router();
 
 /**
  * @swagger
- * /api/users/profile:
- *   get:
- *     tags: [Users]
- *     summary: Get current user profile
- *     description: Retrieve the profile of the authenticated user
+ * components:
+ *   schemas:
+ *     UserNew:
+ *       type: object
+ *       required:
+ *         - firstName
+ *         - lastName
+ *         - username
+ *         - email
+ *         - password
+ *       properties:
+ *         firstName:
+ *           type: string
+ *           minLength: 2
+ *           maxLength: 50
+ *           description: User's first name
+ *         lastName:
+ *           type: string
+ *           minLength: 2
+ *           maxLength: 50
+ *           description: User's last name
+ *         username:
+ *           type: string
+ *           minLength: 3
+ *           maxLength: 50
+ *           pattern: '^[a-zA-Z0-9]+$'
+ *           description: Unique username (alphanumeric only)
+ *         email:
+ *           type: string
+ *           format: email
+ *           description: Unique email address
+ *         password:
+ *           type: string
+ *           minLength: 8
+ *           maxLength: 100
+ *           description: Password with special characters
+ *         phoneNumber:
+ *           type: string
+ *           pattern: '^[+]?[0-9\s\-\(\)]+$'
+ *           description: Phone number
+ *         type:
+ *           type: string
+ *           enum: ['1', '2', '3']
+ *           description: '1-user, 2-owner, 3-admin'
+ *           default: '1'
+ *         activeStatus:
+ *           type: string
+ *           enum: ['0', '1']
+ *           description: '0-inactive, 1-active'
+ *           default: '1'
+ *     UserResponse:
+ *       type: object
+ *       properties:
+ *         id:
+ *           type: string
+ *           description: Unique 7-8 character alphanumeric ID
+ *         firstName:
+ *           type: string
+ *         lastName:
+ *           type: string
+ *         username:
+ *           type: string
+ *         email:
+ *           type: string
+ *         phoneNumber:
+ *           type: string
+ *         type:
+ *           type: string
+ *         activeStatus:
+ *           type: string
+ *         createTimestamp:
+ *           type: string
+ *           format: date-time
+ *         createdBy:
+ *           type: string
+ *         updateTimestamp:
+ *           type: string
+ *           format: date-time
+ *         updatedBy:
+ *           type: string
+ */
+
+/**
+ * @swagger
+ * /api/users:
+ *   post:
+ *     tags: [User Management]
+ *     summary: Create a new user (Admin only)
+ *     description: Create a new user with auto-generated unique ID
  *     security:
  *       - bearerAuth: []
+ *     requestBody:
+ *       required: true
+ *       content:
+ *         application/json:
+ *           schema:
+ *             $ref: '#/components/schemas/UserNew'
+ *           example:
+ *             firstName: 'John'
+ *             lastName: 'Doe'
+ *             username: 'johndoe'
+ *             email: 'john@example.com'
+ *             password: 'SecurePass123!'
+ *             phoneNumber: '+1234567890'
+ *             type: '1'
+ *             activeStatus: '1'
  *     responses:
- *       200:
- *         description: User profile retrieved successfully
+ *       201:
+ *         description: User created successfully
  *         content:
  *           application/json:
  *             schema:
@@ -30,140 +132,25 @@ const userRouter = express.Router();
  *                 - type: object
  *                   properties:
  *                     data:
- *                       $ref: '#/components/schemas/User'
- *       401:
- *         description: Authentication required
- *         content:
- *           application/json:
- *             schema:
- *               $ref: '#/components/schemas/ErrorResponse'
- */
-userRouter.get('/profile', authenticate, async (req, res) => {
-  try {
-    return ResponseUtil.success(res, req.user.toJSON(), 'User profile retrieved');
-  } catch (error) {
-    return ResponseUtil.error(res, 'Failed to retrieve user profile');
-  }
-});
-
-/**
- * @swagger
- * /api/users/profile:
- *   put:
- *     tags: [Users]
- *     summary: Update current user profile
- *     description: Update the profile of the authenticated user
- *     security:
- *       - bearerAuth: []
- *     requestBody:
- *       required: true
- *       content:
- *         application/json:
- *           schema:
- *             $ref: '#/components/schemas/UpdateUser'
- *           example:
- *             firstName: 'Jane'
- *             lastName: 'Smith'
- *             username: 'janesmith'
- *     responses:
- *       200:
- *         description: Profile updated successfully
- *         content:
- *           application/json:
- *             schema:
- *               allOf:
- *                 - $ref: '#/components/schemas/SuccessResponse'
- *                 - type: object
- *                   properties:
- *                     data:
- *                       $ref: '#/components/schemas/User'
- *       401:
- *         description: Authentication required
- *         content:
- *           application/json:
- *             schema:
- *               $ref: '#/components/schemas/ErrorResponse'
+ *                       $ref: '#/components/schemas/UserResponse'
  *       400:
  *         description: Validation error
- *         content:
- *           application/json:
- *             schema:
- *               $ref: '#/components/schemas/ErrorResponse'
- */
-userRouter.put('/profile', authenticate, validate(updateUserSchema), async (req, res) => {
-  try {
-    const updatedUser = await req.user.update(req.body);
-    return ResponseUtil.success(res, updatedUser.toJSON(), 'Profile updated successfully');
-  } catch (error) {
-    return ResponseUtil.error(res, 'Failed to update profile');
-  }
-});
-
-/**
- * @swagger
- * /api/users/change-password:
- *   put:
- *     tags: [Users]
- *     summary: Change user password
- *     description: Change the password of the authenticated user
- *     security:
- *       - bearerAuth: []
- *     requestBody:
- *       required: true
- *       content:
- *         application/json:
- *           schema:
- *             $ref: '#/components/schemas/ChangePassword'
- *           example:
- *             currentPassword: 'OldPass123!'
- *             newPassword: 'NewPass123!'
- *     responses:
- *       200:
- *         description: Password changed successfully
- *         content:
- *           application/json:
- *             schema:
- *               $ref: '#/components/schemas/SuccessResponse'
+ *       409:
+ *         description: Username or email already exists
  *       401:
- *         description: Authentication required or current password incorrect
- *         content:
- *           application/json:
- *             schema:
- *               $ref: '#/components/schemas/ErrorResponse'
- *       400:
- *         description: Validation error
- *         content:
- *           application/json:
- *             schema:
- *               $ref: '#/components/schemas/ErrorResponse'
+ *         description: Authentication required
+ *       403:
+ *         description: Admin access required
  */
-userRouter.put('/change-password', authenticate, validate(changePasswordSchema), async (req, res) => {
-  try {
-    const { currentPassword, newPassword } = req.body;
-    
-    if (!(await req.user.verifyPassword(currentPassword))) {
-      return ResponseUtil.authError(res, 'Current password is incorrect');
-    }
-
-    const bcrypt = require('bcryptjs');
-    const saltRounds = parseInt(process.env.BCRYPT_SALT_ROUNDS) || 12;
-    const hashedPassword = await bcrypt.hash(newPassword, saltRounds);
-
-    await req.user.update({ password: hashedPassword });
-    
-    return ResponseUtil.success(res, null, 'Password changed successfully');
-  } catch (error) {
-    return ResponseUtil.error(res, 'Failed to change password');
-  }
-});
+userRouter.post('/', validate(createUserSchema), authenticate, authorize('3'), UserController.createUser);
 
 /**
  * @swagger
  * /api/users:
  *   get:
- *     tags: [Users]
- *     summary: Get all users (Admin only)
- *     description: Retrieve all users with pagination (admin access required)
+ *     tags: [User Management]
+ *     summary: Get all users with filtering and pagination (Admin only)
+ *     description: Retrieve all users with advanced filtering, search, and pagination
  *     security:
  *       - bearerAuth: []
  *     parameters:
@@ -182,258 +169,291 @@ userRouter.put('/change-password', authenticate, validate(changePasswordSchema),
  *           maximum: 100
  *           default: 10
  *         description: Number of users per page
+ *       - in: query
+ *         name: search
+ *         schema:
+ *           type: string
+ *         description: Search in firstName, lastName, username, email
+ *       - in: query
+ *         name: type
+ *         schema:
+ *           type: string
+ *           enum: ['1', '2', '3']
+ *         description: Filter by user type
+ *       - in: query
+ *         name: activeStatus
+ *         schema:
+ *           type: string
+ *           enum: ['0', '1']
+ *         description: Filter by active status
+ *       - in: query
+ *         name: sortBy
+ *         schema:
+ *           type: string
+ *           enum: ['createTimestamp', 'updateTimestamp', 'firstName', 'lastName', 'username', 'email']
+ *           default: 'createTimestamp'
+ *         description: Sort by field
+ *       - in: query
+ *         name: sortOrder
+ *         schema:
+ *           type: string
+ *           enum: ['ASC', 'DESC']
+ *           default: 'DESC'
+ *         description: Sort order
  *     responses:
  *       200:
- *         description: Users retrieved successfully
- *         content:
- *           application/json:
- *             schema:
- *               allOf:
- *                 - $ref: '#/components/schemas/SuccessResponse'
- *                 - type: object
- *                   properties:
- *                     data:
- *                       type: array
- *                       items:
- *                         $ref: '#/components/schemas/User'
+ *         description: Users retrieved successfully with pagination
  *       401:
  *         description: Authentication required
- *         content:
- *           application/json:
- *             schema:
- *               $ref: '#/components/schemas/ErrorResponse'
  *       403:
  *         description: Admin access required
- *         content:
- *           application/json:
- *             schema:
- *               $ref: '#/components/schemas/ErrorResponse'
  */
-userRouter.get('/', authenticate, authorize('admin'), async (req, res) => {
-  try {
-    const page = parseInt(req.query.page) || 1;
-    const limit = parseInt(req.query.limit) || 10;
-    const offset = (page - 1) * limit;
-
-    const result = await User.findAllWithPagination(limit, offset);
-    const userList = result.rows.map(user => user.toJSON());
-    
-    return ResponseUtil.paginated(
-      res, 
-      userList, 
-      result.count, 
-      page, 
-      limit, 
-      'Users retrieved successfully'
-    );
-  } catch (error) {
-    return ResponseUtil.error(res, 'Failed to retrieve users');
-  }
-});
+userRouter.get('/', validateQuery(queryParamsSchema), authenticate, authorize('3'), UserController.getAllUsers);
 
 /**
  * @swagger
- * /api/users/{id}:
+ * /api/users/{email}:
  *   get:
- *     tags: [Users]
- *     summary: Get user by ID (Admin only)
- *     description: Retrieve a specific user by ID (admin access required)
+ *     tags: [User Management]
+ *     summary: Get user by email (Admin only)
+ *     description: Retrieve a specific user by their email address (primary key)
  *     security:
  *       - bearerAuth: []
  *     parameters:
  *       - in: path
- *         name: id
+ *         name: email
  *         required: true
  *         schema:
- *           type: integer
- *         description: User ID
+ *           type: string
+ *           format: email
+ *         description: User email address
  *     responses:
  *       200:
  *         description: User retrieved successfully
- *         content:
- *           application/json:
- *             schema:
- *               allOf:
- *                 - $ref: '#/components/schemas/SuccessResponse'
- *                 - type: object
- *                   properties:
- *                     data:
- *                       $ref: '#/components/schemas/User'
- *       401:
- *         description: Authentication required
- *         content:
- *           application/json:
- *             schema:
- *               $ref: '#/components/schemas/ErrorResponse'
- *       403:
- *         description: Admin access required
- *         content:
- *           application/json:
- *             schema:
- *               $ref: '#/components/schemas/ErrorResponse'
  *       404:
  *         description: User not found
- *         content:
- *           application/json:
- *             schema:
- *               $ref: '#/components/schemas/ErrorResponse'
+ *       401:
+ *         description: Authentication required
+ *       403:
+ *         description: Admin access required
  */
-userRouter.get('/:id', authenticate, authorize('admin'), async (req, res) => {
-  try {
-    const user = await User.findByPk(req.params.id, {
-      attributes: { exclude: ['password'] }
-    });
-    
-    if (!user) {
-      return ResponseUtil.notFoundError(res, 'User not found');
-    }
-
-    return ResponseUtil.success(res, user.toJSON(), 'User retrieved successfully');
-  } catch (error) {
-    return ResponseUtil.error(res, 'Failed to retrieve user');
-  }
-});
+userRouter.get('/:email', authenticate, authorize('3'), UserController.getUserByEmail);
 
 /**
  * @swagger
- * /api/users/{id}:
+ * /api/users/{email}:
  *   put:
- *     tags: [Users]
- *     summary: Update user by ID (Admin only)
- *     description: Update a specific user by ID (admin access required)
+ *     tags: [User Management]
+ *     summary: Update user (Admin only)
+ *     description: Update an existing user's information
  *     security:
  *       - bearerAuth: []
  *     parameters:
  *       - in: path
- *         name: id
+ *         name: email
  *         required: true
  *         schema:
- *           type: integer
- *         description: User ID
+ *           type: string
+ *           format: email
+ *         description: User email address
  *     requestBody:
  *       required: true
  *       content:
  *         application/json:
  *           schema:
- *             $ref: '#/components/schemas/UpdateUser'
- *           example:
- *             role: 'admin'
- *             isActive: false
+ *             type: object
+ *             properties:
+ *               firstName:
+ *                 type: string
+ *               lastName:
+ *                 type: string
+ *               username:
+ *                 type: string
+ *               phoneNumber:
+ *                 type: string
+ *               type:
+ *                 type: string
+ *                 enum: ['1', '2', '3']
+ *               activeStatus:
+ *                 type: string
+ *                 enum: ['0', '1']
  *     responses:
  *       200:
  *         description: User updated successfully
- *         content:
- *           application/json:
- *             schema:
- *               allOf:
- *                 - $ref: '#/components/schemas/SuccessResponse'
- *                 - type: object
- *                   properties:
- *                     data:
- *                       $ref: '#/components/schemas/User'
- *       401:
- *         description: Authentication required
- *         content:
- *           application/json:
- *             schema:
- *               $ref: '#/components/schemas/ErrorResponse'
- *       403:
- *         description: Admin access required
- *         content:
- *           application/json:
- *             schema:
- *               $ref: '#/components/schemas/ErrorResponse'
- *       404:
- *         description: User not found
- *         content:
- *           application/json:
- *             schema:
- *               $ref: '#/components/schemas/ErrorResponse'
  *       400:
  *         description: Validation error
- *         content:
- *           application/json:
- *             schema:
- *               $ref: '#/components/schemas/ErrorResponse'
+ *       404:
+ *         description: User not found
+ *       409:
+ *         description: Username or email already exists
  */
-userRouter.put('/:id', authenticate, authorize('admin'), validate(updateUserSchema), async (req, res) => {
-  try {
-    const user = await User.findByPk(req.params.id);
-    
-    if (!user) {
-      return ResponseUtil.notFoundError(res, 'User not found');
-    }
-
-    await user.update(req.body);
-    return ResponseUtil.success(res, user.toJSON(), 'User updated successfully');
-  } catch (error) {
-    if (error.name === 'SequelizeUniqueConstraintError') {
-      const field = error.errors[0].path;
-      return ResponseUtil.conflictError(res, `${field} already exists`);
-    }
-    if (error.name === 'SequelizeValidationError') {
-      const errors = error.errors.map(err => err.message);
-      return ResponseUtil.validationError(res, errors);
-    }
-    return ResponseUtil.error(res, 'Failed to update user');
-  }
-});
+userRouter.put('/:email', validate(updateUserSchema), authenticate, authorize('3'), UserController.updateUser);
 
 /**
  * @swagger
- * /api/users/{id}:
+ * /api/users/{email}:
  *   delete:
- *     tags: [Users]
- *     summary: Delete user by ID (Admin only)
- *     description: Delete a specific user by ID (admin access required)
+ *     tags: [User Management]
+ *     summary: Delete user - soft delete (Admin only)
+ *     description: Soft delete a user by setting activeStatus to 0
  *     security:
  *       - bearerAuth: []
  *     parameters:
  *       - in: path
- *         name: id
+ *         name: email
  *         required: true
  *         schema:
- *           type: integer
- *         description: User ID
+ *           type: string
+ *           format: email
+ *         description: User email address
  *     responses:
  *       200:
- *         description: User deleted successfully
- *         content:
- *           application/json:
- *             schema:
- *               $ref: '#/components/schemas/SuccessResponse'
- *       401:
- *         description: Authentication required
- *         content:
- *           application/json:
- *             schema:
- *               $ref: '#/components/schemas/ErrorResponse'
- *       403:
- *         description: Admin access required
- *         content:
- *           application/json:
- *             schema:
- *               $ref: '#/components/schemas/ErrorResponse'
+ *         description: User deleted successfully (soft delete)
  *       404:
  *         description: User not found
- *         content:
- *           application/json:
- *             schema:
- *               $ref: '#/components/schemas/ErrorResponse'
  */
-userRouter.delete('/:id', authenticate, authorize('admin'), async (req, res) => {
-  try {
-    const user = await User.findByPk(req.params.id);
-    
-    if (!user) {
-      return ResponseUtil.notFoundError(res, 'User not found');
-    }
+userRouter.delete('/:email', authenticate, authorize('3'), UserController.deleteUser);
 
-    await user.destroy();
-    return ResponseUtil.success(res, null, 'User deleted successfully');
-  } catch (error) {
-    return ResponseUtil.error(res, 'Failed to delete user');
-  }
-});
+/**
+ * @swagger
+ * /api/users/hard/{email}:
+ *   delete:
+ *     tags: [User Management]
+ *     summary: Permanently delete user (Admin only)
+ *     description: Permanently remove user from database
+ *     security:
+ *       - bearerAuth: []
+ *     parameters:
+ *       - in: path
+ *         name: email
+ *         required: true
+ *         schema:
+ *           type: string
+ *           format: email
+ *         description: User email address
+ *     responses:
+ *       200:
+ *         description: User permanently deleted
+ *       404:
+ *         description: User not found
+ */
+userRouter.delete('/hard/:email', authenticate, authorize('3'), UserController.hardDeleteUser);
+
+/**
+ * @swagger
+ * /api/users/toggle/{email}:
+ *   put:
+ *     tags: [User Management]
+ *     summary: Toggle user active status (Admin only)
+ *     description: Activate or deactivate a user
+ *     security:
+ *       - bearerAuth: []
+ *     parameters:
+ *       - in: path
+ *         name: email
+ *         required: true
+ *         schema:
+ *           type: string
+ *           format: email
+ *         description: User email address
+ *     requestBody:
+ *       required: true
+ *       content:
+ *         application/json:
+ *           schema:
+ *             type: object
+ *             required:
+ *               - activeStatus
+ *             properties:
+ *               activeStatus:
+ *                 type: string
+ *                 enum: ['0', '1']
+ *                 description: '0-inactive, 1-active'
+ *     responses:
+ *       200:
+ *         description: User status updated successfully
+ *       404:
+ *         description: User not found
+ */
+userRouter.put('/toggle/:email', validate(toggleStatusSchema), authenticate, authorize('3'), UserController.toggleUserStatus);
+
+/**
+ * @swagger
+ * /api/users/type/{type}:
+ *   get:
+ *     tags: [User Management]
+ *     summary: Get users by type (Admin only)
+ *     description: Retrieve users filtered by type (1-user, 2-owner, 3-admin)
+ *     security:
+ *       - bearerAuth: []
+ *     parameters:
+ *       - in: path
+ *         name: type
+ *         required: true
+ *         schema:
+ *           type: string
+ *           enum: ['1', '2', '3']
+ *         description: User type (1-user, 2-owner, 3-admin)
+ *       - in: query
+ *         name: page
+ *         schema:
+ *           type: integer
+ *           default: 1
+ *       - in: query
+ *         name: limit
+ *         schema:
+ *           type: integer
+ *           default: 10
+ *     responses:
+ *       200:
+ *         description: Users retrieved successfully
+ *       400:
+ *         description: Invalid user type
+ */
+userRouter.get('/type/:type', validateQuery(queryParamsSchema), authenticate, authorize('3'), UserController.getUsersByType);
+
+/**
+ * @swagger
+ * /api/users/change-password/{email}:
+ *   put:
+ *     tags: [User Management]
+ *     summary: Change user password
+ *     description: Change password for a specific user (Admin or own account)
+ *     security:
+ *       - bearerAuth: []
+ *     parameters:
+ *       - in: path
+ *         name: email
+ *         required: true
+ *         schema:
+ *           type: string
+ *           format: email
+ *         description: User email address
+ *     requestBody:
+ *       required: true
+ *       content:
+ *         application/json:
+ *           schema:
+ *             type: object
+ *             required:
+ *               - currentPassword
+ *               - newPassword
+ *             properties:
+ *               currentPassword:
+ *                 type: string
+ *                 description: Current password
+ *               newPassword:
+ *                 type: string
+ *                 minLength: 8
+ *                 description: New password with special characters
+ *     responses:
+ *       200:
+ *         description: Password changed successfully
+ *       401:
+ *         description: Current password is incorrect
+ *       404:
+ *         description: User not found
+ */
+userRouter.put('/change-password/:email', validate(changePasswordSchema), authenticate, UserController.changePassword);
 
 module.exports = userRouter;

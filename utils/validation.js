@@ -1,6 +1,6 @@
 const Joi = require('joi');
 
-// User registration validation schema
+// User registration validation schema (updated for new schema)
 const registerSchema = Joi.object({
   username: Joi.string().alphanum().min(3).max(50).required(),
   email: Joi.string().email().required(),
@@ -10,7 +10,9 @@ const registerSchema = Joi.object({
     }),
   firstName: Joi.string().min(2).max(50).required(),
   lastName: Joi.string().min(2).max(50).required(),
-  role: Joi.string().valid('admin', 'user').optional()
+  phoneNumber: Joi.string().pattern(/^[+]?[0-9\s\-\(\)]+$/).allow(null, '').optional(),
+  type: Joi.string().valid('1', '2', '3').default('1').optional(),
+  activeStatus: Joi.string().valid('0', '1').default('1').optional()
 });
 
 // User login validation schema

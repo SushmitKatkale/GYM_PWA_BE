@@ -122,15 +122,15 @@ authRouter.post('/login', validate(loginSchema), async (req, res) => {
     const { email, password } = req.body;
     const user = await User.findByEmail(email);
 
-    if (!user || !user.isActive || !(await user.verifyPassword(password))) {
+    if (!user || user.activeStatus === '0' || !(await user.verifyPassword(password))) {
       return ResponseUtil.authError(res, 'Invalid email or password');
     }
 
-    const accessToken = JWTUtils.generateAccessToken({ userId: user.id });
+    const accessToken = JWTUtils.generateAccessToken({ userEmail: user.email });
     const refreshTokenValue = JWTUtils.generateRefreshToken();
     const refreshTokenExpiration = JWTUtils.getRefreshTokenExpiration();
 
-    await RefreshToken.createToken(user.id, refreshTokenValue, refreshTokenExpiration);
+    await RefreshToken.createToken(user.email, refreshTokenValue, refreshTokenExpiration);
 
     return ResponseUtil.success(res, {
       accessToken,
@@ -190,11 +190,11 @@ authRouter.post('/refresh-token', async (req, res) => {
 
     const user = await User.findByPk(storedToken.userId);
 
-    if (!user || !user.isActive) {
+    if (!user || user.activeStatus === '0') {
       return ResponseUtil.authError(res, 'User not found or inactive');
     }
 
-    const newAccessToken = JWTUtils.generateAccessToken({ userId: user.id });
+    const newAccessToken = JWTUtils.generateAccessToken({ userEmail: user.email });
     return ResponseUtil.success(res, {
       accessToken: newAccessToken
     }, 'Access token refreshed');

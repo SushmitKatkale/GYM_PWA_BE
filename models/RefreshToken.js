@@ -9,12 +9,11 @@ const RefreshToken = sequelize.define('RefreshToken', {
     autoIncrement: true,
   },
   userId: {
-    type: DataTypes.INTEGER,
+    type: DataTypes.STRING,
     allowNull: false,
-    field: 'user_id',
     references: {
       model: 'users',
-      key: 'id',
+      key: 'email'
     },
     onDelete: 'CASCADE',
   },
