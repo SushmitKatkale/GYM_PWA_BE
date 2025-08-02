@@ -31,6 +31,9 @@ const Amenity = require('./Amenity');
 const GymImage = require('./GymImage');
 const Subscription = require('./Subscription');
 const SubscriptionFeature = require('./SubscriptionFeature');
+const UserSubscription = require('./UserSubscription');
+const Payment = require('./Payment');
+const Invoice = require('./Invoice');
 
 // Define relationships
 Gym.hasMany(Amenity, {
@@ -78,6 +81,42 @@ SubscriptionFeature.belongsTo(Subscription, {
   as: 'subscription',
 });
 
+// Payment relationships
+Payment.hasOne(UserSubscription, {
+  foreignKey: 'paymentId',
+  as: 'userSubscription',
+  onDelete: 'CASCADE',
+});
+
+UserSubscription.belongsTo(Payment, {
+  foreignKey: 'paymentId',
+  as: 'payment',
+});
+
+// Invoice relationships
+Payment.hasOne(Invoice, {
+  foreignKey: 'paymentId',
+  as: 'invoice',
+  onDelete: 'CASCADE',
+});
+
+Invoice.belongsTo(Payment, {
+  foreignKey: 'paymentId',
+  as: 'payment',
+});
+
+// UserSubscription to Subscription relationship
+UserSubscription.belongsTo(Subscription, {
+  foreignKey: 'subscriptionId',
+  as: 'subscription',
+});
+
+Subscription.hasMany(UserSubscription, {
+  foreignKey: 'subscriptionId',
+  as: 'userSubscriptions',
+  onDelete: 'CASCADE',
+});
+
 // Sync models with database (in development)
 const syncDatabase = async () => {
   try {
@@ -123,6 +162,9 @@ module.exports = {
   GymImage,
   Subscription,
   SubscriptionFeature,
+  UserSubscription,
+  Payment,
+  Invoice,
   syncDatabase,
   testConnection,
 };

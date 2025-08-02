@@ -880,6 +880,388 @@ const options = {
               description: 'User who is updating the feature'
             }
           }
+        },
+        UserSubscription: {
+          type: 'object',
+          properties: {
+            id: {
+              type: 'integer',
+              description: 'User subscription ID'
+            },
+            userEmail: {
+              type: 'string',
+              format: 'email',
+              description: 'User email who purchased the subscription'
+            },
+            subscriptionId: {
+              type: 'integer',
+              description: 'ID of the purchased subscription'
+            },
+            paymentId: {
+              type: 'integer',
+              description: 'ID of the payment transaction'
+            },
+            validFrom: {
+              type: 'string',
+              format: 'date-time',
+              description: 'Subscription validity start date'
+            },
+            validTo: {
+              type: 'string',
+              format: 'date-time',
+              description: 'Subscription validity end date'
+            },
+            bufferDays: {
+              type: 'integer',
+              description: 'Additional buffer days for subscription'
+            },
+            activeStatus: {
+              type: 'boolean',
+              description: 'Active status of the user subscription'
+            },
+            createTimestamp: {
+              type: 'string',
+              format: 'date-time',
+              description: 'Creation timestamp'
+            },
+            createdBy: {
+              type: 'string',
+              description: 'User who created the record'
+            },
+            updateTimestamp: {
+              type: 'string',
+              format: 'date-time',
+              description: 'Last update timestamp'
+            },
+            updatedBy: {
+              type: 'string',
+              description: 'User who last updated the record'
+            },
+            subscription: {
+              $ref: '#/components/schemas/Subscription',
+              description: 'Associated subscription details'
+            },
+            payment: {
+              $ref: '#/components/schemas/Payment',
+              description: 'Associated payment details'
+            }
+          }
+        },
+        CreateUserSubscription: {
+          type: 'object',
+          required: ['userEmail', 'subscriptionId', 'paymentId', 'validFrom', 'validTo'],
+          properties: {
+            userEmail: {
+              type: 'string',
+              format: 'email',
+              description: 'User email who is purchasing the subscription'
+            },
+            subscriptionId: {
+              type: 'integer',
+              description: 'ID of the subscription to purchase'
+            },
+            paymentId: {
+              type: 'integer',
+              description: 'ID of the payment transaction'
+            },
+            validFrom: {
+              type: 'string',
+              format: 'date-time',
+              description: 'Subscription validity start date'
+            },
+            validTo: {
+              type: 'string',
+              format: 'date-time',
+              description: 'Subscription validity end date'
+            },
+            bufferDays: {
+              type: 'integer',
+              description: 'Additional buffer days for subscription'
+            },
+            createdBy: {
+              type: 'string',
+              description: 'User who is creating the record'
+            }
+          }
+        },
+        Payment: {
+          type: 'object',
+          properties: {
+            id: {
+              type: 'integer',
+              description: 'Payment ID'
+            },
+            paymentRefNo: {
+              type: 'string',
+              description: 'Payment reference number'
+            },
+            bankRefNo: {
+              type: 'string',
+              description: 'Bank reference number'
+            },
+            paidVia: {
+              type: 'string',
+              enum: ['credit_card', 'debit_card', 'upi', 'net_banking', 'wallet', 'cash', 'bank_transfer'],
+              description: 'Payment method used'
+            },
+            paymentCcy: {
+              type: 'string',
+              description: 'Payment currency (3-letter code)'
+            },
+            paymentAmount: {
+              type: 'number',
+              format: 'decimal',
+              description: 'Payment amount'
+            },
+            paymentStatus: {
+              type: 'string',
+              enum: ['pending', 'processing', 'completed', 'failed', 'cancelled', 'refunded'],
+              description: 'Payment status'
+            },
+            transactionId: {
+              type: 'string',
+              description: 'Transaction ID from payment gateway'
+            },
+            gatewayResponse: {
+              type: 'string',
+              description: 'Payment gateway response'
+            },
+            userEmail: {
+              type: 'string',
+              format: 'email',
+              description: 'User email who made the payment'
+            },
+            activeStatus: {
+              type: 'boolean',
+              description: 'Active status of the payment record'
+            },
+            createTimestamp: {
+              type: 'string',
+              format: 'date-time',
+              description: 'Creation timestamp'
+            },
+            createdBy: {
+              type: 'string',
+              description: 'User who created the record'
+            },
+            updateTimestamp: {
+              type: 'string',
+              format: 'date-time',
+              description: 'Last update timestamp'
+            },
+            updatedBy: {
+              type: 'string',
+              description: 'User who last updated the record'
+            },
+            userSubscription: {
+              $ref: '#/components/schemas/UserSubscription',
+              description: 'Associated user subscription'
+            },
+            invoice: {
+              $ref: '#/components/schemas/Invoice',
+              description: 'Associated invoice'
+            }
+          }
+        },
+        CreatePayment: {
+          type: 'object',
+          required: ['paymentRefNo', 'paidVia', 'paymentCcy', 'paymentAmount', 'userEmail'],
+          properties: {
+            paymentRefNo: {
+              type: 'string',
+              description: 'Payment reference number'
+            },
+            bankRefNo: {
+              type: 'string',
+              description: 'Bank reference number'
+            },
+            paidVia: {
+              type: 'string',
+              enum: ['credit_card', 'debit_card', 'upi', 'net_banking', 'wallet', 'cash', 'bank_transfer'],
+              description: 'Payment method used'
+            },
+            paymentCcy: {
+              type: 'string',
+              minLength: 3,
+              maxLength: 3,
+              description: 'Payment currency (3-letter code)'
+            },
+            paymentAmount: {
+              type: 'number',
+              format: 'decimal',
+              minimum: 0,
+              description: 'Payment amount'
+            },
+            transactionId: {
+              type: 'string',
+              description: 'Transaction ID from payment gateway'
+            },
+            gatewayResponse: {
+              type: 'string',
+              description: 'Payment gateway response'
+            },
+            userEmail: {
+              type: 'string',
+              format: 'email',
+              description: 'User email who is making the payment'
+            },
+            createdBy: {
+              type: 'string',
+              description: 'User who is creating the record'
+            }
+          }
+        },
+        Invoice: {
+          type: 'object',
+          properties: {
+            id: {
+              type: 'integer',
+              description: 'Invoice ID'
+            },
+            invoiceNumber: {
+              type: 'string',
+              description: 'Invoice number'
+            },
+            paymentId: {
+              type: 'integer',
+              description: 'ID of the associated payment'
+            },
+            path: {
+              type: 'string',
+              description: 'File path of the invoice document'
+            },
+            fileName: {
+              type: 'string',
+              description: 'Invoice file name'
+            },
+            fileSize: {
+              type: 'integer',
+              description: 'Invoice file size in bytes'
+            },
+            mimeType: {
+              type: 'string',
+              description: 'MIME type of the invoice file'
+            },
+            invoiceDate: {
+              type: 'string',
+              format: 'date-time',
+              description: 'Invoice date'
+            },
+            dueDate: {
+              type: 'string',
+              format: 'date-time',
+              description: 'Invoice due date'
+            },
+            totalAmount: {
+              type: 'number',
+              format: 'decimal',
+              description: 'Total invoice amount'
+            },
+            currency: {
+              type: 'string',
+              description: 'Invoice currency (3-letter code)'
+            },
+            status: {
+              type: 'string',
+              enum: ['draft', 'sent', 'paid', 'overdue', 'cancelled'],
+              description: 'Invoice status'
+            },
+            activeStatus: {
+              type: 'boolean',
+              description: 'Active status of the invoice'
+            },
+            createTimestamp: {
+              type: 'string',
+              format: 'date-time',
+              description: 'Creation timestamp'
+            },
+            createdBy: {
+              type: 'string',
+              description: 'User who created the record'
+            },
+            updateTimestamp: {
+              type: 'string',
+              format: 'date-time',
+              description: 'Last update timestamp'
+            },
+            updatedBy: {
+              type: 'string',
+              description: 'User who last updated the record'
+            },
+            payment: {
+              $ref: '#/components/schemas/Payment',
+              description: 'Associated payment details'
+            }
+          }
+        },
+        CreateInvoice: {
+          type: 'object',
+          required: ['invoiceNumber', 'paymentId', 'path', 'fileName', 'totalAmount'],
+          properties: {
+            invoiceNumber: {
+              type: 'string',
+              description: 'Invoice number'
+            },
+            paymentId: {
+              type: 'integer',
+              description: 'ID of the associated payment'
+            },
+            path: {
+              type: 'string',
+              description: 'File path of the invoice document'
+            },
+            fileName: {
+              type: 'string',
+              description: 'Invoice file name'
+            },
+            fileSize: {
+              type: 'integer',
+              description: 'Invoice file size in bytes'
+            },
+            mimeType: {
+              type: 'string',
+              description: 'MIME type of the invoice file'
+            },
+            dueDate: {
+              type: 'string',
+              format: 'date-time',
+              description: 'Invoice due date'
+            },
+            totalAmount: {
+              type: 'number',
+              format: 'decimal',
+              minimum: 0,
+              description: 'Total invoice amount'
+            },
+            currency: {
+              type: 'string',
+              minLength: 3,
+              maxLength: 3,
+              description: 'Invoice currency (3-letter code)'
+            },
+            createdBy: {
+              type: 'string',
+              description: 'User who is creating the record'
+            }
+          }
+        },
+        PurchaseSubscriptionRequest: {
+          type: 'object',
+          required: ['subscriptionId', 'paymentDetails'],
+          properties: {
+            subscriptionId: {
+              type: 'integer',
+              description: 'ID of the subscription to purchase'
+            },
+            paymentDetails: {
+              $ref: '#/components/schemas/CreatePayment',
+              description: 'Payment information'
+            },
+            bufferDays: {
+              type: 'integer',
+              description: 'Additional buffer days for subscription'
+            }
+          }
         }
       }
     },
@@ -911,6 +1293,18 @@ const options = {
       {
         name: 'Subscription Features',
         description: 'Subscription feature management endpoints'
+      },
+      {
+        name: 'User Subscriptions',
+        description: 'User subscription purchase and management endpoints'
+      },
+      {
+        name: 'Payments',
+        description: 'Payment transaction management endpoints'
+      },
+      {
+        name: 'Invoices',
+        description: 'Invoice document management endpoints'
       },
       {
         name: 'Health',
