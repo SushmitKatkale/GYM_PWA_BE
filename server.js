@@ -13,6 +13,7 @@ const subscriptionFeatureRoutes = require('./routes/subscriptionFeatures');
 const userSubscriptionRoutes = require('./routes/userSubscriptions');
 const paymentRoutes = require('./routes/payments');
 const invoiceRoutes = require('./routes/invoices');
+const slotRoutes = require('./routes/slots');
 const { errorHandler, notFoundHandler } = require('./middleware/errorHandler');
 const { specs, swaggerUi, swaggerOptions } = require('./config/swagger');
 const { testConnection, syncDatabase } = require('./models');
@@ -99,6 +100,7 @@ app.use('/api/subscription-features', subscriptionFeatureRoutes);
 app.use('/api/user-subscriptions', userSubscriptionRoutes);
 app.use('/api/payments', paymentRoutes);
 app.use('/api/invoices', invoiceRoutes);
+app.use('/api/slots', slotRoutes);
 
 // 404 handler
 app.use(notFoundHandler);

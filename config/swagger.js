@@ -313,6 +313,28 @@ const options = {
               type: 'string',
               description: 'User who last updated the gym'
             },
+            ownerId: {
+              type: 'integer',
+              description: 'ID of the user who owns this gym'
+            },
+            owner: {
+              type: 'object',
+              properties: {
+                id: {
+                  type: 'integer'
+                },
+                firstName: {
+                  type: 'string'
+                },
+                lastName: {
+                  type: 'string'
+                },
+                email: {
+                  type: 'string'
+                }
+              },
+              description: 'Gym owner details'
+            },
             amenities: {
               type: 'array',
               items: {
@@ -369,6 +391,10 @@ const options = {
             createdBy: {
               type: 'string',
               description: 'User who is creating the gym'
+            },
+            ownerId: {
+              type: 'integer',
+              description: 'ID of the user who will own this gym'
             }
           }
         },
@@ -1262,6 +1288,310 @@ const options = {
               description: 'Additional buffer days for subscription'
             }
           }
+        },
+        GymSlot: {
+          type: 'object',
+          properties: {
+            id: {
+              type: 'integer',
+              description: 'Gym slot ID'
+            },
+            gymId: {
+              type: 'integer',
+              description: 'ID of the gym this slot belongs to'
+            },
+            startTime: {
+              type: 'string',
+              format: 'time',
+              description: 'Slot start time (HH:MM format)'
+            },
+            endTime: {
+              type: 'string',
+              format: 'time',
+              description: 'Slot end time (HH:MM format)'
+            },
+            capacity: {
+              type: 'integer',
+              description: 'Maximum capacity for this slot'
+            },
+            daysOfWeek: {
+              type: 'array',
+              items: {
+                type: 'integer',
+                minimum: 0,
+                maximum: 6
+              },
+              description: 'Days of week when slot is available (0=Sunday, 6=Saturday)'
+            },
+            status: {
+              type: 'string',
+              enum: ['active', 'inactive', 'suspended'],
+              description: 'Status of the gym slot'
+            },
+            createdAt: {
+              type: 'string',
+              format: 'date-time',
+              description: 'Creation timestamp'
+            },
+            updatedAt: {
+              type: 'string',
+              format: 'date-time',
+              description: 'Last update timestamp'
+            },
+            createdBy: {
+              type: 'string',
+              description: 'User who created the slot'
+            },
+            updatedBy: {
+              type: 'string',
+              description: 'User who last updated the slot'
+            },
+            gym: {
+              type: 'object',
+              properties: {
+                id: {
+                  type: 'integer'
+                },
+                name: {
+                  type: 'string'
+                },
+                address: {
+                  type: 'string'
+                }
+              },
+              description: 'Associated gym details'
+            }
+          }
+        },
+        CreateGymSlot: {
+          type: 'object',
+          required: ['gymId', 'startTime', 'endTime', 'capacity', 'daysOfWeek'],
+          properties: {
+            gymId: {
+              type: 'integer',
+              minimum: 1,
+              description: 'ID of the gym this slot belongs to'
+            },
+            startTime: {
+              type: 'string',
+              pattern: '^([01]?[0-9]|2[0-3]):[0-5][0-9]$',
+              description: 'Slot start time (HH:MM format, 24-hour)'
+            },
+            endTime: {
+              type: 'string',
+              pattern: '^([01]?[0-9]|2[0-3]):[0-5][0-9]$',
+              description: 'Slot end time (HH:MM format, 24-hour)'
+            },
+            capacity: {
+              type: 'integer',
+              minimum: 1,
+              maximum: 1000,
+              description: 'Maximum capacity for this slot'
+            },
+            daysOfWeek: {
+              type: 'array',
+              items: {
+                type: 'integer',
+                minimum: 0,
+                maximum: 6
+              },
+              minItems: 1,
+              maxItems: 7,
+              description: 'Days of week when slot is available (0=Sunday, 6=Saturday)'
+            },
+            isActive: {
+              type: 'boolean',
+              description: 'Whether the slot is active'
+            }
+          }
+        },
+        SlotAvailability: {
+          type: 'object',
+          properties: {
+            id: {
+              type: 'integer',
+              description: 'Availability record ID'
+            },
+            gymSlotId: {
+              type: 'integer',
+              description: 'ID of the gym slot'
+            },
+            availabilityDate: {
+              type: 'string',
+              format: 'date',
+              description: 'Date for this availability record'
+            },
+            availableCapacity: {
+              type: 'integer',
+              description: 'Available capacity for this date'
+            },
+            bookedCount: {
+              type: 'integer',
+              description: 'Number of bookings for this date'
+            },
+            createdAt: {
+              type: 'string',
+              format: 'date-time',
+              description: 'Creation timestamp'
+            },
+            updatedAt: {
+              type: 'string',
+              format: 'date-time',
+              description: 'Last update timestamp'
+            },
+            gymSlot: {
+              type: 'object',
+              properties: {
+                id: {
+                  type: 'integer'
+                },
+                startTime: {
+                  type: 'string'
+                },
+                endTime: {
+                  type: 'string'
+                },
+                capacity: {
+                  type: 'integer'
+                },
+                gym: {
+                  type: 'object',
+                  properties: {
+                    id: {
+                      type: 'integer'
+                    },
+                    name: {
+                      type: 'string'
+                    }
+                  }
+                }
+              },
+              description: 'Associated gym slot details'
+            }
+          }
+        },
+        UserSlotBooking: {
+          type: 'object',
+          properties: {
+            id: {
+              type: 'integer',
+              description: 'Booking ID'
+            },
+            userEmail: {
+              type: 'string',
+              format: 'email',
+              description: 'Email of the user who made the booking'
+            },
+            userSubscriptionId: {
+              type: 'integer',
+              description: 'ID of the user subscription'
+            },
+            gymSlotId: {
+              type: 'integer',
+              description: 'ID of the booked gym slot'
+            },
+            bookingDate: {
+              type: 'string',
+              format: 'date',
+              description: 'Date of the booking'
+            },
+            bookingStatus: {
+              type: 'string',
+              enum: ['active', 'cancelled', 'completed', 'no_show', 'checked_in'],
+              description: 'Status of the booking'
+            },
+            bookingType: {
+              type: 'string',
+              enum: ['regular', 'one_time_change', 'temporary'],
+              description: 'Type of booking'
+            },
+            checkinTime: {
+              type: 'string',
+              format: 'date-time',
+              description: 'Check-in timestamp'
+            },
+            checkoutTime: {
+              type: 'string',
+              format: 'date-time',
+              description: 'Check-out timestamp'
+            },
+            cancellationReason: {
+              type: 'string',
+              description: 'Reason for cancellation'
+            },
+            cancellationTime: {
+              type: 'string',
+              format: 'date-time',
+              description: 'Cancellation timestamp'
+            },
+            notes: {
+              type: 'string',
+              description: 'Additional notes for the booking'
+            },
+            createdAt: {
+              type: 'string',
+              format: 'date-time',
+              description: 'Creation timestamp'
+            },
+            updatedAt: {
+              type: 'string',
+              format: 'date-time',
+              description: 'Last update timestamp'
+            },
+            gymSlot: {
+              type: 'object',
+              properties: {
+                id: {
+                  type: 'integer'
+                },
+                startTime: {
+                  type: 'string'
+                },
+                endTime: {
+                  type: 'string'
+                },
+                capacity: {
+                  type: 'integer'
+                },
+                gym: {
+                  type: 'object',
+                  properties: {
+                    id: {
+                      type: 'integer'
+                    },
+                    name: {
+                      type: 'string'
+                    },
+                    address: {
+                      type: 'string'
+                    }
+                  }
+                }
+              },
+              description: 'Associated gym slot details'
+            }
+          }
+        },
+        BookSlot: {
+          type: 'object',
+          required: ['gymSlotId', 'bookingDate'],
+          properties: {
+            gymSlotId: {
+              type: 'integer',
+              minimum: 1,
+              description: 'ID of the gym slot to book'
+            },
+            bookingDate: {
+              type: 'string',
+              format: 'date',
+              description: 'Date for the booking (YYYY-MM-DD format)'
+            },
+            bookingType: {
+              type: 'string',
+              enum: ['regular', 'one_time_change', 'temporary'],
+              description: 'Type of booking (defaults to regular)'
+            }
+          }
         }
       }
     },
@@ -1305,6 +1635,10 @@ const options = {
       {
         name: 'Invoices',
         description: 'Invoice document management endpoints'
+      },
+      {
+        name: 'Gym Slots',
+        description: 'Gym slot booking and management endpoints'
       },
       {
         name: 'Health',

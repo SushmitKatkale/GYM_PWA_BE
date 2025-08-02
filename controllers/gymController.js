@@ -1,4 +1,4 @@
-const { Gym, Amenity, GymImage } = require('../models');
+const { Gym, Amenity, GymImage, User } = require('../models');
 const { successResponse, errorResponse } = require('../utils/response');
 const { Op } = require('sequelize');
 
@@ -12,7 +12,8 @@ const createGym = async (req, res) => {
       description,
       openingTime,
       closingTime,
-      createdBy
+      createdBy,
+      ownerId
     } = req.body;
 
     const gym = await Gym.create({
@@ -23,6 +24,7 @@ const createGym = async (req, res) => {
       openingTime,
       closingTime,
       createdBy,
+      ownerId,
       activeStatus: true
     });
 
@@ -71,6 +73,12 @@ const getAllGyms = async (req, res) => {
           as: 'images',
           where: { activeStatus: true },
           required: false
+        },
+        {
+          model: User,
+          as: 'owner',
+          attributes: ['id', 'firstName', 'lastName', 'email'],
+          required: false
         }
       ],
       limit: parseInt(limit),
@@ -110,6 +118,12 @@ const getGymById = async (req, res) => {
           model: GymImage,
           as: 'images',
           where: { activeStatus: true },
+          required: false
+        },
+        {
+          model: User,
+          as: 'owner',
+          attributes: ['id', 'firstName', 'lastName', 'email'],
           required: false
         }
       ]

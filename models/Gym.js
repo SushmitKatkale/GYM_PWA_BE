@@ -61,6 +61,16 @@ const Gym = sequelize.define('Gym', {
   updatedBy: {
     type: DataTypes.STRING,
     allowNull: true
+  },
+  ownerId: {
+    type: DataTypes.STRING(8),
+    allowNull: true,
+    references: {
+      model: 'users',
+      key: 'id'
+    },
+    onUpdate: 'CASCADE',
+    onDelete: 'SET NULL'
   }
 }, {
   tableName: 'gyms',

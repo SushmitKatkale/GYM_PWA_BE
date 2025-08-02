@@ -34,8 +34,27 @@ const SubscriptionFeature = require('./SubscriptionFeature');
 const UserSubscription = require('./UserSubscription');
 const Payment = require('./Payment');
 const Invoice = require('./Invoice');
+const GymSlot = require('./GymSlot');
+const SlotAvailability = require('./SlotAvailability');
+const UserSlotBooking = require('./UserSlotBooking');
+const SlotChangeHistory = require('./SlotChangeHistory');
+const SlotWaitlist = require('./SlotWaitlist');
 
 // Define relationships
+// Gym-User owner relationship
+User.hasMany(Gym, {
+  foreignKey: 'ownerId',
+  as: 'ownedGyms',
+  onDelete: 'SET NULL',
+});
+
+Gym.belongsTo(User, {
+  foreignKey: 'ownerId',
+  targetKey: 'id',
+  as: 'owner',
+  constraints: true
+});
+
 Gym.hasMany(Amenity, {
   foreignKey: 'gymId',
   as: 'amenities',
@@ -117,6 +136,99 @@ Subscription.hasMany(UserSubscription, {
   onDelete: 'CASCADE',
 });
 
+// Gym Slot relationships
+Gym.hasMany(GymSlot, {
+  foreignKey: 'gymId',
+  as: 'gymSlots',
+  onDelete: 'CASCADE',
+});
+
+GymSlot.belongsTo(Gym, {
+  foreignKey: 'gymId',
+  as: 'gym',
+});
+
+// Slot Availability relationships
+GymSlot.hasMany(SlotAvailability, {
+  foreignKey: 'gymSlotId',
+  as: 'slotAvailability',
+  onDelete: 'CASCADE',
+});
+
+SlotAvailability.belongsTo(GymSlot, {
+  foreignKey: 'gymSlotId',
+  as: 'gymSlot',
+});
+
+// User Slot Booking relationships
+UserSubscription.hasMany(UserSlotBooking, {
+  foreignKey: 'userSubscriptionId',
+  as: 'slotBookings',
+  onDelete: 'CASCADE',
+});
+
+UserSlotBooking.belongsTo(UserSubscription, {
+  foreignKey: 'userSubscriptionId',
+  as: 'userSubscription',
+});
+
+GymSlot.hasMany(UserSlotBooking, {
+  foreignKey: 'gymSlotId',
+  as: 'slotBookings',
+  onDelete: 'CASCADE',
+});
+
+UserSlotBooking.belongsTo(GymSlot, {
+  foreignKey: 'gymSlotId',
+  as: 'gymSlot',
+});
+
+// Slot Change History relationships
+UserSubscription.hasMany(SlotChangeHistory, {
+  foreignKey: 'userSubscriptionId',
+  as: 'slotChangeHistory',
+  onDelete: 'CASCADE',
+});
+
+SlotChangeHistory.belongsTo(UserSubscription, {
+  foreignKey: 'userSubscriptionId',
+  as: 'userSubscription',
+});
+
+GymSlot.hasMany(SlotChangeHistory, {
+  foreignKey: 'oldGymSlotId',
+  as: 'oldSlotChanges',
+  onDelete: 'SET NULL',
+});
+
+GymSlot.hasMany(SlotChangeHistory, {
+  foreignKey: 'newGymSlotId',
+  as: 'newSlotChanges',
+  onDelete: 'CASCADE',
+});
+
+SlotChangeHistory.belongsTo(GymSlot, {
+  foreignKey: 'oldGymSlotId',
+  as: 'oldGymSlot',
+});
+
+SlotChangeHistory.belongsTo(GymSlot, {
+  foreignKey: 'newGymSlotId',
+  as: 'newGymSlot',
+});
+
+// Slot Waitlist relationships
+GymSlot.hasMany(SlotWaitlist, {
+  foreignKey: 'gymSlotId',
+  as: 'waitlist',
+  onDelete: 'CASCADE',
+});
+
+SlotWaitlist.belongsTo(GymSlot, {
+  foreignKey: 'gymSlotId',
+  as: 'gymSlot',
+});
+
 // Sync models with database (in development)
 const syncDatabase = async () => {
   try {
@@ -165,6 +277,11 @@ module.exports = {
   UserSubscription,
   Payment,
   Invoice,
+  GymSlot,
+  SlotAvailability,
+  UserSlotBooking,
+  SlotChangeHistory,
+  SlotWaitlist,
   syncDatabase,
   testConnection,
 };
