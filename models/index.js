@@ -232,13 +232,35 @@ SlotWaitlist.belongsTo(GymSlot, {
 // Sync models with database (in development)
 const syncDatabase = async () => {
   try {
-    await sequelize.sync({ alter: true });
+    // Use force: true in development to recreate tables and avoid key conflicts
+    // WARNING: This will drop existing data - use with caution
+    const syncOptions = process.env.NODE_ENV === 'production' ? 
+      { alter: false } : 
+      { force: true }; // This drops and recreates tables in development
+    
+    await sequelize.sync(syncOptions);
     console.log('✅ Database models synchronized successfully.');
-    // Create a default admin user
-    await createDefaultAdmin();
+    
+    // Create a default admin user (only in development)
+    if (process.env.NODE_ENV !== 'production') {
+      await createDefaultAdmin();
+    }
   } catch (error) {
     console.error('❌ Error synchronizing database models:', error.message);
     console.error('Full error:', error);
+    
+    // If sync fails, try dropping all tables and recreating
+    if (error.message.includes('Too many keys') || error.message.includes('ER_TOO_MANY_KEYS')) {
+      console.log('🔄 Attempting to fix "too many keys" error by recreating database...');
+      try {
+        await sequelize.drop();
+        await sequelize.sync({ force: true });
+        console.log('✅ Database recreated successfully.');
+        await createDefaultAdmin();
+      } catch (retryError) {
+        console.error('❌ Failed to recreate database:', retryError.message);
+      }
+    }
   }
 };
 
@@ -256,7 +278,8 @@ const createDefaultAdmin = async () => {
         email: 'admin@gym.com',
         password: 'Admin123!',
         type: '3',
-        activeStatus: '1'
+        activeStatus: '1',
+        isVerified: true // Admin is pre-verified
       });
       console.log('✅ Default admin user created (admin@gym.com / Admin123!)');
     }

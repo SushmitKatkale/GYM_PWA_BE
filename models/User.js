@@ -92,6 +92,13 @@ const User = sequelize.define('User', {
       isIn: [['0', '1']],
     },
   },
+  isVerified: {
+    type: DataTypes.BOOLEAN,
+    allowNull: false,
+    defaultValue: false,
+    field: 'is_verified',
+    comment: 'Whether the user has verified their email address'
+  },
   createTimestamp: {
     type: DataTypes.DATE,
     allowNull: false,

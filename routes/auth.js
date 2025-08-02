@@ -2,9 +2,12 @@ const express = require('express');
 const { User, RefreshToken } = require('../models');
 const JWTUtils = require('../utils/jwt');
 const ResponseUtil = require('../utils/response');
+const otpService = require('../services/otpService');
 const { 
   registerSchema, 
   loginSchema, 
+  sendOtpSchema,
+  verifyOtpSchema,
   validate 
 } = require('../utils/validation');
 const { 
@@ -59,20 +62,227 @@ const authRouter = express.Router();
  *             schema:
  *               $ref: '#/components/schemas/ErrorResponse'
  */
+/**
+ * @swagger
+ * /api/auth/send-otp:
+ *   post:
+ *     tags: [Authentication]
+ *     summary: Send OTP for email verification
+ *     description: Send OTP to user's email for signup verification
+ *     requestBody:
+ *       required: true
+ *       content:
+ *         application/json:
+ *           schema:
+ *             type: object
+ *             properties:
+ *               email:
+ *                 type: string
+ *                 format: email
+ *               firstName:
+ *                 type: string
+ *             required:
+ *               - email
+ *           example:
+ *             email: 'john@example.com'
+ *             firstName: 'John'
+ *     responses:
+ *       200:
+ *         description: OTP sent successfully
+ *       400:
+ *         description: Invalid request
+ *       409:
+ *         description: Email already exists
+ */
+authRouter.post('/send-otp', validate(sendOtpSchema), async (req, res) => {
+  try {
+    const { email, firstName } = req.body;
+    
+    if (!email) {
+      return ResponseUtil.validationError(res, ['Email is required']);
+    }
+
+    // Check if user already exists
+    const existingUser = await User.findOne({ where: { email } });
+    if (existingUser) {
+      return ResponseUtil.conflictError(res, 'Email already exists');
+    }
+
+    // Send OTP
+    const result = await otpService.sendOTP(email, firstName || '');
+    
+    if (result.success) {
+      return ResponseUtil.success(res, null, result.message);
+    } else {
+      return ResponseUtil.error(res, result.message);
+    }
+  } catch (error) {
+    console.error('Send OTP error:', error);
+    return ResponseUtil.error(res, 'Failed to send OTP');
+  }
+});
+
+/**
+ * @swagger
+ * /api/auth/verify-otp:
+ *   post:
+ *     tags: [Authentication]
+ *     summary: Verify OTP
+ *     description: Verify OTP code sent to user's email
+ *     requestBody:
+ *       required: true
+ *       content:
+ *         application/json:
+ *           schema:
+ *             type: object
+ *             properties:
+ *               email:
+ *                 type: string
+ *                 format: email
+ *               otp:
+ *                 type: string
+ *             required:
+ *               - email
+ *               - otp
+ *           example:
+ *             email: 'john@example.com'
+ *             otp: '123456'
+ *     responses:
+ *       200:
+ *         description: OTP verified successfully
+ *       400:
+ *         description: Invalid OTP or request
+ */
+authRouter.post('/verify-otp', validate(verifyOtpSchema), async (req, res) => {
+  try {
+    const { email, otp } = req.body;
+    console.log('=== VERIFY OTP REQUEST ===');
+    console.log('Email:', email);
+    console.log('OTP:', otp);
+    
+    if (!email || !otp) {
+      console.log('Validation failed: Missing email or OTP');
+      return ResponseUtil.validationError(res, ['Email and OTP are required']);
+    }
+
+    const result = await otpService.verifyOTP(email, otp);
+    console.log('OTP verification result:', result);
+    
+if (result.success) {
+      // Check if we have user data from registration flow
+      if (result.userData) {
+        console.log('User data found:', result.userData);
+        // Create user account upon successful OTP verification
+        const userData = { ...result.userData, isVerified: true };
+        console.log('Creating user with data:', userData);
+        const user = await User.create(userData);
+        console.log('User created successfully:', user.toJSON());
+
+        return ResponseUtil.success(res, {
+          user: user.toJSON()
+        }, 'Email verified and user created successfully');
+      } else {
+        console.log('No user data found - just email verification');
+        // Just email verification without user creation
+        return ResponseUtil.success(res, null, 'Email verified successfully');
+      }
+    } else {
+      console.log('OTP verification failed:', result.message);
+      return ResponseUtil.validationError(res, [result.message]);
+    }
+  } catch (error) {
+    console.error('Verify OTP error:', error);
+    return ResponseUtil.error(res, 'Failed to verify OTP');
+  }
+});
+
+/**
+ * @swagger
+ * /api/auth/resend-otp:
+ *   post:
+ *     tags: [Authentication]
+ *     summary: Resend OTP for email verification
+ *     description: Resend OTP to user's email for verification
+ *     requestBody:
+ *       required: true
+ *       content:
+ *         application/json:
+ *           schema:
+ *             type: object
+ *             properties:
+ *               email:
+ *                 type: string
+ *                 format: email
+ *             required:
+ *               - email
+ *           example:
+ *             email: 'john@example.com'
+ *     responses:
+ *       200:
+ *         description: OTP resent successfully
+ *       400:
+ *         description: Invalid request or no OTP request found
+ */
+authRouter.post('/resend-otp', async (req, res) => {
+  try {
+    const { email } = req.body;
+
+    if (!email) {
+      return ResponseUtil.validationError(res, ['Email is required']);
+    }
+
+    // Check if there's an existing OTP request for this email
+    if (!otpService.hasOTP(email)) {
+      return ResponseUtil.error(res, 'No OTP request found for this email. Please initiate registration first.');
+    }
+
+    // Get existing user data from the OTP storage
+    const existingOtpData = otpService.getOTPData(email);
+    const userData = existingOtpData ? existingOtpData.userData : null;
+    const firstName = userData ? userData.firstName : '';
+
+    // Resend OTP with the same user data
+    const otpResult = await otpService.sendOTP(email, firstName, userData);
+
+    return ResponseUtil.success(res, {
+      otpSent: otpResult.success
+    }, 'OTP resent successfully');
+  } catch (error) {
+    console.error('Resend OTP error:', error);
+    return ResponseUtil.error(res, 'Failed to resend OTP');
+  }
+});
+
 authRouter.post('/register', validate(registerSchema), async (req, res) => {
   try {
-    const user = await User.create(req.body);
-    return ResponseUtil.success(res, user.toJSON(), 'User registered successfully', 201);
+    const { email, firstName, lastName, username, password } = req.body;
+    console.log('=== REGISTER REQUEST ===');
+    console.log('Email:', email);
+    console.log('FirstName:', firstName);
+    console.log('LastName:', lastName);
+    console.log('Username:', username);
+    
+    // Check if user already exists
+    const existingUser = await User.findOne({ where: { email } });
+    if (existingUser) {
+      console.log('User already exists:', email);
+      return ResponseUtil.conflictError(res, 'Email already exists');
+    }
+
+    // Prepare user data for temporary storage
+    const userData = { email, firstName, lastName, username, password };
+    console.log('Prepared user data:', userData);
+
+    // Send OTP for email verification with user data
+    const otpResult = await otpService.sendOTP(email, firstName, userData);
+    console.log('OTP send result:', otpResult);
+
+    return ResponseUtil.success(res, {
+      otpSent: otpResult.success
+    }, 'Please verify your email with the OTP sent.', 200);
   } catch (error) {
-    if (error.name === 'SequelizeUniqueConstraintError') {
-      const field = error.errors[0].path;
-      return ResponseUtil.conflictError(res, `${field} already exists`);
-    }
-    if (error.name === 'SequelizeValidationError') {
-      const errors = error.errors.map(err => err.message);
-      return ResponseUtil.validationError(res, errors);
-    }
-    return ResponseUtil.error(res, 'Failed to register user');
+    console.error('Register error:', error);
+    return ResponseUtil.error(res, 'Failed to initiate registration');
   }
 });
 

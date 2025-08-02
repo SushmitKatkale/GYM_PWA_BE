@@ -44,6 +44,22 @@ const refreshTokenSchema = Joi.object({
   refreshToken: Joi.string().required()
 });
 
+// Send OTP validation schema
+const sendOtpSchema = Joi.object({
+  email: Joi.string().email().required(),
+  firstName: Joi.string().min(2).max(50).optional()
+});
+
+// Verify OTP validation schema
+const verifyOtpSchema = Joi.object({
+  email: Joi.string().email().required(),
+  otp: Joi.string().length(6).pattern(/^[0-9]+$/).required()
+    .messages({
+      'string.length': 'OTP must be exactly 6 digits',
+      'string.pattern.base': 'OTP must contain only numbers'
+    })
+});
+
 // Validation middleware
 const validate = (schema) => {
   return (req, res, next) => {
@@ -65,5 +81,7 @@ module.exports = {
   updateUserSchema,
   changePasswordSchema,
   refreshTokenSchema,
+  sendOtpSchema,
+  verifyOtpSchema,
   validate
 };
