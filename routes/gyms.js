@@ -7,7 +7,7 @@ const {
   updateGym,
   deleteGym
 } = require('../controllers/gymController');
-const { authenticate } = require('../middleware/auth');
+const { authenticate, authorize } = require('../middleware/auth');
 
 /**
  * @swagger
@@ -44,7 +44,7 @@ const { authenticate } = require('../middleware/auth');
  *             schema:
  *               $ref: '#/components/schemas/ErrorResponse'
  */
-router.post('/', authenticate, createGym);
+router.post('/', authenticate, authorize(['admin', 'owner']), createGym);
 
 /**
  * @swagger
@@ -184,7 +184,7 @@ router.get('/:id', getGymById);
  *             schema:
  *               $ref: '#/components/schemas/ErrorResponse'
  */
-router.put('/:id', authenticate, updateGym);
+router.put('/:id', authenticate, authorize(['admin', 'owner']), updateGym);
 
 /**
  * @swagger
@@ -222,6 +222,6 @@ router.put('/:id', authenticate, updateGym);
  *             schema:
  *               $ref: '#/components/schemas/ErrorResponse'
  */
-router.delete('/:id', authenticate, deleteGym);
+router.delete('/:id', authenticate, authorize(['admin', 'owner']), deleteGym);
 
 module.exports = router;

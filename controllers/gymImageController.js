@@ -1,5 +1,5 @@
 const { GymImage, Gym } = require('../models');
-const { successResponse, errorResponse } = require('../utils/response');
+const ResponseUtil = require('../utils/response');
 const path = require('path');
 const fs = require('fs');
 
@@ -257,8 +257,49 @@ const hardDeleteGymImage = async (req, res) => {
   }
 };
 
+// Upload gym image without gym validation (gym_id = -1)
+const uploadGymImageGeneral = async (req, res) => {
+  try {
+    const { title, createdBy } = req.body;
+
+    // Check if file was uploaded
+    if (!req.file) {
+      return errorResponse(res, 'No image file provided', 400);
+    }
+
+    // Create relative path for storing in database
+    const relativePath = `/uploads/gyms/${req.file.filename}`;
+
+    const gymImage = await GymImage.create({
+      title: title || req.file.originalname,
+      path: relativePath,
+      gymId: -1, // Set gym_id to -1 as requested
+      createdBy,
+      activeStatus: true
+    });
+
+    return successResponse(res, 'Image uploaded successfully', {
+      ...gymImage.toJSON(),
+      fullUrl: `${req.protocol}://${req.get('host')}${relativePath}`
+    }, 201);
+  } catch (error) {
+    console.error('Error uploading gym image:', error);
+    
+    // Clean up uploaded file if database operation failed
+    if (req.file) {
+      const filePath = req.file.path;
+      if (fs.existsSync(filePath)) {
+        fs.unlinkSync(filePath);
+      }
+    }
+    
+    return errorResponse(res, 'Failed to upload image', 500);
+  }
+};
+
 module.exports = {
   uploadGymImage,
+  uploadGymImageGeneral,
   getImagesByGym,
   getAllGymImages,
   getGymImageById,

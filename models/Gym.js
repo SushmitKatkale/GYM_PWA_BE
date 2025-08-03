@@ -79,14 +79,40 @@ const Gym = sequelize.define('Gym', {
     allowNull: true
   },
   ownerId: {
-    type: DataTypes.STRING(8),
+    type: DataTypes.STRING(255),
     allowNull: true,
-    references: {
-      model: 'users',
-      key: 'id'
-    },
-    onUpdate: 'CASCADE',
-    onDelete: 'SET NULL'
+    validate: {
+      isEmail: true
+    }
+  },
+  rating: {
+    type: DataTypes.DECIMAL(2, 1),
+    allowNull: true,
+    defaultValue: 0.0,
+    validate: {
+      min: 0,
+      max: 5
+    }
+  },
+  currentOccupancy: {
+    type: DataTypes.INTEGER,
+    allowNull: true,
+    defaultValue: 0,
+    validate: {
+      min: 0
+    }
+  },
+  city: {
+    type: DataTypes.STRING,
+    allowNull: true
+  },
+  state: {
+    type: DataTypes.STRING,
+    allowNull: true
+  },
+  zipCode: {
+    type: DataTypes.STRING(10),
+    allowNull: true
   }
 }, {
   tableName: 'gyms',

@@ -44,15 +44,16 @@ const SlotWaitlist = require('./SlotWaitlist');
 // Gym-User owner relationship
 User.hasMany(Gym, {
   foreignKey: 'ownerId',
+  sourceKey: 'email',
   as: 'ownedGyms',
   onDelete: 'SET NULL',
 });
 
 Gym.belongsTo(User, {
   foreignKey: 'ownerId',
-  targetKey: 'id',
+  targetKey: 'email',
   as: 'owner',
-  constraints: true
+  constraints: false
 });
 
 Gym.hasMany(Amenity, {
@@ -232,11 +233,11 @@ SlotWaitlist.belongsTo(GymSlot, {
 // Sync models with database (in development)
 const syncDatabase = async () => {
   try {
-    // Use force: true in development to recreate tables and avoid key conflicts
-    // WARNING: This will drop existing data - use with caution
+    // Use alter: true in development to modify tables without losing data
+    // Only use force: true when you explicitly want to reset the database
     const syncOptions = process.env.NODE_ENV === 'production' ? 
       { alter: false } : 
-      { force: true }; // This drops and recreates tables in development
+      { alter: true }; // This modifies tables without dropping data
     
     await sequelize.sync(syncOptions);
     console.log('✅ Database models synchronized successfully.');
@@ -254,7 +255,7 @@ const syncDatabase = async () => {
       console.log('🔄 Attempting to fix "too many keys" error by recreating database...');
       try {
         await sequelize.drop();
-        await sequelize.sync({ force: true });
+        await sequelize.sync({ force: false });
         console.log('✅ Database recreated successfully.');
         await createDefaultAdmin();
       } catch (retryError) {

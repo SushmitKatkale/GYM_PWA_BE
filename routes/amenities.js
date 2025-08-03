@@ -8,7 +8,7 @@ const {
   updateAmenity,
   deleteAmenity
 } = require('../controllers/amenityController');
-const { authenticate } = require('../middleware/auth');
+const { authenticate, authorize } = require('../middleware/auth');
 
 /**
  * @swagger
@@ -51,7 +51,7 @@ const { authenticate } = require('../middleware/auth');
  *             schema:
  *               $ref: '#/components/schemas/ErrorResponse'
  */
-router.post('/', authenticate, createAmenity);
+router.post('/', authenticate, authorize(['admin', 'owner']), createAmenity);
 
 /**
  * @swagger
@@ -229,7 +229,7 @@ router.get('/:id', getAmenityById);
  *             schema:
  *               $ref: '#/components/schemas/ErrorResponse'
  */
-router.put('/:id', authenticate, updateAmenity);
+router.put('/:id', authenticate, authorize(['admin', 'owner']), updateAmenity);
 
 /**
  * @swagger
@@ -267,6 +267,6 @@ router.put('/:id', authenticate, updateAmenity);
  *             schema:
  *               $ref: '#/components/schemas/ErrorResponse'
  */
-router.delete('/:id', authenticate, deleteAmenity);
+router.delete('/:id', authenticate, authorize(['admin', 'owner']), deleteAmenity);
 
 module.exports = router;

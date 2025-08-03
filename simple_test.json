@@ -1,0 +1,9 @@
+{
+  "name": "Simple Gym",
+  "capacity": 100,
+  "address": "Test Address",
+  "operatingHours": {
+    "open": "06:00",
+    "close": "22:00"
+  }
+}

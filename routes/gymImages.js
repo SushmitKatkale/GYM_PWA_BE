@@ -9,7 +9,7 @@ const {
   deleteGymImage,
   hardDeleteGymImage
 } = require('../controllers/gymImageController');
-const { authenticate } = require('../middleware/auth');
+const { authenticate, authorize } = require('../middleware/auth');
 const upload = require('../config/multer');
 
 /**
@@ -73,7 +73,7 @@ const upload = require('../config/multer');
  *             schema:
  *               $ref: '#/components/schemas/ErrorResponse'
  */
-router.post('/gym/:gymId/upload', authenticate, upload.single('image'), uploadGymImage);
+router.post('/gym/:gymId/upload', authenticate, authorize(['admin', 'owner']), upload.single('image'), uploadGymImage);
 
 /**
  * @swagger
@@ -240,7 +240,7 @@ router.get('/:id', getGymImageById);
  *             schema:
  *               $ref: '#/components/schemas/ErrorResponse'
  */
-router.put('/:id', authenticate, updateGymImage);
+router.put('/:id', authenticate, authorize(['admin', 'owner']), updateGymImage);
 
 /**
  * @swagger
@@ -278,7 +278,7 @@ router.put('/:id', authenticate, updateGymImage);
  *             schema:
  *               $ref: '#/components/schemas/ErrorResponse'
  */
-router.delete('/:id', authenticate, deleteGymImage);
+router.delete('/:id', authenticate, authorize(['admin', 'owner']), deleteGymImage);
 
 /**
  * @swagger
@@ -316,6 +316,6 @@ router.delete('/:id', authenticate, deleteGymImage);
  *             schema:
  *               $ref: '#/components/schemas/ErrorResponse'
  */
-router.delete('/:id/permanent', authenticate, hardDeleteGymImage);
+router.delete('/:id/permanent', authenticate, authorize(['admin']), hardDeleteGymImage);
 
 module.exports = router;

@@ -8,6 +8,7 @@ const userRoutes = require('./routes/users');
 const gymRoutes = require('./routes/gyms');
 const amenityRoutes = require('./routes/amenities');
 const gymImageRoutes = require('./routes/gymImages');
+const uploadRoutes = require('./routes/upload');
 const subscriptionRoutes = require('./routes/subscriptions');
 const subscriptionFeatureRoutes = require('./routes/subscriptionFeatures');
 // Note: userSubscriptions, payments, and invoices routes removed (were empty)
@@ -94,6 +95,7 @@ app.use('/api/users', userRoutes);
 app.use('/api/gyms', gymRoutes);
 app.use('/api/amenities', amenityRoutes);
 app.use('/api/gym-images', gymImageRoutes);
+app.use('/api/upload', uploadRoutes);
 app.use('/api/subscriptions', subscriptionRoutes);
 app.use('/api/subscription-features', subscriptionFeatureRoutes);
 app.use('/api/owners', ownerRoutes);

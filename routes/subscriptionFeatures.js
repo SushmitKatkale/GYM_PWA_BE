@@ -8,7 +8,7 @@ const {
   updateSubscriptionFeature,
   deleteSubscriptionFeature
 } = require('../controllers/subscriptionFeatureController');
-const { authenticate } = require('../middleware/auth');
+const { authenticate, authorize } = require('../middleware/auth');
 
 /**
  * @swagger
@@ -51,7 +51,7 @@ const { authenticate } = require('../middleware/auth');
  *             schema:
  *               $ref: '#/components/schemas/ErrorResponse'
  */
-router.post('/', authenticate, createSubscriptionFeature);
+router.post('/', authenticate, authorize(['admin', 'owner']), createSubscriptionFeature);
 
 /**
  * @swagger
@@ -234,7 +234,7 @@ router.get('/:id', getSubscriptionFeatureById);
  *             schema:
  *               $ref: '#/components/schemas/ErrorResponse'
  */
-router.put('/:id', authenticate, updateSubscriptionFeature);
+router.put('/:id', authenticate, authorize(['admin', 'owner']), updateSubscriptionFeature);
 
 /**
  * @swagger
@@ -272,6 +272,6 @@ router.put('/:id', authenticate, updateSubscriptionFeature);
  *             schema:
  *               $ref: '#/components/schemas/ErrorResponse'
  */
-router.delete('/:id', authenticate, deleteSubscriptionFeature);
+router.delete('/:id', authenticate, authorize(['admin', 'owner']), deleteSubscriptionFeature);
 
 module.exports = router;
