@@ -28,6 +28,22 @@ const Gym = sequelize.define('Gym', {
       notEmpty: true
     }
   },
+  latitude: {
+    type: DataTypes.DECIMAL(10, 8),
+    allowNull: true,
+    validate: {
+      min: -90,
+      max: 90
+    }
+  },
+  longitude: {
+    type: DataTypes.DECIMAL(11, 8),
+    allowNull: true,
+    validate: {
+      min: -180,
+      max: 180
+    }
+  },
   description: {
     type: DataTypes.TEXT,
     allowNull: true

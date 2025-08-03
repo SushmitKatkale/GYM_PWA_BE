@@ -1,5 +1,5 @@
 const { Subscription, SubscriptionFeature, Gym } = require('../models');
-const { successResponse, errorResponse } = require('../utils/response');
+const ResponseUtil = require('../utils/response');
 const { Op } = require('sequelize');
 
 // Create a new subscription
@@ -19,7 +19,7 @@ const createSubscription = async (req, res) => {
     // Check if gym exists
     const gym = await Gym.findByPk(gymId);
     if (!gym) {
-      return errorResponse(res, 'Gym not found', 404);
+      return ResponseUtil.notFoundError(res, 'Gym not found');
     }
 
     const subscription = await Subscription.create({
@@ -34,10 +34,10 @@ const createSubscription = async (req, res) => {
       activeStatus: true
     });
 
-    return successResponse(res, 'Subscription created successfully', subscription, 201);
+    return ResponseUtil.success(res, subscription, 'Subscription created successfully', 201);
   } catch (error) {
     console.error('Error creating subscription:', error);
-    return errorResponse(res, 'Failed to create subscription', 500);
+    return ResponseUtil.error(res, 'Failed to create subscription', 500);
   }
 };
 
@@ -87,7 +87,7 @@ const getAllSubscriptions = async (req, res) => {
       order: [['createTimestamp', 'DESC']]
     });
 
-    return successResponse(res, 'Subscriptions retrieved successfully', {
+    return ResponseUtil.success(res, {
       subscriptions: rows,
       pagination: {
         currentPage: parseInt(page),
@@ -95,10 +95,10 @@ const getAllSubscriptions = async (req, res) => {
         totalItems: count,
         itemsPerPage: parseInt(limit)
       }
-    });
+    }, 'Subscriptions retrieved successfully');
   } catch (error) {
     console.error('Error fetching subscriptions:', error);
-    return errorResponse(res, 'Failed to fetch subscriptions', 500);
+    return ResponseUtil.error(res, 'Failed to fetch subscriptions', 500);
   }
 };
 
@@ -131,10 +131,10 @@ const getSubscriptionsByGym = async (req, res) => {
       order: [['createTimestamp', 'DESC']]
     });
 
-    return successResponse(res, 'Subscriptions retrieved successfully', subscriptions);
+    return ResponseUtil.success(res, subscriptions, 'Subscriptions retrieved successfully');
   } catch (error) {
     console.error('Error fetching subscriptions by gym:', error);
-    return errorResponse(res, 'Failed to fetch subscriptions', 500);
+    return ResponseUtil.error(res, 'Failed to fetch subscriptions', 500);
   }
 };
 
@@ -160,13 +160,13 @@ const getSubscriptionById = async (req, res) => {
     });
 
     if (!subscription) {
-      return errorResponse(res, 'Subscription not found', 404);
+      return ResponseUtil.notFoundError(res, 'Subscription not found');
     }
 
-    return successResponse(res, 'Subscription retrieved successfully', subscription);
+    return ResponseUtil.success(res, subscription, 'Subscription retrieved successfully');
   } catch (error) {
     console.error('Error fetching subscription:', error);
-    return errorResponse(res, 'Failed to fetch subscription', 500);
+    return ResponseUtil.error(res, 'Failed to fetch subscription', 500);
   }
 };
 
@@ -186,7 +186,7 @@ const updateSubscription = async (req, res) => {
 
     const subscription = await Subscription.findByPk(id);
     if (!subscription) {
-      return errorResponse(res, 'Subscription not found', 404);
+      return ResponseUtil.notFoundError(res, 'Subscription not found');
     }
 
     await subscription.update({
@@ -216,10 +216,10 @@ const updateSubscription = async (req, res) => {
       ]
     });
 
-    return successResponse(res, 'Subscription updated successfully', updatedSubscription);
+    return ResponseUtil.success(res, updatedSubscription, 'Subscription updated successfully');
   } catch (error) {
     console.error('Error updating subscription:', error);
-    return errorResponse(res, 'Failed to update subscription', 500);
+    return ResponseUtil.error(res, 'Failed to update subscription', 500);
   }
 };
 
@@ -231,7 +231,7 @@ const deleteSubscription = async (req, res) => {
 
     const subscription = await Subscription.findByPk(id);
     if (!subscription) {
-      return errorResponse(res, 'Subscription not found', 404);
+      return ResponseUtil.notFoundError(res, 'Subscription not found');
     }
 
     await subscription.update({
@@ -240,10 +240,10 @@ const deleteSubscription = async (req, res) => {
       updateTimestamp: new Date()
     });
 
-    return successResponse(res, 'Subscription deleted successfully');
+    return ResponseUtil.success(res, null, 'Subscription deleted successfully');
   } catch (error) {
     console.error('Error deleting subscription:', error);
-    return errorResponse(res, 'Failed to delete subscription', 500);
+    return ResponseUtil.error(res, 'Failed to delete subscription', 500);
   }
 };
 
