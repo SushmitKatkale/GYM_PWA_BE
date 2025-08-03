@@ -1,5 +1,5 @@
 const { Gym, Amenity, GymImage, User } = require('../models');
-const { successResponse, errorResponse } = require('../utils/response');
+const ResponseUtil = require('../utils/response');
 const { Op } = require('sequelize');
 
 // Create a new gym
@@ -28,10 +28,10 @@ const createGym = async (req, res) => {
       activeStatus: true
     });
 
-    return successResponse(res, 'Gym created successfully', gym, 201);
+    return ResponseUtil.success(res, gym, 'Gym created successfully', 201);
   } catch (error) {
     console.error('Error creating gym:', error);
-    return errorResponse(res, 'Failed to create gym', 500);
+    return ResponseUtil.error(res, 'Failed to create gym', 500);
   }
 };
 
@@ -86,7 +86,7 @@ const getAllGyms = async (req, res) => {
       order: [['createTimestamp', 'DESC']]
     });
 
-    return successResponse(res, 'Gyms retrieved successfully', {
+    return ResponseUtil.success(res, {
       gyms: rows,
       pagination: {
         currentPage: parseInt(page),
@@ -94,10 +94,10 @@ const getAllGyms = async (req, res) => {
         totalItems: count,
         itemsPerPage: parseInt(limit)
       }
-    });
+    }, 'Gyms retrieved successfully');
   } catch (error) {
     console.error('Error fetching gyms:', error);
-    return errorResponse(res, 'Failed to fetch gyms', 500);
+    return ResponseUtil.error(res, 'Failed to fetch gyms', 500);
   }
 };
 
@@ -130,13 +130,13 @@ const getGymById = async (req, res) => {
     });
 
     if (!gym) {
-      return errorResponse(res, 'Gym not found', 404);
+      return ResponseUtil.notFoundError(res, 'Gym not found');
     }
 
-    return successResponse(res, 'Gym retrieved successfully', gym);
+    return ResponseUtil.success(res, gym, 'Gym retrieved successfully');
   } catch (error) {
     console.error('Error fetching gym:', error);
-    return errorResponse(res, 'Failed to fetch gym', 500);
+    return ResponseUtil.error(res, 'Failed to fetch gym', 500);
   }
 };
 
@@ -156,7 +156,7 @@ const updateGym = async (req, res) => {
 
     const gym = await Gym.findByPk(id);
     if (!gym) {
-      return errorResponse(res, 'Gym not found', 404);
+      return ResponseUtil.notFoundError(res, 'Gym not found');
     }
 
     await gym.update({
@@ -187,10 +187,10 @@ const updateGym = async (req, res) => {
       ]
     });
 
-    return successResponse(res, 'Gym updated successfully', updatedGym);
+    return ResponseUtil.success(res, updatedGym, 'Gym updated successfully');
   } catch (error) {
     console.error('Error updating gym:', error);
-    return errorResponse(res, 'Failed to update gym', 500);
+    return ResponseUtil.error(res, 'Failed to update gym', 500);
   }
 };
 
@@ -202,7 +202,7 @@ const deleteGym = async (req, res) => {
 
     const gym = await Gym.findByPk(id);
     if (!gym) {
-      return errorResponse(res, 'Gym not found', 404);
+      return ResponseUtil.notFoundError(res, 'Gym not found');
     }
 
     await gym.update({
@@ -211,10 +211,10 @@ const deleteGym = async (req, res) => {
       updateTimestamp: new Date()
     });
 
-    return successResponse(res, 'Gym deleted successfully');
+    return ResponseUtil.success(res, null, 'Gym deleted successfully');
   } catch (error) {
     console.error('Error deleting gym:', error);
-    return errorResponse(res, 'Failed to delete gym', 500);
+    return ResponseUtil.error(res, 'Failed to delete gym', 500);
   }
 };
 
