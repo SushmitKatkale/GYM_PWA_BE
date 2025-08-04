@@ -438,10 +438,120 @@ const deleteGym = async (req, res) => {
   }
 };
 
+// Public gym discovery with location-based filtering and sorting
+const getPublicGyms = async (req, res) => {
+  try {
+    const {
+      latitude,
+      longitude,
+      radius = 50,
+      minRating,
+      maxPrice,
+      amenities,
+      city,
+      state,
+      sortBy = 'distance',
+      sortOrder = 'asc',
+      page = 1,
+      limit = 20
+    } = req.query;
+
+    const offset = (page - 1) * limit;
+    const whereClause = { activeStatus: true };
+
+    if (minRating) {
+      whereClause.rating = { [Op.gte]: parseFloat(minRating) };
+    }
+
+    if (maxPrice) {
+      whereClause['$subscriptions.price$'] = { [Op.lte]: parseFloat(maxPrice) };
+    }
+
+    if (city) {
+      whereClause.city = city;
+    }
+
+    if (state) {
+      whereClause.state = state;
+    }
+
+    if (amenities) {
+      whereClause['$amenities.name$'] = { [Op.in]: amenities.split(',') };
+    }
+
+    const { count, rows } = await Gym.findAndCountAll({
+      where: whereClause,
+      include: [
+        {
+          model: Amenity,
+          as: 'amenities',
+          where: { activeStatus: true },
+          required: amenities ? true : false
+        },
+        {
+          model: Subscription,
+          as: 'subscriptions',
+          where: { activeStatus: true },
+          required: false,
+          include: [{
+            model: SubscriptionFeature,
+            as: 'features',
+            where: { activeStatus: true },
+            required: false
+          }]
+        },
+        {
+          model: User,
+          as: 'owner',
+          attributes: ['id', 'firstName', 'lastName', 'email'],
+          required: false
+        }
+      ],
+      limit: parseInt(limit),
+      offset: parseInt(offset)
+    });
+
+    let gymsData = rows.map(gym => gym.toJSON());
+
+    if (latitude && longitude) {
+      const userLat = parseFloat(latitude);
+      const userLng = parseFloat(longitude);
+
+      gymsData = gymsData.map(gym => {
+        const gymLat = typeof gym.latitude === 'string' ? parseFloat(gym.latitude) : gym.latitude;
+        const gymLng = typeof gym.longitude === 'string' ? parseFloat(gym.longitude) : gym.longitude;
+
+        const distance = Math.sqrt(Math.pow(userLat - gymLat, 2) + Math.pow(userLng - gymLng, 2));
+        return { ...gym, distance };
+      }).filter(gym => gym.distance <= radius);
+    }
+
+    gymsData.sort((a, b) => {
+      if (sortBy === 'distance') return sortOrder === 'asc' ? a.distance - b.distance : b.distance - a.distance;
+      if (sortBy === 'rating') return sortOrder === 'asc' ? a.rating - b.rating : b.rating - a.rating;
+      return 0;
+    });
+
+    return ResponseUtil.success(res, {
+      gyms: gymsData,
+      pagination: {
+        currentPage: parseInt(page),
+        totalPages: Math.ceil(count / limit),
+        totalItems: count,
+        itemsPerPage: parseInt(limit)
+      }
+    }, 'Public gyms retrieved successfully');
+  } catch (error) {
+    console.error('Error fetching public gyms:', error);
+    return ResponseUtil.error(res, 'Failed to fetch public gyms', 500);
+  }
+};
+
 module.exports = {
   createGym,
   getAllGyms,
   getGymById,
   updateGym,
-  deleteGym
+  deleteGym,
+  getPublicGyms
 };

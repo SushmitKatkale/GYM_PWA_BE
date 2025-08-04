@@ -5,7 +5,8 @@ const {
   getAllGyms,
   getGymById,
   updateGym,
-  deleteGym
+  deleteGym,
+  getPublicGyms
 } = require('../controllers/gymController');
 const { authenticate, authorize } = require('../middleware/auth');
 const { checkGymOwnership } = require('../middleware/ownership');
@@ -232,5 +233,113 @@ router.put('/:id', authenticate, authorize('3', '2'), checkGymOwnership, updateG
  */
 // Admin and Owner can delete gyms (with ownership check)
 router.delete('/:id', authenticate, authorize('3', '2'), checkGymOwnership, deleteGym);
+
+/**
+ * @swagger
+ * /api/gyms/public/discover:
+ *   get:
+ *     tags: [Public Gyms]
+ *     summary: Get public gyms for discovery
+ *     description: Retrieve gyms for public discovery with location-based filtering and sorting. No authentication required.
+ *     parameters:
+ *       - in: query
+ *         name: latitude
+ *         schema:
+ *           type: number
+ *         description: User's latitude for distance calculation
+ *       - in: query
+ *         name: longitude
+ *         schema:
+ *           type: number
+ *         description: User's longitude for distance calculation
+ *       - in: query
+ *         name: radius
+ *         schema:
+ *           type: number
+ *           default: 50
+ *         description: Search radius in kilometers
+ *       - in: query
+ *         name: minRating
+ *         schema:
+ *           type: number
+ *         description: Minimum rating filter
+ *       - in: query
+ *         name: maxPrice
+ *         schema:
+ *           type: number
+ *         description: Maximum price filter
+ *       - in: query
+ *         name: amenities
+ *         schema:
+ *           type: array
+ *           items:
+ *             type: string
+ *         description: Filter by amenities
+ *       - in: query
+ *         name: city
+ *         schema:
+ *           type: string
+ *         description: Filter by city
+ *       - in: query
+ *         name: state
+ *         schema:
+ *           type: string
+ *         description: Filter by state
+ *       - in: query
+ *         name: sortBy
+ *         schema:
+ *           type: string
+ *           enum: [distance, rating, price, name]
+ *           default: distance
+ *         description: Sort criteria
+ *       - in: query
+ *         name: sortOrder
+ *         schema:
+ *           type: string
+ *           enum: [asc, desc]
+ *           default: asc
+ *         description: Sort order
+ *       - in: query
+ *         name: page
+ *         schema:
+ *           type: integer
+ *           default: 1
+ *         description: Page number
+ *       - in: query
+ *         name: limit
+ *         schema:
+ *           type: integer
+ *           default: 20
+ *         description: Items per page
+ *     responses:
+ *       200:
+ *         description: List of gyms for discovery
+ *         content:
+ *           application/json:
+ *             schema:
+ *               type: object
+ *               properties:
+ *                 success:
+ *                   type: boolean
+ *                 message:
+ *                   type: string
+ *                 data:
+ *                   type: object
+ *                   properties:
+ *                     gyms:
+ *                       type: array
+ *                       items:
+ *                         $ref: '#/components/schemas/Gym'
+ *                     pagination:
+ *                       $ref: '#/components/schemas/PaginationResponse'
+ *       500:
+ *         description: Server error
+ *         content:
+ *           application/json:
+ *             schema:
+ *               $ref: '#/components/schemas/ErrorResponse'
+ */
+// Public gym discovery endpoint - no authentication required
+router.get('/public/discover', getPublicGyms);
 
 module.exports = router;
