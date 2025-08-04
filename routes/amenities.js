@@ -9,6 +9,7 @@ const {
   deleteAmenity
 } = require('../controllers/amenityController');
 const { authenticate, authorize } = require('../middleware/auth');
+const { checkAmenityOwnership, checkGymOwnershipForCreation } = require('../middleware/ownership');
 
 /**
  * @swagger
@@ -51,7 +52,7 @@ const { authenticate, authorize } = require('../middleware/auth');
  *             schema:
  *               $ref: '#/components/schemas/ErrorResponse'
  */
-router.post('/', authenticate, authorize(['admin', 'owner']), createAmenity);
+router.post('/', authenticate, authorize(['admin', 'owner']), checkGymOwnershipForCreation, createAmenity);
 
 /**
  * @swagger
@@ -229,7 +230,7 @@ router.get('/:id', getAmenityById);
  *             schema:
  *               $ref: '#/components/schemas/ErrorResponse'
  */
-router.put('/:id', authenticate, authorize(['admin', 'owner']), updateAmenity);
+router.put('/:id', authenticate, authorize(['admin', 'owner']), checkAmenityOwnership, updateAmenity);
 
 /**
  * @swagger
@@ -267,6 +268,6 @@ router.put('/:id', authenticate, authorize(['admin', 'owner']), updateAmenity);
  *             schema:
  *               $ref: '#/components/schemas/ErrorResponse'
  */
-router.delete('/:id', authenticate, authorize(['admin', 'owner']), deleteAmenity);
+router.delete('/:id', authenticate, authorize(['admin', 'owner']), checkAmenityOwnership, deleteAmenity);
 
 module.exports = router;

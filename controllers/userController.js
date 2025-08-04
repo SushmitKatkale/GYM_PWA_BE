@@ -267,6 +267,57 @@ class UserController {
     }
   }
 
+  // Get current user profile (from JWT token)
+  static async getUserProfile(req, res) {
+    try {
+      const userEmail = req.user.email;
+
+      const user = await User.findByPk(userEmail, {
+        attributes: { exclude: ['password'] },
+        include: [
+          {
+            model: User,
+            as: 'creator',
+            attributes: ['id', 'firstName', 'lastName', 'username'],
+            required: false,
+          },
+          {
+            model: User,
+            as: 'updater',
+            attributes: ['id', 'firstName', 'lastName', 'username'],
+            required: false,
+          }
+        ]
+      });
+
+      if (!user) {
+        return ResponseUtil.notFoundError(res, 'User profile not found');
+      }
+
+      // Add role information for better frontend handling
+      const userProfile = {
+        ...user.toJSON(),
+        role: {
+          value: user.type,
+          name: user.type === '1' ? 'User' : user.type === '2' ? 'Owner' : 'Admin',
+          permissions: {
+            canManageUsers: user.type === '3',
+            canManageGyms: user.type === '2' || user.type === '3',
+            canBookSlots: true,
+            isAdmin: user.type === '3',
+            isOwner: user.type === '2',
+            isUser: user.type === '1'
+          }
+        }
+      };
+
+      return ResponseUtil.success(res, userProfile, 'User profile retrieved successfully');
+    } catch (error) {
+      console.error('Get user profile error:', error);
+      return ResponseUtil.error(res, 'Failed to retrieve user profile');
+    }
+  }
+
   // Change password
   static async changePassword(req, res) {
     try {

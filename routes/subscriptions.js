@@ -9,6 +9,7 @@ const {
   deleteSubscription
 } = require('../controllers/subscriptionController');
 const { authenticate, authorize } = require('../middleware/auth');
+const { checkSubscriptionOwnership, checkGymOwnershipForCreation } = require('../middleware/ownership');
 
 /**
  * @swagger
@@ -51,7 +52,7 @@ const { authenticate, authorize } = require('../middleware/auth');
  *             schema:
  *               $ref: '#/components/schemas/ErrorResponse'
  */
-router.post('/', authenticate, authorize(['admin', 'owner']), createSubscription);
+router.post('/', authenticate, authorize(['admin', 'owner']), checkGymOwnershipForCreation, createSubscription);
 
 /**
  * @swagger
@@ -234,7 +235,7 @@ router.get('/:id', getSubscriptionById);
  *             schema:
  *               $ref: '#/components/schemas/ErrorResponse'
  */
-router.put('/:id', authenticate, authorize(['admin', 'owner']), updateSubscription);
+router.put('/:id', authenticate, authorize(['admin', 'owner']), checkSubscriptionOwnership, updateSubscription);
 
 /**
  * @swagger
@@ -272,6 +273,6 @@ router.put('/:id', authenticate, authorize(['admin', 'owner']), updateSubscripti
  *             schema:
  *               $ref: '#/components/schemas/ErrorResponse'
  */
-router.delete('/:id', authenticate, authorize(['admin', 'owner']), deleteSubscription);
+router.delete('/:id', authenticate, authorize(['admin', 'owner']), checkSubscriptionOwnership, deleteSubscription);
 
 module.exports = router;

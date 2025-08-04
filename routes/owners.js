@@ -4,10 +4,11 @@ const { authenticate, authorize } = require('../middleware/auth');
 
 const router = Router();
 
-router.get('/', authenticate, authorize(['admin']), getOwners);
-router.get('/search', authenticate, authorize(['admin']), searchOwners);
-router.post('/', authenticate, authorize(['admin']), createOwner);
-router.put('/:id', authenticate, authorize(['admin']), updateOwner);
-router.delete('/:id', authenticate, authorize(['admin']), deleteOwner);
+// Admin only routes (type='3')
+router.get('/', authenticate, authorize('3'), getOwners);
+router.get('/search', authenticate, authorize('3'), searchOwners);
+router.post('/', authenticate, authorize('3'), createOwner);
+router.put('/:id', authenticate, authorize('3'), updateOwner);
+router.delete('/:id', authenticate, authorize('3'), deleteOwner);
 
 module.exports = router;

@@ -1,5 +1,7 @@
 const { User } = require('../models');
 const { Op } = require('sequelize');
+const DataFilter = require('../utils/dataFilter');
+const ResponseUtil = require('../utils/response');
 
 /**
  * @swagger
@@ -28,10 +30,18 @@ const { Op } = require('sequelize');
  */
 async function getOwners(req, res) {
   try {
-    const owners = await User.findAll({ where: { type: '2' } }); // Type '2' for owners
-    res.json({ success: true, data: owners });
+    const owners = await User.findAll({ 
+      where: { type: '2' },
+      attributes: { exclude: ['password'] } // Never return passwords
+    });
+    
+    // Apply role-based filtering
+    const filteredData = DataFilter.filterOwnerData(req.user, owners.map(owner => owner.toJSON()));
+    
+    return ResponseUtil.success(res, filteredData, 'Owners retrieved successfully');
   } catch (error) {
-    res.status(500).json({ success: false, message: error.message });
+    console.error('Get owners error:', error);
+    return ResponseUtil.error(res, 'Failed to retrieve owners');
   }
 }
 
@@ -70,15 +80,31 @@ async function getOwners(req, res) {
 async function searchOwners(req, res) {
   try {
     const { query } = req.query;
+    
+    if (!query) {
+      return ResponseUtil.error(res, 'Search query is required', 400);
+    }
+    
     const owners = await User.findAll({
       where: {
         type: '2',
-        [Op.or]: [{ firstName: { [Op.like]: `%${query}%` } }, { lastName: { [Op.like]: `%${query}%` } }]
-      }
+        [Op.or]: [
+          { firstName: { [Op.like]: `%${query}%` } }, 
+          { lastName: { [Op.like]: `%${query}%` } },
+          { username: { [Op.like]: `%${query}%` } },
+          { email: { [Op.like]: `%${query}%` } }
+        ]
+      },
+      attributes: { exclude: ['password'] } // Never return passwords
     });
-    res.json({ success: true, data: owners });
+    
+    // Apply role-based filtering
+    const filteredData = DataFilter.filterOwnerData(req.user, owners.map(owner => owner.toJSON()));
+    
+    return ResponseUtil.success(res, filteredData, `Found ${filteredData.length} owners`);
   } catch (error) {
-    res.status(500).json({ success: false, message: error.message });
+    console.error('Search owners error:', error);
+    return ResponseUtil.error(res, 'Failed to search owners');
   }
 }
 

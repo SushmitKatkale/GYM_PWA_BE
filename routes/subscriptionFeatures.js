@@ -9,6 +9,53 @@ const {
   deleteSubscriptionFeature
 } = require('../controllers/subscriptionFeatureController');
 const { authenticate, authorize } = require('../middleware/auth');
+const { checkSubscriptionFeatureOwnership } = require('../middleware/ownership');
+const { Subscription, Gym } = require('../models');
+const ResponseUtil = require('../utils/response');
+
+// Middleware to validate subscription ownership for feature creation
+const checkSubscriptionOwnershipForCreation = async (req, res, next) => {
+  try {
+    const userId = req.user.id;
+    const userType = req.user.type;
+    const subscriptionId = req.body.subscriptionId;
+
+    // Admin can create for any subscription
+    if (userType === '3') {
+      return next();
+    }
+
+    // Owner can only create for subscriptions of their own gyms
+    if (userType === '2') {
+      if (!subscriptionId) {
+        return ResponseUtil.error(res, 'Subscription ID is required', 400);
+      }
+
+      const subscription = await Subscription.findByPk(subscriptionId, {
+        include: [{
+          model: Gym,
+          as: 'gym',
+          attributes: ['ownerId']
+        }]
+      });
+
+      if (!subscription) {
+        return ResponseUtil.notFoundError(res, 'Subscription not found');
+      }
+
+      if (subscription.gym.ownerId !== userId) {
+        return ResponseUtil.forbiddenError(res, 'Access denied. You can only create features for your own gym subscriptions');
+      }
+
+      return next();
+    }
+
+    return ResponseUtil.forbiddenError(res, 'Access denied. Insufficient permissions');
+  } catch (error) {
+    console.error('Subscription ownership creation check error:', error);
+    return ResponseUtil.error(res, 'Error checking ownership', 500);
+  }
+};
 
 /**
  * @swagger
@@ -51,7 +98,7 @@ const { authenticate, authorize } = require('../middleware/auth');
  *             schema:
  *               $ref: '#/components/schemas/ErrorResponse'
  */
-router.post('/', authenticate, authorize(['admin', 'owner']), createSubscriptionFeature);
+router.post('/', authenticate, authorize(['admin', 'owner']), checkSubscriptionOwnershipForCreation, createSubscriptionFeature);
 
 /**
  * @swagger
@@ -234,7 +281,7 @@ router.get('/:id', getSubscriptionFeatureById);
  *             schema:
  *               $ref: '#/components/schemas/ErrorResponse'
  */
-router.put('/:id', authenticate, authorize(['admin', 'owner']), updateSubscriptionFeature);
+router.put('/:id', authenticate, authorize(['admin', 'owner']), checkSubscriptionFeatureOwnership, updateSubscriptionFeature);
 
 /**
  * @swagger
@@ -272,6 +319,6 @@ router.put('/:id', authenticate, authorize(['admin', 'owner']), updateSubscripti
  *             schema:
  *               $ref: '#/components/schemas/ErrorResponse'
  */
-router.delete('/:id', authenticate, authorize(['admin', 'owner']), deleteSubscriptionFeature);
+router.delete('/:id', authenticate, authorize(['admin', 'owner']), checkSubscriptionFeatureOwnership, deleteSubscriptionFeature);
 
 module.exports = router;

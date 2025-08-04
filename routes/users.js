@@ -212,6 +212,61 @@ userRouter.get('/', validateQuery(queryParamsSchema), authenticate, authorize('3
 
 /**
  * @swagger
+ * /api/users/profile:
+ *   get:
+ *     tags: [User Management]
+ *     summary: Get current user profile
+ *     description: Retrieve the profile information of the currently authenticated user based on JWT token
+ *     security:
+ *       - bearerAuth: []
+ *     responses:
+ *       200:
+ *         description: User profile retrieved successfully
+ *         content:
+ *           application/json:
+ *             schema:
+ *               allOf:
+ *                 - $ref: '#/components/schemas/SuccessResponse'
+ *                 - type: object
+ *                   properties:
+ *                     data:
+ *                       allOf:
+ *                         - $ref: '#/components/schemas/UserResponse'
+ *                         - type: object
+ *                           properties:
+ *                             role:
+ *                               type: object
+ *                               properties:
+ *                                 value:
+ *                                   type: string
+ *                                   description: User type value (1, 2, or 3)
+ *                                 name:
+ *                                   type: string
+ *                                   description: Human readable role name
+ *                                 permissions:
+ *                                   type: object
+ *                                   properties:
+ *                                     canManageUsers:
+ *                                       type: boolean
+ *                                     canManageGyms:
+ *                                       type: boolean
+ *                                     canBookSlots:
+ *                                       type: boolean
+ *                                     isAdmin:
+ *                                       type: boolean
+ *                                     isOwner:
+ *                                       type: boolean
+ *                                     isUser:
+ *                                       type: boolean
+ *       401:
+ *         description: Authentication required
+ *       404:
+ *         description: User profile not found
+ */
+userRouter.get('/profile', authenticate, UserController.getUserProfile);
+
+/**
+ * @swagger
  * /api/users/{email}:
  *   get:
  *     tags: [User Management]

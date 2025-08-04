@@ -8,6 +8,7 @@ const {
   deleteGym
 } = require('../controllers/gymController');
 const { authenticate, authorize } = require('../middleware/auth');
+const { checkGymOwnership } = require('../middleware/ownership');
 
 /**
  * @swagger
@@ -44,7 +45,8 @@ const { authenticate, authorize } = require('../middleware/auth');
  *             schema:
  *               $ref: '#/components/schemas/ErrorResponse'
  */
-router.post('/', authenticate, authorize(['admin', 'owner']), createGym);
+// Admin and Owner can create gyms (type='3' or type='2')
+router.post('/', authenticate, authorize('3', '2'), createGym);
 
 /**
  * @swagger
@@ -52,7 +54,9 @@ router.post('/', authenticate, authorize(['admin', 'owner']), createGym);
  *   get:
  *     tags: [Gyms]
  *     summary: Get all gyms
- *     description: Retrieve a paginated list of gyms with optional search and filters.
+ *     description: Retrieve a paginated list of gyms with optional search and filters. Owners see only their gyms, Admins see all gyms.
+ *     security:
+ *       - bearerAuth: []
  *     parameters:
  *       - in: query
  *         name: page
@@ -79,7 +83,7 @@ router.post('/', authenticate, authorize(['admin', 'owner']), createGym);
  *         description: Filter active gyms only
  *     responses:
  *       200:
- *         description: A list of gyms
+ *         description: A list of gyms with role-based filtering
  *         content:
  *           application/json:
  *             schema:
@@ -91,6 +95,8 @@ router.post('/', authenticate, authorize(['admin', 'owner']), createGym);
  *                     $ref: '#/components/schemas/Gym'
  *                 pagination:
  *                   $ref: '#/components/schemas/PaginationResponse'
+ *       401:
+ *         description: Authentication required
  *       500:
  *         description: Server error
  *         content:
@@ -98,7 +104,8 @@ router.post('/', authenticate, authorize(['admin', 'owner']), createGym);
  *             schema:
  *               $ref: '#/components/schemas/ErrorResponse'
  */
-router.get('/', getAllGyms);
+// Admin and Owner can view gyms (with ownership filtering)
+router.get('/', authenticate, authorize('3', '2'), getAllGyms);
 
 /**
  * @swagger
@@ -184,7 +191,8 @@ router.get('/:id', getGymById);
  *             schema:
  *               $ref: '#/components/schemas/ErrorResponse'
  */
-router.put('/:id', authenticate, authorize(['admin', 'owner']), updateGym);
+// Admin and Owner can update gyms (with ownership check)
+router.put('/:id', authenticate, authorize('3', '2'), checkGymOwnership, updateGym);
 
 /**
  * @swagger
@@ -222,6 +230,7 @@ router.put('/:id', authenticate, authorize(['admin', 'owner']), updateGym);
  *             schema:
  *               $ref: '#/components/schemas/ErrorResponse'
  */
-router.delete('/:id', authenticate, authorize(['admin', 'owner']), deleteGym);
+// Admin and Owner can delete gyms (with ownership check)
+router.delete('/:id', authenticate, authorize('3', '2'), checkGymOwnership, deleteGym);
 
 module.exports = router;

@@ -708,9 +708,164 @@ const getSlotAvailability = async (req, res) => {
   }
 };
 
+// Update gym slot
+const updateGymSlot = async (req, res) => {
+  const transaction = await sequelize.transaction({
+    isolationLevel: Transaction.ISOLATION_LEVELS.SERIALIZABLE
+  });
+  
+  try {
+    const { id } = req.params;
+    const { startTime, endTime, capacity, daysOfWeek, isActive } = req.body;
+    const updatedBy = req.user.email;
+
+    // Find the slot
+    const gymSlot = await GymSlot.findByPk(id, { transaction });
+    if (!gymSlot) {
+      await transaction.rollback();
+      return res.status(404).json({
+        success: false,
+        message: 'Gym slot not found',
+        timestamp: new Date().toISOString()
+      });
+    }
+
+    // Check for overlapping slots (excluding current slot)
+    if (startTime && endTime && daysOfWeek) {
+      const overlappingSlot = await GymSlot.findOne({
+        where: {
+          gymId: gymSlot.gymId,
+          id: { [Op.ne]: id }, // Exclude current slot
+          status: 'active',
+          [Op.or]: [
+            {
+              startTime: { [Op.between]: [startTime, endTime] }
+            },
+            {
+              endTime: { [Op.between]: [startTime, endTime] }
+            },
+            {
+              [Op.and]: [
+                { startTime: { [Op.lte]: startTime } },
+                { endTime: { [Op.gte]: endTime } }
+              ]
+            }
+          ],
+          daysOfWeek: {
+            [Op.overlap]: daysOfWeek
+          }
+        },
+        transaction
+      });
+
+      if (overlappingSlot) {
+        await transaction.rollback();
+        return res.status(409).json({
+          success: false,
+          message: 'Updated slot time overlaps with existing slot',
+          timestamp: new Date().toISOString()
+        });
+      }
+    }
+
+    // Update the slot
+    const updateData = { updatedBy };
+    if (startTime !== undefined) updateData.startTime = startTime;
+    if (endTime !== undefined) updateData.endTime = endTime;
+    if (capacity !== undefined) updateData.capacity = capacity;
+    if (daysOfWeek !== undefined) updateData.daysOfWeek = daysOfWeek;
+    if (isActive !== undefined) updateData.status = isActive ? 'active' : 'inactive';
+
+    await gymSlot.update(updateData, { transaction });
+
+    await transaction.commit();
+
+    res.json({
+      success: true,
+      message: 'Gym slot updated successfully',
+      data: gymSlot,
+      timestamp: new Date().toISOString()
+    });
+
+  } catch (error) {
+    await transaction.rollback();
+    console.error('Update gym slot error:', error);
+    res.status(500).json({
+      success: false,
+      message: 'Internal server error',
+      timestamp: new Date().toISOString()
+    });
+  }
+};
+
+// Delete (deactivate) gym slot
+const deleteGymSlot = async (req, res) => {
+  const transaction = await sequelize.transaction();
+  
+  try {
+    const { id } = req.params;
+    const updatedBy = req.user.email;
+
+    // Find the slot
+    const gymSlot = await GymSlot.findByPk(id, { transaction });
+    if (!gymSlot) {
+      await transaction.rollback();
+      return res.status(404).json({
+        success: false,
+        message: 'Gym slot not found',
+        timestamp: new Date().toISOString()
+      });
+    }
+
+    // Check if there are any future active bookings
+    const futureBookings = await UserSlotBooking.count({
+      where: {
+        gymSlotId: id,
+        bookingDate: { [Op.gte]: new Date().toISOString().split('T')[0] },
+        bookingStatus: { [Op.in]: ['active', 'checked_in'] }
+      },
+      transaction
+    });
+
+    if (futureBookings > 0) {
+      await transaction.rollback();
+      return res.status(400).json({
+        success: false,
+        message: `Cannot delete slot. There are ${futureBookings} future active bookings.`,
+        timestamp: new Date().toISOString()
+      });
+    }
+
+    // Soft delete by setting status to inactive
+    await gymSlot.update({
+      status: 'inactive',
+      updatedBy
+    }, { transaction });
+
+    await transaction.commit();
+
+    res.json({
+      success: true,
+      message: 'Gym slot deleted successfully',
+      timestamp: new Date().toISOString()
+    });
+
+  } catch (error) {
+    await transaction.rollback();
+    console.error('Delete gym slot error:', error);
+    res.status(500).json({
+      success: false,
+      message: 'Internal server error',
+      timestamp: new Date().toISOString()
+    });
+  }
+};
+
 module.exports = {
   createGymSlot,
   getGymSlots,
+  updateGymSlot,
+  deleteGymSlot,
   bookSlot,
   cancelBooking,
   checkInSlot,

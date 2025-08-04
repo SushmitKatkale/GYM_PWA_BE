@@ -3,6 +3,8 @@ const { body, query, param } = require('express-validator');
 const {
   createGymSlot,
   getGymSlots,
+  updateGymSlot,
+  deleteGymSlot,
   bookSlot,
   cancelBooking,
   checkInSlot,
@@ -11,6 +13,7 @@ const {
   getSlotAvailability
 } = require('../controllers/slotController');
 const { authenticate, authorize } = require('../middleware/auth');
+const { checkGymOwnershipForCreation, checkSlotOwnership } = require('../middleware/ownership');
 
 const router = express.Router();
 
@@ -137,8 +140,9 @@ const availabilityValidation = [
  */
 router.post('/', 
   authenticate, 
-  authorize(['admin']), 
-  createGymSlotValidation, 
+  authorize(['admin', 'owner']), 
+  createGymSlotValidation,
+  checkGymOwnershipForCreation, 
   createGymSlot
 );
 
@@ -430,6 +434,106 @@ router.get('/availability',
   authenticate, 
   availabilityValidation, 
   getSlotAvailability
+);
+
+/**
+ * @swagger
+ * /api/slots/{id}:
+ *   put:
+ *     summary: Update a gym slot
+ *     tags: [Gym Slots]
+ *     security:
+ *       - bearerAuth: []
+ *     parameters:
+ *       - in: path
+ *         name: id
+ *         required: true
+ *         schema:
+ *           type: integer
+ *         description: Gym slot ID
+ *     requestBody:
+ *       required: true
+ *       content:
+ *         application/json:
+ *           schema:
+ *             type: object
+ *             properties:
+ *               startTime:
+ *                 type: string
+ *                 pattern: '^([01]?[0-9]|2[0-3]):[0-5][0-9]$'
+ *                 description: Start time in HH:MM format
+ *               endTime:
+ *                 type: string
+ *                 pattern: '^([01]?[0-9]|2[0-3]):[0-5][0-9]$'
+ *                 description: End time in HH:MM format
+ *               capacity:
+ *                 type: integer
+ *                 minimum: 1
+ *                 maximum: 1000
+ *                 description: Slot capacity
+ *               daysOfWeek:
+ *                 type: array
+ *                 items:
+ *                   type: integer
+ *                   minimum: 0
+ *                   maximum: 6
+ *                 description: Days of week (0=Sunday, 6=Saturday)
+ *               isActive:
+ *                 type: boolean
+ *                 description: Slot active status
+ *     responses:
+ *       200:
+ *         description: Gym slot updated successfully
+ *       400:
+ *         description: Validation error
+ *       401:
+ *         description: Unauthorized
+ *       403:
+ *         description: Forbidden (admin/owner only)
+ *       404:
+ *         description: Slot not found
+ *       409:
+ *         description: Updated slot time overlaps with existing slot
+ */
+router.put('/:id', 
+  authenticate, 
+  authorize(['admin', 'owner']),
+  checkSlotOwnership,
+  updateGymSlot
+);
+
+/**
+ * @swagger
+ * /api/slots/{id}:
+ *   delete:
+ *     summary: Delete (deactivate) a gym slot
+ *     tags: [Gym Slots]
+ *     security:
+ *       - bearerAuth: []
+ *     parameters:
+ *       - in: path
+ *         name: id
+ *         required: true
+ *         schema:
+ *           type: integer
+ *         description: Gym slot ID
+ *     responses:
+ *       200:
+ *         description: Gym slot deleted successfully
+ *       400:
+ *         description: Cannot delete slot with future bookings
+ *       401:
+ *         description: Unauthorized
+ *       403:
+ *         description: Forbidden (admin/owner only)
+ *       404:
+ *         description: Slot not found
+ */
+router.delete('/:id', 
+  authenticate, 
+  authorize(['admin', 'owner']),
+  checkSlotOwnership,
+  deleteGymSlot
 );
 
 module.exports = router;

@@ -1,5 +1,6 @@
 const { Gym, Amenity, GymImage, User, Subscription, SubscriptionFeature, sequelize } = require('../models');
 const ResponseUtil = require('../utils/response');
+const DataFilter = require('../utils/dataFilter');
 const { Op } = require('sequelize');
 
 // Create a new gym with amenities and subscription plans
@@ -158,6 +159,12 @@ const getAllGyms = async (req, res) => {
       ];
     }
 
+    // Apply ownership filter for owners (only their own gyms)
+    if (req.user.type === '2') { // Owner
+      whereClause.ownerId = req.user.email;
+    }
+    // Admin gets all gyms (no additional filter needed)
+
     const { count, rows } = await Gym.findAndCountAll({
       where: whereClause,
       include: [
@@ -197,8 +204,12 @@ const getAllGyms = async (req, res) => {
       order: [['createTimestamp', 'DESC']]
     });
 
+    // Apply role-based data filtering
+    const gymsData = rows.map(gym => gym.toJSON());
+    const filteredGyms = DataFilter.filterGymData(req.user, gymsData);
+
     return ResponseUtil.success(res, {
-      gyms: rows,
+      gyms: filteredGyms,
       pagination: {
         currentPage: parseInt(page),
         totalPages: Math.ceil(count / limit),
