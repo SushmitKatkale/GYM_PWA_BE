@@ -10,6 +10,7 @@ const {
 } = require('../validation/userValidation');
 const UserController = require('../controllers/userController');
 const { authenticate, authorize } = require('../middleware/auth');
+const profileImageUpload = require('../config/profileImageMulter');
 
 const userRouter = express.Router();
 
@@ -264,6 +265,151 @@ userRouter.get('/', validateQuery(queryParamsSchema), authenticate, authorize('3
  *         description: User profile not found
  */
 userRouter.get('/profile', authenticate, UserController.getUserProfile);
+
+// Profile settings management
+userRouter.get('/profile/settings', authenticate, UserController.getCompleteProfile);
+userRouter.put('/profile/settings', authenticate, UserController.updateUserProfile);
+
+// Notification settings management
+userRouter.get('/profile/settings/notifications', authenticate, UserController.getCompleteProfile);
+userRouter.put('/profile/settings/notifications', authenticate, UserController.updateNotificationSettings);
+
+// Privacy settings management
+userRouter.get('/profile/settings/privacy', authenticate, UserController.getCompleteProfile);
+userRouter.put('/profile/settings/privacy', authenticate, UserController.updatePrivacySettings);
+
+// App preferences management
+userRouter.get('/profile/settings/preferences', authenticate, UserController.getCompleteProfile);
+userRouter.put('/profile/settings/preferences', authenticate, UserController.updateAppPreferences);
+
+// Fitness goals management
+userRouter.get('/profile/fitness-goals', authenticate, UserController.getFitnessGoals);
+userRouter.put('/profile/fitness-goals', authenticate, UserController.updateUserFitnessGoals);
+
+// Emergency contacts management
+userRouter.post('/profile/emergency-contacts', authenticate, UserController.addEmergencyContact);
+userRouter.put('/profile/emergency-contacts/:contactId', authenticate, UserController.updateEmergencyContact);
+userRouter.delete('/profile/emergency-contacts/:contactId', authenticate, UserController.deleteEmergencyContact);
+
+// Profile image management
+/**
+ * @swagger
+ * /api/users/profile/image:
+ *   post:
+ *     tags: [User Profile]
+ *     summary: Upload profile image
+ *     description: Upload a profile image for the current user
+ *     security:
+ *       - bearerAuth: []
+ *     requestBody:
+ *       required: true
+ *       content:
+ *         multipart/form-data:
+ *           schema:
+ *             type: object
+ *             properties:
+ *               image:
+ *                 type: string
+ *                 format: binary
+ *                 description: Profile image file (jpeg, jpg, png, gif, webp)
+ *             required:
+ *               - image
+ *     responses:
+ *       201:
+ *         description: Profile image uploaded successfully
+ *       400:
+ *         description: Invalid file or missing image
+ *       401:
+ *         description: Authentication required
+ */
+userRouter.post('/profile/image', authenticate, profileImageUpload.single('image'), UserController.uploadProfileImage);
+
+/**
+ * @swagger
+ * /api/users/profile/image/url:
+ *   get:
+ *     tags: [User Profile]
+ *     summary: Get current user's profile image URL
+ *     description: Retrieve the URL of the current user's active profile image
+ *     security:
+ *       - bearerAuth: []
+ *     responses:
+ *       200:
+ *         description: Profile image URL retrieved successfully
+ *         content:
+ *           application/json:
+ *             schema:
+ *               type: object
+ *               properties:
+ *                 imageUrl:
+ *                   type: string
+ *                   description: Direct URL to access the profile image
+ *       404:
+ *         description: Profile image not found
+ *       401:
+ *         description: Authentication required
+ */
+userRouter.get('/profile/image/url', authenticate, UserController.getProfileImageUrl);
+
+/**
+ * /api/users/profile/image/file/{imageId}:
+ *   get:
+ *     tags: [User Profile]
+ *     summary: Serve profile image file
+ *     description: Serve the actual profile image file (public access for img tags)
+ *     parameters:
+ *       - in: path
+ *         name: imageId
+ *         required: true
+ *         schema:
+ *           type: string
+ *         description: Profile image ID
+ *     responses:
+ *       200:
+ *         description: Profile image file served successfully
+ *         content:
+ *           image/*:
+ *             schema:
+ *               type: string
+ *               format: binary
+ *       404:
+ *         description: Profile image not found
+ */
+userRouter.get('/profile/image/file/:imageId', UserController.getProfileImageFile);
+
+/**
+ * @swagger
+ * /api/users/profile/image/{imageId}:
+ *   delete:
+ *     tags: [User Profile]
+ *     summary: Delete profile image
+ *     description: Delete a specific profile image by ID
+ *     security:
+ *       - bearerAuth: []
+ *     parameters:
+ *       - in: path
+ *         name: imageId
+ *         required: true
+ *         schema:
+ *           type: string
+ *         description: Profile image ID
+ *     responses:
+ *       200:
+ *         description: Profile image deleted successfully
+ *       404:
+ *         description: Profile image not found
+ *       401:
+ *         description: Authentication required
+ */
+userRouter.delete('/profile/image/:imageId', authenticate, UserController.deleteProfileImage);
+
+// Push subscription management (PWA)
+userRouter.post('/push-subscription', authenticate, (req, res) => {
+  // Basic push subscription endpoint for PWA
+  // In a real app, you'd save the subscription to database
+  console.log('Push subscription received:', req.body);
+  res.json({ success: true, message: 'Push subscription saved' });
+});
 
 /**
  * @swagger

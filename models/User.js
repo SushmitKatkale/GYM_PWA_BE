@@ -198,6 +198,21 @@ User.associate = function(models) {
     as: 'updater',
     constraints: false
   });
+  
+  // Profile images association
+  User.hasMany(models.ProfileImage, {
+    foreignKey: 'userId',
+    as: 'profileImages'
+  });
+  
+  // Current active profile image association
+  User.hasOne(models.ProfileImage, {
+    foreignKey: 'userId',
+    as: 'currentProfileImage',
+    scope: {
+      isActive: true
+    }
+  });
 };
 
 // Class methods

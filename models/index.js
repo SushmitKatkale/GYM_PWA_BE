@@ -1,6 +1,14 @@
 const { sequelize, testConnection } = require('../config/database');
 const User = require('./User');
 const RefreshToken = require('./RefreshToken');
+const UserProfile = require('./UserProfile');
+const EmergencyContact = require('./EmergencyContact');
+const UserNotificationSettings = require('./UserNotificationSettings');
+const UserPrivacySettings = require('./UserPrivacySettings');
+const UserAppPreferences = require('./UserAppPreferences');
+const FitnessGoal = require('./FitnessGoal');
+const UserFitnessGoal = require('./UserFitnessGoal');
+const ProfileImage = require('./ProfileImage');
 
 // Define associations
 User.hasMany(RefreshToken, {
@@ -25,6 +33,131 @@ User.belongsTo(User, {
   foreignKey: 'updatedBy',
   as: 'updater',
   constraints: false
+});
+
+// User Profile Extended Data associations
+User.hasOne(UserProfile, {
+  foreignKey: 'userEmail',
+  sourceKey: 'email',
+  as: 'profile',
+  onDelete: 'CASCADE'
+});
+
+UserProfile.belongsTo(User, {
+  foreignKey: 'userEmail',
+  targetKey: 'email',
+  as: 'user'
+});
+
+// Emergency Contact associations
+User.hasMany(EmergencyContact, {
+  foreignKey: 'userEmail',
+  sourceKey: 'email',
+  as: 'emergencyContacts',
+  onDelete: 'CASCADE'
+});
+
+EmergencyContact.belongsTo(User, {
+  foreignKey: 'userEmail',
+  targetKey: 'email',
+  as: 'user'
+});
+
+// User Settings associations
+User.hasOne(UserNotificationSettings, {
+  foreignKey: 'userEmail',
+  sourceKey: 'email',
+  as: 'notificationSettings',
+  onDelete: 'CASCADE'
+});
+
+UserNotificationSettings.belongsTo(User, {
+  foreignKey: 'userEmail',
+  targetKey: 'email',
+  as: 'user'
+});
+
+User.hasOne(UserPrivacySettings, {
+  foreignKey: 'userEmail',
+  sourceKey: 'email',
+  as: 'privacySettings',
+  onDelete: 'CASCADE'
+});
+
+UserPrivacySettings.belongsTo(User, {
+  foreignKey: 'userEmail',
+  targetKey: 'email',
+  as: 'user'
+});
+
+User.hasOne(UserAppPreferences, {
+  foreignKey: 'userEmail',
+  sourceKey: 'email',
+  as: 'appPreferences',
+  onDelete: 'CASCADE'
+});
+
+UserAppPreferences.belongsTo(User, {
+  foreignKey: 'userEmail',
+  targetKey: 'email',
+  as: 'user'
+});
+
+// Fitness Goals Many-to-Many associations
+User.belongsToMany(FitnessGoal, {
+  through: UserFitnessGoal,
+  foreignKey: 'userEmail',
+  otherKey: 'goalId',
+  as: 'fitnessGoals'
+});
+
+FitnessGoal.belongsToMany(User, {
+  through: UserFitnessGoal,
+  foreignKey: 'goalId',
+  otherKey: 'userEmail',
+  as: 'users'
+});
+
+// UserFitnessGoal associations
+UserFitnessGoal.belongsTo(User, {
+  foreignKey: 'userEmail',
+  targetKey: 'email',
+  as: 'user'
+});
+
+UserFitnessGoal.belongsTo(FitnessGoal, {
+  foreignKey: 'goalId',
+  as: 'goal'
+});
+
+// ProfileImage associations
+User.hasMany(ProfileImage, {
+  foreignKey: 'userId',
+  as: 'profileImages',
+  onDelete: 'CASCADE'
+});
+
+User.hasOne(ProfileImage, {
+  foreignKey: 'userId',
+  as: 'currentProfileImage',
+  scope: {
+    isActive: true
+  }
+});
+
+ProfileImage.belongsTo(User, {
+  foreignKey: 'userId',
+  as: 'user'
+});
+
+ProfileImage.belongsTo(User, {
+  foreignKey: 'createdBy',
+  as: 'creator'
+});
+
+ProfileImage.belongsTo(User, {
+  foreignKey: 'updatedBy',
+  as: 'updater'
 });
 const Gym = require('./Gym');
 const Amenity = require('./Amenity');
@@ -242,9 +375,10 @@ const syncDatabase = async () => {
     await sequelize.sync(syncOptions);
     console.log('✅ Database models synchronized successfully.');
     
-    // Create a default admin user (only in development)
+    // Create defaults (only in development)
     if (process.env.NODE_ENV !== 'production') {
       await createDefaultAdmin();
+      await createDefaultFitnessGoals();
     }
   } catch (error) {
     console.error('❌ Error synchronizing database models:', error.message);
@@ -289,10 +423,70 @@ const createDefaultAdmin = async () => {
   }
 };
 
+// Create default fitness goals
+const createDefaultFitnessGoals = async () => {
+  try {
+    const goals = [
+      { goalName: 'Weight Loss', description: 'Focus on losing weight and reducing body fat' },
+      { goalName: 'Muscle Building', description: 'Build lean muscle mass and strength' },
+      { goalName: 'Endurance', description: 'Improve cardiovascular endurance and stamina' },
+      { goalName: 'Flexibility', description: 'Enhance flexibility and mobility' },
+      { goalName: 'General Fitness', description: 'Overall health and fitness improvement' },
+      { goalName: 'Strength Training', description: 'Focus on building raw strength' },
+      { goalName: 'Cardio Health', description: 'Improve heart health and cardiovascular system' }
+    ];
+
+    for (const goal of goals) {
+      await FitnessGoal.findOrCreate({
+        where: { goalName: goal.goalName },
+        defaults: goal
+      });
+    }
+    console.log('✅ Default fitness goals initialized');
+  } catch (error) {
+    console.log('⚠️  Could not create default fitness goals:', error.message);
+  }
+};
+
+// Create default settings for a user
+const createDefaultUserSettings = async (userEmail) => {
+  try {
+    // Create default notification settings
+    await UserNotificationSettings.findOrCreate({
+      where: { userEmail },
+      defaults: { userEmail }
+    });
+
+    // Create default privacy settings
+    await UserPrivacySettings.findOrCreate({
+      where: { userEmail },
+      defaults: { userEmail }
+    });
+
+    // Create default app preferences
+    await UserAppPreferences.findOrCreate({
+      where: { userEmail },
+      defaults: { userEmail }
+    });
+
+    console.log(`✅ Default settings created for user: ${userEmail}`);
+  } catch (error) {
+    console.log(`⚠️  Could not create default settings for ${userEmail}:`, error.message);
+  }
+};
+
 module.exports = {
   sequelize,
   User,
   RefreshToken,
+  UserProfile,
+  EmergencyContact,
+  UserNotificationSettings,
+  UserPrivacySettings,
+  UserAppPreferences,
+  FitnessGoal,
+  UserFitnessGoal,
+  ProfileImage,
   Gym,
   Amenity,
   GymImage,
@@ -308,4 +502,7 @@ module.exports = {
   SlotWaitlist,
   syncDatabase,
   testConnection,
+  createDefaultAdmin,
+  createDefaultFitnessGoals,
+  createDefaultUserSettings,
 };

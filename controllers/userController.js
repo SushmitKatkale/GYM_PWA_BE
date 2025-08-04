@@ -1,6 +1,19 @@
-const { User } = require('../models');
+const { 
+  User, 
+  UserProfile, 
+  EmergencyContact, 
+  UserNotificationSettings, 
+  UserPrivacySettings, 
+  UserAppPreferences, 
+  FitnessGoal, 
+  UserFitnessGoal,
+  ProfileImage,
+  createDefaultUserSettings 
+} = require('../models');
 const ResponseUtil = require('../utils/response');
 const { Op } = require('sequelize');
+const path = require('path');
+const fs = require('fs');
 
 class UserController {
   // Create a new user
@@ -344,6 +357,488 @@ class UserController {
       return ResponseUtil.success(res, null, 'Password changed successfully');
     } catch (error) {
       return ResponseUtil.error(res, 'Failed to change password');
+    }
+  }
+
+  // Get complete user profile with all settings
+  static async getCompleteProfile(req, res) {
+    try {
+      const userEmail = req.user.email;
+
+      const user = await User.findByPk(userEmail, {
+        attributes: { exclude: ['password'] },
+        include: [
+          {
+            model: UserProfile,
+            as: 'profile',
+            required: false
+          },
+          {
+            model: EmergencyContact,
+            as: 'emergencyContacts',
+            required: false
+          },
+          {
+            model: UserNotificationSettings,
+            as: 'notificationSettings',
+            required: false
+          },
+          {
+            model: UserPrivacySettings,
+            as: 'privacySettings',
+            required: false
+          },
+          {
+            model: UserAppPreferences,
+            as: 'appPreferences',
+            required: false
+          },
+          {
+            model: FitnessGoal,
+            as: 'fitnessGoals',
+            through: { attributes: ['priority', 'targetDate'] },
+            required: false
+          },
+          {
+            model: ProfileImage,
+            as: 'currentProfileImage',
+            required: false
+          }
+        ]
+      });
+
+      if (!user) {
+        return ResponseUtil.notFoundError(res, 'User profile not found');
+      }
+
+      // Ensure default settings exist if not found
+      if (!user.notificationSettings || !user.privacySettings || !user.appPreferences) {
+        await createDefaultUserSettings(userEmail);
+        // Re-fetch the user with settings
+        const updatedUser = await User.findByPk(userEmail, {
+          attributes: { exclude: ['password'] },
+          include: [
+            {
+              model: UserProfile,
+              as: 'profile',
+              required: false
+            },
+            {
+              model: EmergencyContact,
+              as: 'emergencyContacts',
+              required: false
+            },
+            {
+              model: UserNotificationSettings,
+              as: 'notificationSettings',
+              required: false
+            },
+            {
+              model: UserPrivacySettings,
+              as: 'privacySettings',
+              required: false
+            },
+            {
+              model: UserAppPreferences,
+              as: 'appPreferences',
+              required: false
+            },
+            {
+              model: FitnessGoal,
+              as: 'fitnessGoals',
+              through: { attributes: ['priority', 'targetDate'] },
+              required: false
+            }
+          ]
+        });
+        return ResponseUtil.success(res, updatedUser.toJSON(), 'Complete profile retrieved successfully');
+      }
+
+      return ResponseUtil.success(res, user.toJSON(), 'Complete profile retrieved successfully');
+    } catch (error) {
+      console.error('Get complete profile error:', error);
+      return ResponseUtil.error(res, 'Failed to retrieve complete profile');
+    }
+  }
+
+  // Update user profile extended data
+  static async updateUserProfile(req, res) {
+    try {
+      const userEmail = req.user.email;
+      const { firstName, lastName, phoneNumber, dateOfBirth, gender, height, weight, ...extendedProfileData } = req.body;
+
+      // Update basic user information in User table
+      const user = await User.findByPk(userEmail);
+      if (!user) {
+        return ResponseUtil.notFoundError(res, 'User not found');
+      }
+
+      // Update basic user fields
+      const userUpdateData = {};
+      if (firstName !== undefined) userUpdateData.firstName = firstName;
+      if (lastName !== undefined) userUpdateData.lastName = lastName;
+      if (phoneNumber !== undefined) userUpdateData.phoneNumber = phoneNumber;
+      
+      if (Object.keys(userUpdateData).length > 0) {
+        await user.update(userUpdateData);
+      }
+
+      // Update extended profile data in UserProfile table
+      const profileData = {};
+      
+      // Validate and sanitize dateOfBirth
+      if (dateOfBirth !== undefined) {
+        if (dateOfBirth === '' || dateOfBirth === null) {
+          profileData.dateOfBirth = null;
+        } else {
+          const parsedDate = new Date(dateOfBirth);
+          if (!isNaN(parsedDate.getTime()) && dateOfBirth !== 'Invalid date') {
+            profileData.dateOfBirth = dateOfBirth;
+          } else {
+            profileData.dateOfBirth = null;
+          }
+        }
+      }
+      
+      if (gender !== undefined) profileData.gender = gender || null;
+      if (height !== undefined) profileData.height = height || null;
+      if (weight !== undefined) profileData.weight = weight || null;
+      
+      // Add any other extended profile fields
+      Object.assign(profileData, extendedProfileData);
+
+      if (Object.keys(profileData).length > 0) {
+        const [profile, created] = await UserProfile.findOrCreate({
+          where: { userEmail },
+          defaults: { ...profileData, userEmail }
+        });
+
+        if (!created) {
+          await profile.update(profileData);
+        }
+      }
+
+      // Return updated user with profile
+      const updatedUser = await User.findByPk(userEmail, {
+        attributes: { exclude: ['password'] },
+        include: [
+          {
+            model: UserProfile,
+            as: 'profile',
+            required: false
+          }
+        ]
+      });
+
+      return ResponseUtil.success(res, updatedUser.toJSON(), 'Profile updated successfully');
+    } catch (error) {
+      console.error('Update user profile error:', error);
+      return ResponseUtil.error(res, 'Failed to update profile');
+    }
+  }
+
+  // Update notification settings
+  static async updateNotificationSettings(req, res) {
+    try {
+      const userEmail = req.user.email;
+      const settings = req.body;
+
+      const [notificationSettings, created] = await UserNotificationSettings.findOrCreate({
+        where: { userEmail },
+        defaults: { ...settings, userEmail }
+      });
+
+      if (!created) {
+        await notificationSettings.update(settings);
+      }
+
+      return ResponseUtil.success(res, notificationSettings.toJSON(), 'Notification settings updated successfully');
+    } catch (error) {
+      console.error('Update notification settings error:', error);
+      return ResponseUtil.error(res, 'Failed to update notification settings');
+    }
+  }
+
+  // Update privacy settings
+  static async updatePrivacySettings(req, res) {
+    try {
+      const userEmail = req.user.email;
+      const settings = req.body;
+
+      const [privacySettings, created] = await UserPrivacySettings.findOrCreate({
+        where: { userEmail },
+        defaults: { ...settings, userEmail }
+      });
+
+      if (!created) {
+        await privacySettings.update(settings);
+      }
+
+      return ResponseUtil.success(res, privacySettings.toJSON(), 'Privacy settings updated successfully');
+    } catch (error) {
+      console.error('Update privacy settings error:', error);
+      return ResponseUtil.error(res, 'Failed to update privacy settings');
+    }
+  }
+
+  // Update app preferences
+  static async updateAppPreferences(req, res) {
+    try {
+      const userEmail = req.user.email;
+      const preferences = req.body;
+
+      const [appPreferences, created] = await UserAppPreferences.findOrCreate({
+        where: { userEmail },
+        defaults: { ...preferences, userEmail }
+      });
+
+      if (!created) {
+        await appPreferences.update(preferences);
+      }
+
+      return ResponseUtil.success(res, appPreferences.toJSON(), 'App preferences updated successfully');
+    } catch (error) {
+      console.error('Update app preferences error:', error);
+      return ResponseUtil.error(res, 'Failed to update app preferences');
+    }
+  }
+
+  // Get all fitness goals
+  static async getFitnessGoals(req, res) {
+    try {
+      const goals = await FitnessGoal.findAll({
+        order: [['goalName', 'ASC']]
+      });
+
+      return ResponseUtil.success(res, goals, 'Fitness goals retrieved successfully');
+    } catch (error) {
+      console.error('Get fitness goals error:', error);
+      return ResponseUtil.error(res, 'Failed to retrieve fitness goals');
+    }
+  }
+
+  // Update user fitness goals
+  static async updateUserFitnessGoals(req, res) {
+    try {
+      const userEmail = req.user.email;
+      const { goalIds } = req.body; // Array of { goalId, priority, targetDate }
+
+      // Remove existing goals
+      await UserFitnessGoal.destroy({
+        where: { userEmail }
+      });
+
+      // Add new goals
+      if (goalIds && goalIds.length > 0) {
+        const userGoals = goalIds.map(goal => ({
+          userEmail,
+          goalId: goal.goalId,
+          priority: goal.priority || 1,
+          targetDate: goal.targetDate || null
+        }));
+
+        await UserFitnessGoal.bulkCreate(userGoals);
+      }
+
+      // Fetch updated goals
+      const updatedGoals = await User.findByPk(userEmail, {
+        include: [
+          {
+            model: FitnessGoal,
+            as: 'fitnessGoals',
+            through: { attributes: ['priority', 'targetDate'] }
+          }
+        ]
+      });
+
+      return ResponseUtil.success(res, updatedGoals.fitnessGoals, 'Fitness goals updated successfully');
+    } catch (error) {
+      console.error('Update user fitness goals error:', error);
+      return ResponseUtil.error(res, 'Failed to update fitness goals');
+    }
+  }
+
+  // Emergency contacts CRUD
+  static async addEmergencyContact(req, res) {
+    try {
+      const userEmail = req.user.email;
+      const contactData = { ...req.body, userEmail };
+
+      const contact = await EmergencyContact.create(contactData);
+      return ResponseUtil.success(res, contact.toJSON(), 'Emergency contact added successfully', 201);
+    } catch (error) {
+      console.error('Add emergency contact error:', error);
+      return ResponseUtil.error(res, 'Failed to add emergency contact');
+    }
+  }
+
+  static async updateEmergencyContact(req, res) {
+    try {
+      const userEmail = req.user.email;
+      const { contactId } = req.params;
+      const updateData = req.body;
+
+      const contact = await EmergencyContact.findOne({
+        where: { id: contactId, userEmail }
+      });
+
+      if (!contact) {
+        return ResponseUtil.notFoundError(res, 'Emergency contact not found');
+      }
+
+      await contact.update(updateData);
+      return ResponseUtil.success(res, contact.toJSON(), 'Emergency contact updated successfully');
+    } catch (error) {
+      console.error('Update emergency contact error:', error);
+      return ResponseUtil.error(res, 'Failed to update emergency contact');
+    }
+  }
+
+  static async deleteEmergencyContact(req, res) {
+    try {
+      const userEmail = req.user.email;
+      const { contactId } = req.params;
+
+      const contact = await EmergencyContact.findOne({
+        where: { id: contactId, userEmail }
+      });
+
+      if (!contact) {
+        return ResponseUtil.notFoundError(res, 'Emergency contact not found');
+      }
+
+      await contact.destroy();
+      return ResponseUtil.success(res, null, 'Emergency contact deleted successfully');
+    } catch (error) {
+      console.error('Delete emergency contact error:', error);
+      return ResponseUtil.error(res, 'Failed to delete emergency contact');
+    }
+  }
+
+  // Upload profile image
+  static async uploadProfileImage(req, res) {
+    try {
+      const userId = req.user.id;
+      const imageFile = req.file;
+
+      if (!imageFile) {
+        return ResponseUtil.validationError(res, 'Image file is required');
+      }
+
+      // Generate unique ID manually as a safety measure
+      const generateUniqueId = () => {
+        const chars = 'ABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789';
+        let result = '';
+        for (let i = 0; i < 8; i++) {
+          result += chars.charAt(Math.floor(Math.random() * chars.length));
+        }
+        return result;
+      };
+
+      let imageId;
+      let isUnique = false;
+      while (!isUnique) {
+        imageId = generateUniqueId();
+        const existing = await ProfileImage.findOne({ where: { id: imageId } });
+        if (!existing) {
+          isUnique = true;
+        }
+      }
+
+      const imagePath = imageFile.path;
+
+      const profileImage = await ProfileImage.create({
+        id: imageId,
+        userId,
+        originalName: imageFile.originalname,
+        filename: imageFile.filename,
+        filePath: imagePath,
+        mimeType: imageFile.mimetype,
+        fileSize: imageFile.size,
+        isActive: true,
+        uploadSource: 'web',
+        createdBy: userId
+      });
+
+      return ResponseUtil.success(res, profileImage.toJSON(), 'Profile image uploaded successfully', 201);
+    } catch (error) {
+      console.error('Upload profile image error:', error);
+      return ResponseUtil.error(res, 'Failed to upload profile image');
+    }
+  }
+
+  // Get profile image URL
+  static async getProfileImageUrl(req, res) {
+    try {
+      const userId = req.user.id;
+
+      const profileImage = await ProfileImage.findOne({
+        where: { userId, isActive: true }
+      });
+
+      if (!profileImage) {
+        return ResponseUtil.notFoundError(res, 'Profile image not found');
+      }
+
+      // Return the image URL that can be accessed directly
+      const imageUrl = `${req.protocol}://${req.get('host')}/api/users/profile/image/file/${profileImage.id}`;
+      
+      return ResponseUtil.success(res, { imageUrl }, 'Profile image URL retrieved successfully');
+    } catch (error) {
+      console.error('Get profile image URL error:', error);
+      return ResponseUtil.error(res, 'Failed to retrieve profile image URL');
+    }
+  }
+
+  // Serve profile image file
+  static async getProfileImageFile(req, res) {
+    try {
+      const { imageId } = req.params;
+
+      const profileImage = await ProfileImage.findOne({
+        where: { id: imageId, isActive: true }
+      });
+
+      if (!profileImage) {
+        return res.status(404).send('Profile image not found');
+      }
+
+      // Check if file exists
+      if (!fs.existsSync(profileImage.filePath)) {
+        return res.status(404).send('Image file not found');
+      }
+
+      // Set appropriate headers
+      res.setHeader('Content-Type', profileImage.mimeType);
+      res.setHeader('Cache-Control', 'public, max-age=31536000'); // Cache for 1 year
+      
+      return res.sendFile(path.resolve(profileImage.filePath));
+    } catch (error) {
+      console.error('Get profile image file error:', error);
+      return res.status(500).send('Failed to retrieve profile image file');
+    }
+  }
+
+  // Delete profile image
+  static async deleteProfileImage(req, res) {
+    try {
+      const userId = req.user.id;
+      const { imageId } = req.params;
+
+      const profileImage = await ProfileImage.findOne({
+        where: { id: imageId, userId }
+      });
+
+      if (!profileImage) {
+        return ResponseUtil.notFoundError(res, 'Profile image not found');
+      }
+
+      await profileImage.destroy();
+
+      return ResponseUtil.success(res, null, 'Profile image deleted successfully');
+    } catch (error) {
+      console.error('Delete profile image error:', error);
+      return ResponseUtil.error(res, 'Failed to delete profile image');
     }
   }
 }
