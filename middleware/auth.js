@@ -13,7 +13,7 @@ const authenticate = async (req, res, next) => {
     }
 
     const decoded = JWTUtils.verifyAccessToken(token);
-    const user = await User.findByPk(decoded.userEmail);
+    const user = await User.findOne({ where: { email: decoded.userEmail } });
 
     if (!user || user.activeStatus === '0') {
       return ResponseUtil.authError(res, 'Invalid token or user not found');
@@ -49,7 +49,7 @@ const optionalAuth = async (req, res, next) => {
 
     if (token) {
       const decoded = JWTUtils.verifyAccessToken(token);
-      const user = await User.findByPk(decoded.userEmail);
+      const user = await User.findOne({ where: { email: decoded.userEmail } });
 
       if (user && user.activeStatus === '1') {
         req.user = user;

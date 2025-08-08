@@ -91,6 +91,68 @@ const Payment = sequelize.define('Payment', {
     type: DataTypes.STRING(100),
     allowNull: true,
     field: 'updated_by'
+  },
+  // Razorpay specific fields
+  razorpayOrderId: {
+    type: DataTypes.STRING(255),
+    allowNull: true,
+    field: 'razorpay_order_id'
+  },
+  razorpayPaymentId: {
+    type: DataTypes.STRING(255),
+    allowNull: true,
+    field: 'razorpay_payment_id'
+  },
+  transferId: {
+    type: DataTypes.STRING(255),
+    allowNull: true,
+    field: 'transfer_id'
+  },
+  vendorConfigId: {
+    type: DataTypes.INTEGER,
+    allowNull: true,
+    references: {
+      model: 'vendor_payment_configs',
+      key: 'id'
+    },
+    field: 'vendor_config_id'
+  },
+  // Commission calculation fields
+  commission: {
+    type: DataTypes.DECIMAL(10, 2),
+    allowNull: true,
+    validate: {
+      min: 0
+    }
+  },
+  gstOnCommission: {
+    type: DataTypes.DECIMAL(10, 2),
+    allowNull: true,
+    validate: {
+      min: 0
+    },
+    field: 'gst_on_commission'
+  },
+  totalDeduction: {
+    type: DataTypes.DECIMAL(10, 2),
+    allowNull: true,
+    validate: {
+      min: 0
+    },
+    field: 'total_deduction'
+  },
+  vendorAmount: {
+    type: DataTypes.DECIMAL(10, 2),
+    allowNull: true,
+    validate: {
+      min: 0
+    },
+    field: 'vendor_amount'
+  },
+  cutCalculationDetails: {
+    type: DataTypes.JSON,
+    allowNull: true,
+    field: 'cut_calculation_details'
   }
 }, {
   tableName: 'payments',

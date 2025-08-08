@@ -172,6 +172,7 @@ const SlotAvailability = require('./SlotAvailability');
 const UserSlotBooking = require('./UserSlotBooking');
 const SlotChangeHistory = require('./SlotChangeHistory');
 const SlotWaitlist = require('./SlotWaitlist');
+const VendorPaymentConfig = require('./VendorPaymentConfig');
 
 // Define relationships
 // Gym-User owner relationship
@@ -363,6 +364,43 @@ SlotWaitlist.belongsTo(GymSlot, {
   as: 'gymSlot',
 });
 
+// VendorPaymentConfig relationships
+Gym.hasMany(VendorPaymentConfig, {
+  foreignKey: 'gymId',
+  as: 'vendorConfigs',
+  onDelete: 'CASCADE',
+});
+
+VendorPaymentConfig.belongsTo(Gym, {
+  foreignKey: 'gymId',
+  as: 'gym',
+});
+
+User.hasMany(VendorPaymentConfig, {
+  foreignKey: 'ownerEmail',
+  sourceKey: 'email',
+  as: 'vendorConfigs',
+  onDelete: 'CASCADE',
+});
+
+VendorPaymentConfig.belongsTo(User, {
+  foreignKey: 'ownerEmail',
+  targetKey: 'email',
+  as: 'owner',
+});
+
+// Payment to VendorPaymentConfig relationship
+Payment.belongsTo(VendorPaymentConfig, {
+  foreignKey: 'vendorConfigId',
+  as: 'vendorConfig',
+});
+
+VendorPaymentConfig.hasMany(Payment, {
+  foreignKey: 'vendorConfigId',
+  as: 'payments',
+  onDelete: 'SET NULL',
+});
+
 // Sync models with database (in development)
 const syncDatabase = async () => {
   try {
@@ -500,6 +538,7 @@ module.exports = {
   UserSlotBooking,
   SlotChangeHistory,
   SlotWaitlist,
+  VendorPaymentConfig,
   syncDatabase,
   testConnection,
   createDefaultAdmin,

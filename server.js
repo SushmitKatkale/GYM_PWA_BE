@@ -14,6 +14,7 @@ const subscriptionFeatureRoutes = require('./routes/subscriptionFeatures');
 // Note: userSubscriptions, payments, and invoices routes removed (were empty)
 const slotRoutes = require('./routes/slots');
 const ownerRoutes = require('./routes/owners');
+const adminPaymentRoutes = require('./routes/adminPayments');
 const { errorHandler, notFoundHandler } = require('./middleware/errorHandler');
 const { specs, swaggerUi, swaggerOptions } = require('./config/swagger');
 const { testConnection, syncDatabase } = require('./models');
@@ -112,6 +113,7 @@ app.use('/api/upload', uploadRoutes);
 app.use('/api/subscriptions', subscriptionRoutes);
 app.use('/api/subscription-features', subscriptionFeatureRoutes);
 app.use('/api/owners', ownerRoutes);
+app.use('/api/admin', adminPaymentRoutes);
 // Note: /api/user-subscriptions, /api/payments, and /api/invoices routes removed (were empty)
 app.use('/api/slots', slotRoutes);
 

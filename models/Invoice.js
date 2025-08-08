@@ -66,10 +66,44 @@ const Invoice = sequelize.define('Invoice', {
   currency: {
     type: DataTypes.STRING(3),
     allowNull: false,
-    defaultValue: 'USD',
+    defaultValue: 'INR',
     validate: {
       len: [3, 3]
     }
+  },
+  // Commission breakdown fields
+  commission: {
+    type: DataTypes.DECIMAL(10, 2),
+    allowNull: true,
+    validate: {
+      min: 0
+    }
+  },
+  gstOnCommission: {
+    type: DataTypes.DECIMAL(10, 2),
+    allowNull: true,
+    validate: {
+      min: 0
+    },
+    field: 'gst_on_commission'
+  },
+  vendorAmount: {
+    type: DataTypes.DECIMAL(10, 2),
+    allowNull: true,
+    validate: {
+      min: 0
+    },
+    field: 'vendor_amount'
+  },
+  gymName: {
+    type: DataTypes.STRING(255),
+    allowNull: true,
+    field: 'gym_name'
+  },
+  subscriptionTitle: {
+    type: DataTypes.STRING(255),
+    allowNull: true,
+    field: 'subscription_title'
   },
   status: {
     type: DataTypes.ENUM('draft', 'sent', 'paid', 'overdue', 'cancelled'),
