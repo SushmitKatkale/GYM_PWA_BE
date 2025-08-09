@@ -16,6 +16,7 @@ const slotRoutes = require('./routes/slots');
 const ownerRoutes = require('./routes/owners');
 const adminPaymentRoutes = require('./routes/adminPayments');
 const advertisementRoutes = require('./routes/advertisements');
+const dashboardRoutes = require('./routes/dashboard');
 const { errorHandler, notFoundHandler } = require('./middleware/errorHandler');
 const { specs, swaggerUi, swaggerOptions } = require('./config/swagger');
 const { testConnection, syncDatabase } = require('./models');
@@ -119,6 +120,7 @@ app.use('/api/admin', adminPaymentRoutes);
 // Note: /api/user-subscriptions, /api/payments, and /api/invoices routes removed (were empty)
 app.use('/api/slots', slotRoutes);
 app.use('/api/advertisements', advertisementRoutes);
+app.use('/api/dashboard', dashboardRoutes);
 
 // 404 handler
 app.use(notFoundHandler);
