@@ -442,4 +442,165 @@ router.get('/search/gyms', adminPaymentController.searchGyms);
  */
 router.get('/search/subscriptions', adminPaymentController.searchSubscriptions);
 
+// Payment Management Routes
+/**
+ * @swagger
+ * /api/admin/payments:
+ *   get:
+ *     summary: Get all payments with filtering and pagination
+ *     tags: [Admin Payment Management]
+ *     security:
+ *       - bearerAuth: []
+ *     parameters:
+ *       - in: query
+ *         name: page
+ *         schema:
+ *           type: integer
+ *           default: 1
+ *       - in: query
+ *         name: limit
+ *         schema:
+ *           type: integer
+ *           default: 10
+ *       - in: query
+ *         name: status
+ *         schema:
+ *           type: string
+ *           enum: [pending, completed, failed, cancelled]
+ *       - in: query
+ *         name: gateway
+ *         schema:
+ *           type: string
+ *           enum: [razorpay, phonepe]
+ *       - in: query
+ *         name: userEmail
+ *         schema:
+ *           type: string
+ *       - in: query
+ *         name: gymName
+ *         schema:
+ *           type: string
+ *       - in: query
+ *         name: dateFrom
+ *         schema:
+ *           type: string
+ *           format: date
+ *       - in: query
+ *         name: dateTo
+ *         schema:
+ *           type: string
+ *           format: date
+ *     responses:
+ *       200:
+ *         description: Payments retrieved successfully
+ */
+router.get('/payments', adminPaymentController.getAllPayments);
+
+/**
+ * @swagger
+ * /api/admin/payments/{id}:
+ *   get:
+ *     summary: Get payment details by ID
+ *     tags: [Admin Payment Management]
+ *     security:
+ *       - bearerAuth: []
+ *     parameters:
+ *       - in: path
+ *         name: id
+ *         required: true
+ *         schema:
+ *           type: integer
+ *     responses:
+ *       200:
+ *         description: Payment details retrieved successfully
+ */
+router.get('/payments/:id', adminPaymentController.getPaymentById);
+
+/**
+ * @swagger
+ * /api/admin/payments/stats:
+ *   get:
+ *     summary: Get payment statistics
+ *     tags: [Admin Payment Management]
+ *     security:
+ *       - bearerAuth: []
+ *     responses:
+ *       200:
+ *         description: Payment statistics retrieved successfully
+ */
+router.get('/payments/stats', adminPaymentController.getPaymentStats);
+
+// User Subscription Management Routes
+/**
+ * @swagger
+ * /api/admin/user-subscriptions:
+ *   get:
+ *     summary: Get all user subscriptions with filtering and pagination
+ *     tags: [Admin Subscription Management]
+ *     security:
+ *       - bearerAuth: []
+ *     parameters:
+ *       - in: query
+ *         name: page
+ *         schema:
+ *           type: integer
+ *           default: 1
+ *       - in: query
+ *         name: limit
+ *         schema:
+ *           type: integer
+ *           default: 10
+ *       - in: query
+ *         name: status
+ *         schema:
+ *           type: string
+ *           enum: [active, expired, expiring]
+ *       - in: query
+ *         name: userEmail
+ *         schema:
+ *           type: string
+ *       - in: query
+ *         name: gymName
+ *         schema:
+ *           type: string
+ *     responses:
+ *       200:
+ *         description: User subscriptions retrieved successfully
+ */
+router.get('/user-subscriptions', adminPaymentController.getAllUserSubscriptions);
+
+/**
+ * @swagger
+ * /api/admin/user-subscriptions/{id}:
+ *   get:
+ *     summary: Get user subscription details by ID
+ *     tags: [Admin Subscription Management]
+ *     security:
+ *       - bearerAuth: []
+ *     parameters:
+ *       - in: path
+ *         name: id
+ *         required: true
+ *         schema:
+ *           type: integer
+ *     responses:
+ *       200:
+ *         description: User subscription details retrieved successfully
+ */
+router.get('/user-subscriptions/:id', adminPaymentController.getUserSubscriptionById);
+
+/**
+ * @swagger
+ * /api/admin/user-subscriptions/stats:
+ *   get:
+ *     summary: Get user subscription statistics
+ *     tags: [Admin Subscription Management]
+ *     security:
+ *       - bearerAuth: []
+ *     responses:
+ *       200:
+ *         description: User subscription statistics retrieved successfully
+ */
+router.get('/user-subscriptions/stats', adminPaymentController.getUserSubscriptionStats);
+
 module.exports = router;
