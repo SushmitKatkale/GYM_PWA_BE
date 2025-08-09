@@ -125,7 +125,7 @@ async function determinePaymentGateway(gymId) {
  * Create payment order with automatic gateway selection
  */
 async function initiatePayment(paymentData) {
-  const { gymId, subscriptionId, amount, userEmail } = paymentData;
+  const { gymId, subscriptionId, baseAmount, gstAmount, totalAmount, userEmail } = paymentData;
 
   try {
     // Get user details
@@ -149,18 +149,23 @@ async function initiatePayment(paymentData) {
     const { gateway, config } = await determinePaymentGateway(gymId);
     
     console.log(`Using payment gateway: ${gateway} for gym ${gymId}`);
+    console.log(`Payment breakdown: Base: ₹${baseAmount}, GST: ₹${gstAmount}, Total: ₹${totalAmount}`);
 
     if (gateway === 'razorpay') {
       return await createRazorpayPayment({
         subscription,
         vendorConfig: config,
-        amount,
+        baseAmount,
+        gstAmount,
+        totalAmount,
         userEmail
       });
     } else {
       return await createPhonepePayment({
         subscription,
-        amount,
+        baseAmount,
+        gstAmount,
+        totalAmount,
         userEmail,
         user
       });
@@ -172,18 +177,18 @@ async function initiatePayment(paymentData) {
 }
 
 /**
- * Create Razorpay payment with commission splits
+ * Create Razorpay payment with commission splits and GST
  */
-async function createRazorpayPayment({ subscription, vendorConfig, amount, userEmail }) {
+async function createRazorpayPayment({ subscription, vendorConfig, baseAmount, gstAmount, totalAmount, userEmail }) {
   const splits = calculateCommissionWithGST(
-    amount,
+    totalAmount, // Calculate commission on total amount including GST
     vendorConfig.cutType,
     vendorConfig.cutValue
   );
 
   // Create Razorpay order with transfers
   const order = await razorpayInstance.orders.create({
-    amount: amount * 100, // in paise
+    amount: totalAmount * 100, // Total amount including GST in paise
     currency: 'INR',
     receipt: `sub_${subscription.id}_${Date.now()}`,
     transfers: [
@@ -200,10 +205,10 @@ async function createRazorpayPayment({ subscription, vendorConfig, amount, userE
     ],
   });
 
-  // Save payment record
+  // Save payment record with GST details
   const payment = await Payment.create({
-    paymentAmount: amount,
-    paymentRefNo: order.receipt, // Use Razorpay receipt as payment reference
+    paymentAmount: totalAmount, // Total amount including GST
+    paymentRefNo: order.receipt,
     razorpayOrderId: order.id,
     vendorConfigId: vendorConfig.id,
     subscriptionId: subscription.id,
@@ -214,29 +219,45 @@ async function createRazorpayPayment({ subscription, vendorConfig, amount, userE
     gstOnCommission: splits.gstOnCommission,
     totalDeduction: splits.totalDeduction,
     vendorAmount: splits.vendorAmount,
+    // Add GST breakdown to payment record
+    cutCalculationDetails: {
+      baseAmount,
+      gstAmount,
+      gstRate: 18,
+      totalAmount,
+      commissionCalculation: splits
+    }
   });
 
   return {
     success: true,
     gateway: 'razorpay',
     orderId: order.id,
-    amount: amount,
+    amount: totalAmount, // Return total amount including GST
+    baseAmount,
+    gstAmount,
     currency: 'INR',
     key: process.env.RAZORPAY_KEY_ID,
     paymentId: payment.id,
-    splits
+    splits,
+    gstBreakdown: {
+      baseAmount,
+      gstRate: '18%',
+      gstAmount,
+      totalAmount
+    }
   };
 }
 
 /**
- * Create PhonePe payment (fallback)
+ * Create PhonePe payment (fallback) with GST
  */
-async function createPhonepePayment({ subscription, amount, userEmail, user }) {
+async function createPhonepePayment({ subscription, baseAmount, gstAmount, totalAmount, userEmail, user }) {
   const merchantTransactionId = phonepeService.generateMerchantTransactionId();
 
   // Save payment record first to get payment ID
   const payment = await Payment.create({
-    paymentAmount: amount,
+    paymentAmount: totalAmount, // Total amount including GST
     paymentRefNo: merchantTransactionId,
     phonepeTransactionId: merchantTransactionId,
     subscriptionId: subscription.id,
@@ -246,13 +267,21 @@ async function createPhonepePayment({ subscription, amount, userEmail, user }) {
     commission: 0, // No commission for PhonePe fallback
     gstOnCommission: 0,
     totalDeduction: 0,
-    vendorAmount: amount, // Full amount goes to one account
+    vendorAmount: totalAmount, // Full amount goes to one account
+    // Add GST breakdown to payment record
+    cutCalculationDetails: {
+      baseAmount,
+      gstAmount,
+      gstRate: 18,
+      totalAmount,
+      commissionCalculation: null // No commission splits for PhonePe
+    }
   });
 
   // Create PhonePe order with payment ID for dynamic redirect URL
   const phonepeOrder = await phonepeService.createOrder({
     merchantTransactionId,
-    amount,
+    amount: totalAmount, // Send total amount including GST
     userEmail,
     userPhone: user.phoneNumber || '9999999999', // Fallback phone number
     paymentId: payment.id // Pass payment ID for dynamic redirect URL
@@ -263,8 +292,16 @@ async function createPhonepePayment({ subscription, amount, userEmail, user }) {
     gateway: 'phonepe',
     orderId: merchantTransactionId,
     paymentUrl: phonepeOrder.paymentUrl,
-    amount: amount,
-    paymentId: payment.id
+    amount: totalAmount, // Return total amount including GST
+    baseAmount,
+    gstAmount,
+    paymentId: payment.id,
+    gstBreakdown: {
+      baseAmount,
+      gstRate: '18%',
+      gstAmount,
+      totalAmount
+    }
   };
 }
 

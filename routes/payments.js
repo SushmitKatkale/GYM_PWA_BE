@@ -39,7 +39,7 @@ const paymentController = require('../controllers/paymentController');
  *               amount:
  *                 type: number
  *                 format: float
- *                 description: Payment amount
+ *                 description: Base subscription amount (18% GST will be added automatically)
  *               userId:
  *                 type: integer
  *                 description: ID of the user making payment
@@ -59,16 +59,26 @@ const paymentController = require('../controllers/paymentController');
  *                     gateway:
  *                       type: string
  *                       enum: [razorpay, phonepe]
- *                     orderId:
- *                       type: string
  *                     amount:
  *                       type: number
+ *                       description: Total amount including 18% GST
+ *                     baseAmount:
+ *                       type: number
+ *                       description: Base subscription amount
+ *                     gstAmount:
+ *                       type: number
+ *                       description: GST amount (18%)
+ *                     currency:
+ *                       type: string
  *                     paymentUrl:
  *                       type: string
  *                       description: For PhonePe payments
  *                     key:
  *                       type: string
  *                       description: For Razorpay payments
+ *                     gstBreakdown:
+ *                       type: object
+ *                       description: GST calculation breakdown
  *       400:
  *         description: Invalid request data
  *       401:

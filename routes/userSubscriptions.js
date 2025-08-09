@@ -313,6 +313,67 @@ router.get('/history', authenticate, async (req, res) => {
   }
 });
 
+// Route for getting subscriptions by user email
+router.get('/user/:userEmail', authenticate, async (req, res) => {
+  try {
+    const userEmail = req.params.userEmail;
+    
+    // Verify user can access this data (admin or self)
+    if (req.user.email !== userEmail && req.user.role !== 'admin') {
+      return res.status(403).json({
+        success: false,
+        message: 'Access denied. You can only view your own subscriptions.',
+        timestamp: new Date().toISOString()
+      });
+    }
+
+    const subscriptions = await UserSubscription.findAll({
+      where: {
+        userEmail,
+        activeStatus: true
+      },
+      include: [
+        {
+          model: Subscription,
+          as: 'subscription',
+          include: [
+            {
+              model: Gym,
+              as: 'gym',
+              attributes: ['id', 'name', 'address', 'city', 'rating']
+            }
+          ]
+        },
+        {
+          model: Payment,
+          as: 'payment',
+          attributes: [
+            'id', 'paymentAmount', 'status', 'gateway', 
+            'paidVia', 'completedAt', 'transactionId'
+          ]
+        }
+      ],
+      order: [['createTimestamp', 'DESC']]
+    });
+
+    res.status(200).json({
+      success: true,
+      message: 'User subscriptions retrieved successfully',
+      data: {
+        subscriptions
+      },
+      timestamp: new Date().toISOString()
+    });
+  } catch (error) {
+    console.error('Error fetching user subscriptions by email:', error);
+    res.status(500).json({
+      success: false,
+      message: 'Failed to retrieve user subscriptions',
+      timestamp: new Date().toISOString()
+    });
+  }
+});
+
 router.get('/', authenticate, async (req, res) => {
   try {
     const userEmail = req.user.email;

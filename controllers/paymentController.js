@@ -18,15 +18,24 @@ async function initiatePayment(req, res) {
       return ResponseUtil.error(res, 'Amount must be greater than 0', 400);
     }
 
-    // Initiate payment
+    // Calculate total amount including 18% GST
+    const baseAmount = parseFloat(amount);
+    const gstAmount = Math.round(baseAmount * 0.18 * 100) / 100; // Round to 2 decimal places
+    const totalAmountWithGST = baseAmount + gstAmount;
+
+    console.log(`💰 Payment calculation: Base: ₹${baseAmount}, GST (18%): ₹${gstAmount}, Total: ₹${totalAmountWithGST}`);
+
+    // Initiate payment with GST included
     const paymentData = await paymentService.initiatePayment({
       gymId,
       subscriptionId,
-      amount: parseFloat(amount),
+      baseAmount,
+      gstAmount,
+      totalAmount: totalAmountWithGST,
       userEmail
     });
 
-    return ResponseUtil.success(res, paymentData, 'Payment initiated successfully');
+    return ResponseUtil.success(res, paymentData, 'Payment initiated successfully with 18% GST included');
 
   } catch (error) {
     console.error('Payment initiation error:', error);
