@@ -11,10 +11,11 @@ const gymImageRoutes = require('./routes/gymImages');
 const uploadRoutes = require('./routes/upload');
 const subscriptionRoutes = require('./routes/subscriptions');
 const subscriptionFeatureRoutes = require('./routes/subscriptionFeatures');
-// Note: userSubscriptions, payments, and invoices routes removed (were empty)
+const userSubscriptionRoutes = require('./routes/userSubscriptions');
 const slotRoutes = require('./routes/slots');
 const ownerRoutes = require('./routes/owners');
 const adminPaymentRoutes = require('./routes/adminPayments');
+const paymentRoutes = require('./routes/payments');
 const advertisementRoutes = require('./routes/advertisements');
 const dashboardRoutes = require('./routes/dashboard');
 const { errorHandler, notFoundHandler } = require('./middleware/errorHandler');
@@ -115,9 +116,10 @@ app.use('/api/gym-images', gymImageRoutes);
 app.use('/api/upload', uploadRoutes);
 app.use('/api/subscriptions', subscriptionRoutes);
 app.use('/api/subscription-features', subscriptionFeatureRoutes);
+app.use('/api/user-subscriptions', userSubscriptionRoutes);
 app.use('/api/owners', ownerRoutes);
 app.use('/api/admin', adminPaymentRoutes);
-// Note: /api/user-subscriptions, /api/payments, and /api/invoices routes removed (were empty)
+app.use('/api/payments', paymentRoutes);
 app.use('/api/slots', slotRoutes);
 app.use('/api/advertisements', advertisementRoutes);
 app.use('/api/dashboard', dashboardRoutes);

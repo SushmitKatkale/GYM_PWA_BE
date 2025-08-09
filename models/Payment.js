@@ -20,13 +20,13 @@ const Payment = sequelize.define('Payment', {
   },
   paidVia: {
     type: DataTypes.ENUM('credit_card', 'debit_card', 'upi', 'net_banking', 'wallet', 'cash', 'bank_transfer'),
-    allowNull: false,
+    allowNull: true,
     field: 'paid_via'
   },
   paymentCcy: {
     type: DataTypes.STRING(3),
     allowNull: false,
-    defaultValue: 'USD',
+    defaultValue: 'INR',
     validate: {
       len: [3, 3]
     },
@@ -55,14 +55,6 @@ const Payment = sequelize.define('Payment', {
     type: DataTypes.TEXT,
     allowNull: true,
     field: 'gateway_response'
-  },
-  userEmail: {
-    type: DataTypes.STRING(255),
-    allowNull: false,
-    validate: {
-      isEmail: true
-    },
-    field: 'user_email'
   },
   activeStatus: {
     type: DataTypes.BOOLEAN,
@@ -153,6 +145,55 @@ const Payment = sequelize.define('Payment', {
     type: DataTypes.JSON,
     allowNull: true,
     field: 'cut_calculation_details'
+  },
+  // Gateway information
+  gateway: {
+    type: DataTypes.ENUM('razorpay', 'phonepe'),
+    allowNull: true,
+    defaultValue: 'razorpay'
+  },
+  // PhonePe specific fields
+  phonepeTransactionId: {
+    type: DataTypes.STRING(255),
+    allowNull: true,
+    field: 'phonepe_transaction_id'
+  },
+  phonepePaymentId: {
+    type: DataTypes.STRING(255),
+    allowNull: true,
+    field: 'phonepe_payment_id'
+  },
+  // Additional fields for better tracking
+  userEmail: {
+    type: DataTypes.STRING(255),
+    allowNull: false,
+    validate: {
+      isEmail: true
+    },
+    references: {
+      model: 'users',
+      key: 'email'
+    },
+    field: 'user_email'
+  },
+  subscriptionId: {
+    type: DataTypes.INTEGER,
+    allowNull: true,
+    references: {
+      model: 'subscriptions',
+      key: 'id'
+    },
+    field: 'subscription_id'
+  },
+  status: {
+    type: DataTypes.ENUM('pending', 'completed', 'failed', 'cancelled'),
+    allowNull: false,
+    defaultValue: 'pending'
+  },
+  completedAt: {
+    type: DataTypes.DATE,
+    allowNull: true,
+    field: 'completed_at'
   }
 }, {
   tableName: 'payments',
