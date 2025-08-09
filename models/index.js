@@ -176,6 +176,7 @@ const VendorPaymentConfig = require('./VendorPaymentConfig');
 const Advertisement = require('./Advertisement');
 const AdvertisementMedia = require('./AdvertisementMedia');
 const AdvertisementAnalytics = require('./AdvertisementAnalytics');
+const Refund = require('./Refund');
 
 // Define relationships
 // Gym-User owner relationship
@@ -416,6 +417,42 @@ VendorPaymentConfig.hasMany(Payment, {
   onDelete: 'SET NULL',
 });
 
+// Refund relationships
+Payment.hasMany(Refund, {
+  foreignKey: 'paymentId',
+  as: 'refunds',
+  onDelete: 'CASCADE',
+});
+
+Refund.belongsTo(Payment, {
+  foreignKey: 'paymentId',
+  as: 'payment',
+});
+
+UserSubscription.hasMany(Refund, {
+  foreignKey: 'subscriptionId',
+  as: 'refunds',
+  onDelete: 'CASCADE',
+});
+
+Refund.belongsTo(UserSubscription, {
+  foreignKey: 'subscriptionId',
+  as: 'subscription',
+});
+
+User.hasMany(Refund, {
+  foreignKey: 'userEmail',
+  sourceKey: 'email',
+  as: 'refunds',
+  onDelete: 'CASCADE',
+});
+
+Refund.belongsTo(User, {
+  foreignKey: 'userEmail',
+  targetKey: 'email',
+  as: 'user',
+});
+
 // Advertisement relationships
 Advertisement.hasMany(AdvertisementMedia, {
   foreignKey: 'advertisementId',
@@ -606,6 +643,7 @@ module.exports = {
   SlotChangeHistory,
   SlotWaitlist,
   VendorPaymentConfig,
+  Refund,
   Advertisement,
   AdvertisementMedia,
   AdvertisementAnalytics,

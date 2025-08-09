@@ -331,9 +331,114 @@ function getFullStateName(abbreviation) {
   return states[abbreviation] || abbreviation;
 }
 
+/**
+ * Initiate refund with Razorpay
+ */
+async function initiateRefund(refundData) {
+  try {
+    const {
+      razorpayPaymentId,
+      refundAmount,
+      refundReason,
+      refundId // Our internal refund ID for tracking
+    } = refundData;
+
+    if (!razorpayPaymentId) {
+      throw new Error('Razorpay payment ID is required for refund');
+    }
+
+    if (!refundAmount || refundAmount <= 0) {
+      throw new Error('Valid refund amount is required');
+    }
+
+    // Convert amount to paise for Razorpay
+    const amountInPaise = Math.round(refundAmount * 100);
+
+    // Create refund request payload
+    const refundPayload = {
+      amount: amountInPaise,
+      notes: {
+        reason: refundReason || 'Refund requested',
+        internal_refund_id: refundId?.toString() || 'N/A'
+      }
+    };
+
+    console.log('Initiating Razorpay refund:', {
+      paymentId: razorpayPaymentId,
+      amount: `₹${refundAmount}`,
+      amountInPaise,
+      reason: refundReason
+    });
+
+    // Call Razorpay refund API
+    const razorpayRefund = await razorpayInstance.payments.refund(razorpayPaymentId, refundPayload);
+
+    console.log('Razorpay refund initiated successfully:', {
+      refundId: razorpayRefund.id,
+      status: razorpayRefund.status,
+      amount: razorpayRefund.amount
+    });
+
+    return {
+      success: true,
+      gatewayRefundId: razorpayRefund.id,
+      status: convertRazorpayRefundStatus(razorpayRefund.status),
+      amount: razorpayRefund.amount / 100, // Convert back to rupees
+      gatewayResponse: razorpayRefund,
+      message: 'Refund initiated successfully with Razorpay'
+    };
+
+  } catch (error) {
+    console.error('Razorpay refund initiation error:', {
+      message: error.message,
+      response: error.response?.data,
+      status: error.response?.status
+    });
+
+    throw new Error(`Razorpay refund failed: ${error.message}`);
+  }
+}
+
+/**
+ * Check refund status with Razorpay
+ */
+async function checkRefundStatus(gatewayRefundId) {
+  try {
+    const refund = await razorpayInstance.refunds.fetch(gatewayRefundId);
+    
+    return {
+      success: true,
+      status: convertRazorpayRefundStatus(refund.status),
+      amount: refund.amount / 100,
+      gatewayResponse: refund
+    };
+  } catch (error) {
+    console.error('Razorpay refund status check error:', error);
+    throw new Error(`Failed to check refund status: ${error.message}`);
+  }
+}
+
+/**
+ * Convert Razorpay refund status to our standard status
+ */
+function convertRazorpayRefundStatus(razorpayStatus) {
+  switch (razorpayStatus) {
+    case 'pending':
+      return 'processing';
+    case 'processed':
+      return 'completed';
+    case 'failed':
+      return 'failed';
+    default:
+      return 'processing';
+  }
+}
+
 module.exports = {
   onboardVendor,
   checkVendorAccountStatus,
   updateVendorKYCStatus,
+  initiateRefund,
+  checkRefundStatus,
   getFullStateName // export for testing
 };

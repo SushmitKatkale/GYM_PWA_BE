@@ -328,6 +328,8 @@ async function handleRazorpayCallback(paymentData) {
     });
 
     if (payment) {
+      const wasPaymentPending = payment.status === 'pending';
+      
       await payment.update({
         razorpayPaymentId: razorpay_payment_id,
         transactionId: razorpay_payment_id,
@@ -335,6 +337,16 @@ async function handleRazorpayCallback(paymentData) {
         completedAt: new Date(),
         gatewayResponse: JSON.stringify(paymentData)
       });
+
+      // Send payment confirmation email if payment was pending
+      if (wasPaymentPending) {
+        try {
+          await sendPaymentCompletionEmail(payment.id);
+        } catch (emailError) {
+          console.error('Error sending payment confirmation email from Razorpay callback:', emailError);
+          // Don't fail the callback if email fails
+        }
+      }
     }
 
     return { success: true, payment };
@@ -400,7 +412,18 @@ async function handlePhonepeCallback(webhookData, xVerifyHeader) {
         updateFields: Object.keys(updateData)
       });
       
+      const wasPaymentPending = payment.status === 'pending';
       await payment.update(updateData);
+
+      // Send payment confirmation email if payment was completed
+      if (paymentStatus === 'completed' && wasPaymentPending) {
+        try {
+          await sendPaymentCompletionEmail(payment.id);
+        } catch (emailError) {
+          console.error('Error sending payment confirmation email from PhonePe callback:', emailError);
+          // Don't fail the callback if email fails
+        }
+      }
     }
 
     return { success: true, payment, status: paymentStatus };
@@ -411,11 +434,82 @@ async function handlePhonepeCallback(webhookData, xVerifyHeader) {
 }
 
 /**
+ * Helper function to send payment completion email
+ */
+async function sendPaymentCompletionEmail(paymentId) {
+  try {
+    const { UserSubscription, User } = require('../models');
+    const mailService = require('./mailService');
+    
+    // Get payment with related data
+    const payment = await Payment.findByPk(paymentId, {
+      include: [{
+        model: Subscription,
+        as: 'subscription',
+        include: [{
+          model: Gym,
+          as: 'gym'
+        }]
+      }]
+    });
+
+    if (!payment) {
+      throw new Error('Payment not found for email notification');
+    }
+
+    // Get or create user subscription
+    let userSubscription = await UserSubscription.findOne({
+      where: { paymentId: payment.id }
+    });
+
+    if (!userSubscription) {
+      const validFrom = new Date();
+      const validTo = new Date();
+      validTo.setDate(validTo.getDate() + payment.subscription.validityDays);
+
+      userSubscription = await UserSubscription.create({
+        userEmail: payment.userEmail,
+        subscriptionId: payment.subscriptionId,
+        paymentId: payment.id,
+        validFrom,
+        validTo,
+        bufferDays: 0,
+        activeStatus: true
+      });
+    }
+
+    // Get user details for personalized email
+    const user = await User.findOne({ where: { email: payment.userEmail } });
+    const userName = user ? `${user.firstName} ${user.lastName}`.trim() : 'Valued Customer';
+
+    // Send payment confirmation email
+    await mailService.sendPaymentConfirmation({
+      userEmail: payment.userEmail,
+      userName,
+      paymentAmount: payment.paymentAmount,
+      transactionId: payment.transactionId || payment.razorpayPaymentId || payment.phonepePaymentId,
+      paymentMethod: payment.paidVia,
+      gymName: payment.subscription?.gym?.name || 'Gym',
+      subscriptionTitle: payment.subscription?.title || 'Gym Subscription',
+      validFrom: userSubscription.validFrom,
+      validTo: userSubscription.validTo,
+      gateway: payment.gateway
+    });
+
+    console.log(`Payment confirmation email sent to ${payment.userEmail} from helper function`);
+  } catch (error) {
+    console.error('Error in sendPaymentCompletionEmail helper:', error);
+    throw error;
+  }
+}
+
+/**
  * Process payment status after redirect from gateway and update related records
  */
 async function processPaymentStatus(paymentId) {
   try {
-    const { UserSubscription } = require('../models');
+    const { UserSubscription, User } = require('../models');
+    const mailService = require('./mailService');
     
     // Get payment with related data including subscription and gym information
     const payment = await Payment.findByPk(paymentId, {
@@ -437,6 +531,7 @@ async function processPaymentStatus(paymentId) {
     let message = '';
     let nextAction = '';
     let userSubscription = null;
+    let shouldSendPaymentEmail = false; // Track if we need to send email
 
     // Check payment status from gateway if still pending
     if (payment.status === 'pending') {
@@ -516,6 +611,10 @@ async function processPaymentStatus(paymentId) {
           await payment.update(updateData);
           
           paymentStatus = newStatus;
+          // Mark for email if status changed to completed
+          if (newStatus === 'completed' && payment.status === 'pending') {
+            shouldSendPaymentEmail = true;
+          }
         }
       } else if (payment.gateway === 'razorpay' && payment.razorpayOrderId) {
         // Check Razorpay payment status
@@ -528,6 +627,10 @@ async function processPaymentStatus(paymentId) {
               completedAt: new Date()
             });
             paymentStatus = 'completed';
+            // Mark for email if status changed to completed
+            if (payment.status === 'pending') {
+              shouldSendPaymentEmail = true;
+            }
           }
         } catch (razorpayError) {
           console.error('Razorpay status check error:', razorpayError);
@@ -558,6 +661,33 @@ async function processPaymentStatus(paymentId) {
         });
       } else {
         userSubscription = existingUserSub;
+      }
+
+      // Send payment confirmation email
+      if (shouldSendPaymentEmail || !existingUserSub) {
+        try {
+          // Get user details for personalized email
+          const user = await User.findOne({ where: { email: payment.userEmail } });
+          const userName = user ? `${user.firstName} ${user.lastName}`.trim() : 'Valued Customer';
+
+          await mailService.sendPaymentConfirmation({
+            userEmail: payment.userEmail,
+            userName,
+            paymentAmount: payment.paymentAmount,
+            transactionId: payment.transactionId || payment.razorpayPaymentId || payment.phonepePaymentId,
+            paymentMethod: payment.paidVia,
+            gymName: payment.subscription?.gym?.name || 'Gym',
+            subscriptionTitle: payment.subscription?.title || 'Gym Subscription',
+            validFrom: userSubscription?.validFrom || new Date(),
+            validTo: userSubscription?.validTo || new Date(),
+            gateway: payment.gateway
+          });
+
+          console.log(`Payment confirmation email sent to ${payment.userEmail}`);
+        } catch (emailError) {
+          console.error('Error sending payment confirmation email:', emailError);
+          // Don't fail the payment process if email fails
+        }
       }
 
       message = 'Payment completed successfully! Your subscription is now active.';

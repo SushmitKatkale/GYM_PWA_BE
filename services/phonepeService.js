@@ -287,6 +287,108 @@ class PhonePeService {
         return phonepeMethod.toLowerCase();
     }
   }
+
+  /**
+   * Initiate refund with PhonePe
+   * Note: PhonePe refunds are typically processed through their dashboard/API
+   * This is a placeholder implementation for the gateway-first refund flow
+   */
+  async initiateRefund(refundData) {
+    try {
+      const {
+        phonepeTransactionId,
+        refundAmount,
+        refundReason,
+        refundId
+      } = refundData;
+
+      if (!phonepeTransactionId) {
+        throw new Error('PhonePe transaction ID is required for refund');
+      }
+
+      if (!refundAmount || refundAmount <= 0) {
+        throw new Error('Valid refund amount is required');
+      }
+
+      console.log('Initiating PhonePe refund:', {
+        transactionId: phonepeTransactionId,
+        amount: `₹${refundAmount}`,
+        reason: refundReason,
+        internalRefundId: refundId
+      });
+
+      // Note: PhonePe doesn't have a direct refund API in their current SDK
+      // Refunds are typically processed through their merchant dashboard
+      // For now, we'll simulate the refund initiation and mark it as processing
+      
+      console.warn('PhonePe refunds require manual processing through merchant dashboard');
+      
+      // Generate a mock refund ID for tracking
+      const mockGatewayRefundId = `phonepe_refund_${Date.now()}_${Math.random().toString(36).substring(2, 8)}`;
+
+      return {
+        success: true,
+        gatewayRefundId: mockGatewayRefundId,
+        status: 'processing', // PhonePe refunds start as processing
+        amount: refundAmount,
+        gatewayResponse: {
+          message: 'Refund initiated - requires manual processing via PhonePe dashboard',
+          originalTransactionId: phonepeTransactionId,
+          refundId: mockGatewayRefundId,
+          amount: refundAmount,
+          reason: refundReason
+        },
+        message: 'Refund initiated with PhonePe - manual processing required'
+      };
+
+    } catch (error) {
+      console.error('PhonePe refund initiation error:', error);
+      throw new Error(`PhonePe refund failed: ${error.message}`);
+    }
+  }
+
+  /**
+   * Check refund status with PhonePe
+   * Note: This is a placeholder as PhonePe doesn't provide direct refund status API
+   */
+  async checkRefundStatus(gatewayRefundId) {
+    try {
+      console.log(`Checking PhonePe refund status for: ${gatewayRefundId}`);
+      
+      // Since PhonePe doesn't have direct refund status API,
+      // this would typically require manual status updates through webhook/dashboard
+      return {
+        success: true,
+        status: 'processing', // Default status until manually updated
+        gatewayResponse: {
+          message: 'PhonePe refund status requires manual verification',
+          refundId: gatewayRefundId
+        }
+      };
+    } catch (error) {
+      console.error('PhonePe refund status check error:', error);
+      throw new Error(`Failed to check refund status: ${error.message}`);
+    }
+  }
+
+  /**
+   * Convert PhonePe refund status to standard status
+   */
+  convertRefundStatus(phonepeStatus) {
+    // PhonePe specific refund status mapping
+    switch (phonepeStatus) {
+      case 'SUCCESS':
+      case 'COMPLETED':
+        return 'completed';
+      case 'FAILED':
+        return 'failed';
+      case 'PENDING':
+      case 'IN_PROGRESS':
+        return 'processing';
+      default:
+        return 'processing';
+    }
+  }
 }
 
 module.exports = new PhonePeService();

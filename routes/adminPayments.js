@@ -603,4 +603,287 @@ router.get('/user-subscriptions/:id', adminPaymentController.getUserSubscription
  */
 router.get('/user-subscriptions/stats', adminPaymentController.getUserSubscriptionStats);
 
+// Refund Management Routes
+/**
+ * @swagger
+ * /api/admin/payments/{paymentId}/refund-check:
+ *   get:
+ *     summary: Check if payment is eligible for refund
+ *     tags: [Admin Refund Management]
+ *     security:
+ *       - bearerAuth: []
+ *     parameters:
+ *       - in: path
+ *         name: paymentId
+ *         required: true
+ *         schema:
+ *           type: integer
+ *         description: Payment ID to check refund eligibility
+ *     responses:
+ *       200:
+ *         description: Refund eligibility check completed
+ *         content:
+ *           application/json:
+ *             schema:
+ *               type: object
+ *               properties:
+ *                 success:
+ *                   type: boolean
+ *                 data:
+ *                   type: object
+ *                   properties:
+ *                     isRefundable:
+ *                       type: boolean
+ *                     reason:
+ *                       type: string
+ *                     maxRefundAmount:
+ *                       type: number
+ *                     alreadyRefunded:
+ *                       type: number
+ *       404:
+ *         description: Payment not found
+ */
+router.get('/payments/:paymentId/refund-check', adminPaymentController.checkPaymentRefundable);
+
+/**
+ * @swagger
+ * /api/admin/refunds:
+ *   get:
+ *     summary: Get all refunds with filtering and pagination
+ *     tags: [Admin Refund Management]
+ *     security:
+ *       - bearerAuth: []
+ *     parameters:
+ *       - in: query
+ *         name: page
+ *         schema:
+ *           type: integer
+ *           default: 1
+ *       - in: query
+ *         name: limit
+ *         schema:
+ *           type: integer
+ *           default: 10
+ *       - in: query
+ *         name: status
+ *         schema:
+ *           type: string
+ *           enum: [pending, processing, completed, failed, cancelled]
+ *       - in: query
+ *         name: userEmail
+ *         schema:
+ *           type: string
+ *       - in: query
+ *         name: refundType
+ *         schema:
+ *           type: string
+ *           enum: [full, partial]
+ *       - in: query
+ *         name: dateFrom
+ *         schema:
+ *           type: string
+ *           format: date
+ *       - in: query
+ *         name: dateTo
+ *         schema:
+ *           type: string
+ *           format: date
+ *     responses:
+ *       200:
+ *         description: Refunds retrieved successfully
+ */
+router.get('/refunds', adminPaymentController.getAllRefunds);
+
+/**
+ * @swagger
+ * /api/admin/refunds:
+ *   post:
+ *     summary: Create a new refund
+ *     tags: [Admin Refund Management]
+ *     security:
+ *       - bearerAuth: []
+ *     requestBody:
+ *       required: true
+ *       content:
+ *         application/json:
+ *           schema:
+ *             type: object
+ *             required:
+ *               - paymentId
+ *               - refundAmount
+ *               - refundReason
+ *               - refundType
+ *             properties:
+ *               paymentId:
+ *                 type: integer
+ *                 description: ID of the payment to refund
+ *               subscriptionId:
+ *                 type: integer
+ *                 description: ID of the subscription (if applicable)
+ *               refundAmount:
+ *                 type: number
+ *                 format: float
+ *                 description: Amount to refund
+ *               refundReason:
+ *                 type: string
+ *                 description: Reason for the refund
+ *               refundType:
+ *                 type: string
+ *                 enum: [full, partial]
+ *                 description: Type of refund
+ *     responses:
+ *       201:
+ *         description: Refund created successfully
+ *       400:
+ *         description: Invalid request data
+ *       404:
+ *         description: Payment not found
+ */
+router.post('/refunds', adminPaymentController.createRefund);
+
+/**
+ * @swagger
+ * /api/admin/refunds/initiate-with-gateway:
+ *   post:
+ *     summary: Initiate refund with payment gateway first, then create refund record (New gateway-first flow)
+ *     tags: [Admin Refund Management]
+ *     security:
+ *       - bearerAuth: []
+ *     requestBody:
+ *       required: true
+ *       content:
+ *         application/json:
+ *           schema:
+ *             type: object
+ *             required:
+ *               - paymentId
+ *               - refundAmount
+ *               - refundReason
+ *               - refundType
+ *             properties:
+ *               paymentId:
+ *                 type: integer
+ *                 description: ID of the payment to refund
+ *               subscriptionId:
+ *                 type: integer
+ *                 description: ID of the subscription (if applicable)
+ *               refundAmount:
+ *                 type: number
+ *                 format: float
+ *                 description: Amount to refund
+ *               refundReason:
+ *                 type: string
+ *                 description: Reason for the refund
+ *               refundType:
+ *                 type: string
+ *                 enum: [full, partial]
+ *                 description: Type of refund
+ *     responses:
+ *       201:
+ *         description: Refund initiated successfully with payment gateway
+ *         content:
+ *           application/json:
+ *             schema:
+ *               type: object
+ *               properties:
+ *                 success:
+ *                   type: boolean
+ *                 data:
+ *                   type: object
+ *                   properties:
+ *                     refund:
+ *                       $ref: '#/components/schemas/Refund'
+ *                     gatewayResult:
+ *                       type: object
+ *                       properties:
+ *                         success:
+ *                           type: boolean
+ *                         gatewayRefundId:
+ *                           type: string
+ *                         status:
+ *                           type: string
+ *                         message:
+ *                           type: string
+ *       400:
+ *         description: Invalid request data or gateway refund failed
+ *       404:
+ *         description: Payment not found
+ */
+router.post('/refunds/initiate-with-gateway', adminPaymentController.initiateRefundWithGateway);
+
+/**
+ * @swagger
+ * /api/admin/refunds/{id}:
+ *   get:
+ *     summary: Get refund details by ID
+ *     tags: [Admin Refund Management]
+ *     security:
+ *       - bearerAuth: []
+ *     parameters:
+ *       - in: path
+ *         name: id
+ *         required: true
+ *         schema:
+ *           type: integer
+ *     responses:
+ *       200:
+ *         description: Refund details retrieved successfully
+ *       404:
+ *         description: Refund not found
+ */
+router.get('/refunds/:id', adminPaymentController.getRefundById);
+
+/**
+ * @swagger
+ * /api/admin/refunds/{id}/status:
+ *   put:
+ *     summary: Update refund status
+ *     tags: [Admin Refund Management]
+ *     security:
+ *       - bearerAuth: []
+ *     parameters:
+ *       - in: path
+ *         name: id
+ *         required: true
+ *         schema:
+ *           type: integer
+ *     requestBody:
+ *       required: true
+ *       content:
+ *         application/json:
+ *           schema:
+ *             type: object
+ *             required:
+ *               - status
+ *             properties:
+ *               status:
+ *                 type: string
+ *                 enum: [pending, processing, completed, failed, cancelled]
+ *               notes:
+ *                 type: string
+ *                 description: Additional notes
+ *     responses:
+ *       200:
+ *         description: Refund status updated successfully
+ *       400:
+ *         description: Invalid status
+ *       404:
+ *         description: Refund not found
+ */
+router.put('/refunds/:id/status', adminPaymentController.updateRefundStatus);
+
+/**
+ * @swagger
+ * /api/admin/refunds/stats:
+ *   get:
+ *     summary: Get refund statistics
+ *     tags: [Admin Refund Management]
+ *     security:
+ *       - bearerAuth: []
+ *     responses:
+ *       200:
+ *         description: Refund statistics retrieved successfully
+ */
+router.get('/refunds/stats', adminPaymentController.getRefundStats);
+
 module.exports = router;

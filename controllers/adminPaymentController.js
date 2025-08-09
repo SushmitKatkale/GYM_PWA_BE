@@ -1,5 +1,5 @@
 const paymentService = require('../services/paymentService');
-const { User, Gym, Subscription, Payment, UserSubscription } = require('../models');
+const { User, Gym, Subscription, Payment, UserSubscription, Refund } = require('../models');
 const { Op, fn, col, literal } = require('sequelize');
 const ResponseUtil = require('../utils/response');
 
@@ -230,7 +230,7 @@ async function getPaymentById(req, res) {
           include: [{
             model: Gym,
             as: 'gym',
-            attributes: ['id', 'name', 'address', 'city', 'phoneNumber']
+            attributes: ['id', 'name', 'address', 'city']
           }],
           attributes: ['id', 'title', 'price', 'validityDays']
         }
@@ -415,7 +415,7 @@ async function getUserSubscriptionById(req, res) {
           include: [{
             model: Gym,
             as: 'gym',
-            attributes: ['id', 'name', 'address', 'city', 'phoneNumber']
+            attributes: ['id', 'name', 'address', 'city']
           }],
           attributes: ['id', 'title', 'price', 'validityDays']
         },
@@ -482,6 +482,648 @@ async function getUserSubscriptionStats(req, res) {
   }
 }
 
+/**
+ * Check if payment is refundable
+ */
+async function checkPaymentRefundable(req, res) {
+  try {
+    const { paymentId } = req.params;
+    
+    const payment = await Payment.findByPk(paymentId, {
+      include: [
+        {
+          model: Refund,
+          as: 'refunds',
+          where: { status: { [Op.in]: ['completed', 'processing'] } },
+          required: false
+        }
+      ]
+    });
+
+    if (!payment) {
+      return ResponseUtil.notFoundError(res, 'Payment not found');
+    }
+
+    // Check if payment is completed
+    if (payment.status !== 'completed') {
+      return ResponseUtil.success(res, {
+        isRefundable: false,
+        reason: 'Payment is not completed yet',
+        maxRefundAmount: payment.paymentAmount,
+        alreadyRefunded: 0
+      }, 'Payment refund check completed');
+    }
+
+    // Calculate already refunded amount
+    const alreadyRefunded = payment.refunds
+      ? payment.refunds.reduce((total, refund) => total + parseFloat(refund.refundAmount), 0)
+      : 0;
+
+    const maxRefundAmount = parseFloat(payment.paymentAmount);
+    const remainingRefundAmount = maxRefundAmount - alreadyRefunded;
+
+    // Check if fully refunded
+    if (remainingRefundAmount <= 0) {
+      return ResponseUtil.success(res, {
+        isRefundable: false,
+        reason: 'Payment has already been fully refunded',
+        maxRefundAmount,
+        alreadyRefunded
+      }, 'Payment refund check completed');
+    }
+
+    // Check if payment is too old (6 months)
+    const paymentDate = new Date(payment.createTimestamp);
+    const sixMonthsAgo = new Date();
+    sixMonthsAgo.setMonth(sixMonthsAgo.getMonth() - 6);
+
+    if (paymentDate < sixMonthsAgo) {
+      return ResponseUtil.success(res, {
+        isRefundable: false,
+        reason: 'Payment is older than 6 months and cannot be refunded',
+        maxRefundAmount,
+        alreadyRefunded
+      }, 'Payment refund check completed');
+    }
+
+    // Payment is refundable
+    return ResponseUtil.success(res, {
+      isRefundable: true,
+      maxRefundAmount,
+      alreadyRefunded,
+      remainingRefundAmount
+    }, 'Payment is eligible for refund');
+
+  } catch (error) {
+    console.error('Error checking payment refund eligibility:', error);
+    return ResponseUtil.error(res, 'Failed to check refund eligibility', 500);
+  }
+}
+
+/**
+ * Get all refunds with filtering and pagination
+ */
+async function getAllRefunds(req, res) {
+  try {
+    const {
+      page = 1,
+      limit = 10,
+      status,
+      userEmail,
+      refundType,
+      dateFrom,
+      dateTo
+    } = req.query;
+
+    const offset = (parseInt(page) - 1) * parseInt(limit);
+    
+    // Build where conditions
+    const whereConditions = { activeStatus: true };
+    if (status) whereConditions.status = status;
+    if (userEmail) whereConditions.userEmail = { [Op.like]: `%${userEmail}%` };
+    if (refundType) whereConditions.refundType = refundType;
+    
+    // Date range filtering
+    if (dateFrom || dateTo) {
+      whereConditions.createTimestamp = {};
+      if (dateFrom) whereConditions.createTimestamp[Op.gte] = new Date(dateFrom);
+      if (dateTo) whereConditions.createTimestamp[Op.lte] = new Date(dateTo + 'T23:59:59.999Z');
+    }
+
+    const { count, rows: refunds } = await Refund.findAndCountAll({
+      where: whereConditions,
+      include: [
+        {
+          model: Payment,
+          as: 'payment',
+          attributes: ['id', 'paymentAmount', 'status', 'gateway', 'transactionId', 'userEmail']
+        },
+        {
+          model: UserSubscription,
+          as: 'subscription',
+          include: [{
+            model: Subscription,
+            as: 'subscription',
+            include: [{
+              model: Gym,
+              as: 'gym',
+              attributes: ['id', 'name', 'city']
+            }],
+            attributes: ['id', 'title', 'validityDays']
+          }],
+          attributes: ['id']
+        },
+        {
+          model: User,
+          as: 'user',
+          attributes: ['firstName', 'lastName', 'email', 'phoneNumber']
+        }
+      ],
+      limit: parseInt(limit),
+      offset,
+      order: [['createTimestamp', 'DESC']],
+      distinct: true
+    });
+
+    // Process refunds to format data
+    const processedRefunds = refunds.map(refund => {
+      const ref = refund.toJSON();
+      return {
+        ...ref,
+        createdAt: ref.createTimestamp,
+        updatedAt: ref.updateTimestamp
+      };
+    });
+
+    const totalPages = Math.ceil(count / parseInt(limit));
+
+    return ResponseUtil.success(res, {
+      refunds: processedRefunds,
+      pagination: {
+        total: count,
+        page: parseInt(page),
+        limit: parseInt(limit),
+        totalPages
+      }
+    }, 'Refunds retrieved successfully');
+  } catch (error) {
+    console.error('Error fetching refunds:', error);
+    return ResponseUtil.error(res, 'Failed to fetch refunds', 500);
+  }
+}
+
+/**
+ * Get refund details by ID
+ */
+async function getRefundById(req, res) {
+  try {
+    const { id } = req.params;
+    
+    const refund = await Refund.findByPk(id, {
+      include: [
+        {
+          model: Payment,
+          as: 'payment',
+          include: [{
+            model: Subscription,
+            as: 'subscription',
+            include: [{
+              model: Gym,
+              as: 'gym',
+              attributes: ['id', 'name', 'address', 'city']
+            }],
+            attributes: ['id', 'title', 'price', 'validityDays']
+          }],
+          attributes: ['id', 'paymentAmount', 'status', 'gateway', 'transactionId', 'completedAt']
+        },
+        {
+          model: UserSubscription,
+          as: 'subscription',
+          include: [{
+            model: Subscription,
+            as: 'subscription',
+            include: [{
+              model: Gym,
+              as: 'gym',
+              attributes: ['id', 'name', 'address', 'city']
+            }],
+            attributes: ['id', 'title', 'validityDays']
+          }]
+        },
+        {
+          model: User,
+          as: 'user',
+          attributes: ['firstName', 'lastName', 'email', 'phoneNumber']
+        }
+      ]
+    });
+
+    if (!refund) {
+      return ResponseUtil.notFoundError(res, 'Refund not found');
+    }
+
+    return ResponseUtil.success(res, refund, 'Refund details retrieved successfully');
+  } catch (error) {
+    console.error('Error fetching refund details:', error);
+    return ResponseUtil.error(res, 'Failed to fetch refund details', 500);
+  }
+}
+
+/**
+ * Create a new refund
+ */
+async function createRefund(req, res) {
+  try {
+    const {
+      paymentId,
+      subscriptionId,
+      refundAmount,
+      refundReason,
+      refundType
+    } = req.body;
+
+    // Validate required fields
+    if (!paymentId || !refundAmount || !refundReason || !refundType) {
+      return ResponseUtil.error(res, 'Payment ID, refund amount, reason, and type are required', 400);
+    }
+
+    // Get payment details
+    const payment = await Payment.findByPk(paymentId, {
+      include: [{
+        model: Refund,
+        as: 'refunds',
+        where: { status: { [Op.in]: ['completed', 'processing'] } },
+        required: false
+      }]
+    });
+
+    if (!payment) {
+      return ResponseUtil.notFoundError(res, 'Payment not found');
+    }
+
+    if (payment.status !== 'completed') {
+      return ResponseUtil.error(res, 'Cannot refund incomplete payment', 400);
+    }
+
+    // Calculate already refunded amount
+    const alreadyRefunded = payment.refunds
+      ? payment.refunds.reduce((total, refund) => total + parseFloat(refund.refundAmount), 0)
+      : 0;
+
+    const maxRefundAmount = parseFloat(payment.paymentAmount);
+    const requestedRefundAmount = parseFloat(refundAmount);
+    const totalAfterRefund = alreadyRefunded + requestedRefundAmount;
+
+    // Validate refund amount
+    if (requestedRefundAmount <= 0) {
+      return ResponseUtil.error(res, 'Refund amount must be greater than 0', 400);
+    }
+
+    if (totalAfterRefund > maxRefundAmount) {
+      return ResponseUtil.error(res, `Refund amount exceeds available balance. Available: ₹${(maxRefundAmount - alreadyRefunded).toFixed(2)}`, 400);
+    }
+
+    // Create refund record
+    const refund = await Refund.create({
+      paymentId,
+      userEmail: payment.userEmail,
+      subscriptionId: subscriptionId || null,
+      originalAmount: payment.paymentAmount,
+      refundAmount: requestedRefundAmount,
+      refundReason,
+      refundType,
+      paymentGateway: payment.gateway,
+      status: 'pending',
+      createdBy: req.user?.email || 'system'
+    });
+
+    // If this is a subscription refund, deactivate the subscription
+    if (subscriptionId) {
+      await UserSubscription.update(
+        { activeStatus: false, updatedBy: req.user?.email || 'system' },
+        { where: { id: subscriptionId } }
+      );
+    }
+
+    return ResponseUtil.success(res, refund, 'Refund created successfully', 201);
+  } catch (error) {
+    console.error('Error creating refund:', error);
+    return ResponseUtil.error(res, 'Failed to create refund', 500);
+  }
+}
+
+/**
+ * Update refund status
+ */
+async function updateRefundStatus(req, res) {
+  try {
+    const { id } = req.params;
+    const { status, notes } = req.body;
+
+    if (!status) {
+      return ResponseUtil.error(res, 'Status is required', 400);
+    }
+
+    const validStatuses = ['pending', 'processing', 'completed', 'failed', 'cancelled'];
+    if (!validStatuses.includes(status)) {
+      return ResponseUtil.error(res, 'Invalid status', 400);
+    }
+
+    const refund = await Refund.findByPk(id);
+    if (!refund) {
+      return ResponseUtil.notFoundError(res, 'Refund not found');
+    }
+
+    const updateData = {
+      status,
+      updatedBy: req.user?.email || 'system'
+    };
+
+    if (notes) updateData.notes = notes;
+    if (status === 'completed' || status === 'processing') {
+      updateData.processedBy = req.user?.email || 'system';
+      updateData.processedAt = new Date();
+    }
+
+    await refund.update(updateData);
+
+    // Send refund completed email notification if status is completed
+    if (status === 'completed') {
+      try {
+        const mailService = require('../services/mailService');
+        
+        // Get full refund details with payment and subscription info
+        const refundDetails = await Refund.findByPk(id, {
+          include: [
+            {
+              model: Payment,
+              as: 'payment',
+              include: [{
+                model: Subscription,
+                as: 'subscription',
+                include: [{
+                  model: Gym,
+                  as: 'gym',
+                  attributes: ['name']
+                }],
+                attributes: ['title']
+              }],
+              attributes: ['userEmail', 'gateway']
+            }
+          ]
+        });
+        
+        const { User } = require('../models');
+        const user = await User.findOne({ where: { email: refundDetails.userEmail } });
+        const userName = user ? `${user.firstName} ${user.lastName}`.trim() : 'Valued Customer';
+
+        await mailService.sendRefundCompleted({
+          userEmail: refundDetails.userEmail,
+          userName,
+          refundAmount: refundDetails.refundAmount,
+          refundReason: refundDetails.refundReason,
+          gatewayRefundId: refundDetails.gatewayRefundId,
+          gymName: refundDetails.payment?.subscription?.gym?.name || 'Gym',
+          subscriptionTitle: refundDetails.payment?.subscription?.title || 'Gym Subscription',
+          gateway: refundDetails.paymentGateway,
+          completedAt: new Date().toLocaleDateString('en-IN', {
+            day: 'numeric',
+            month: 'long',
+            year: 'numeric'
+          })
+        });
+
+        console.log(`Refund completed email sent to ${refundDetails.userEmail}`);
+      } catch (emailError) {
+        console.error('Error sending refund completed email:', emailError);
+        // Don't fail the status update if email fails
+      }
+    }
+
+    return ResponseUtil.success(res, refund, 'Refund status updated successfully');
+  } catch (error) {
+    console.error('Error updating refund status:', error);
+    return ResponseUtil.error(res, 'Failed to update refund status', 500);
+  }
+}
+
+/**
+ * Get refund statistics
+ */
+async function getRefundStats(req, res) {
+  try {
+    const stats = await Refund.findAll({
+      where: { activeStatus: true },
+      attributes: [
+        [fn('COUNT', col('id')), 'totalRefunds'],
+        [fn('SUM', col('refundAmount')), 'totalRefundAmount'],
+        [fn('COUNT', literal('CASE WHEN status = "pending" THEN 1 END')), 'pendingRefunds'],
+        [fn('COUNT', literal('CASE WHEN status = "completed" THEN 1 END')), 'completedRefunds'],
+        [fn('COUNT', literal('CASE WHEN status = "failed" THEN 1 END')), 'failedRefunds']
+      ],
+      raw: true
+    });
+
+    const todaysStats = await Refund.findAll({
+      where: {
+        activeStatus: true,
+        createTimestamp: {
+          [Op.gte]: new Date(new Date().setHours(0, 0, 0, 0))
+        }
+      },
+      attributes: [
+        [fn('COUNT', col('id')), 'todayRefunds'],
+        [fn('SUM', col('refundAmount')), 'todayRefundAmount']
+      ],
+      raw: true
+    });
+
+    const result = {
+      ...stats[0],
+      ...todaysStats[0],
+      totalRefundAmount: parseFloat(stats[0].totalRefundAmount || 0),
+      todayRefundAmount: parseFloat(todaysStats[0].todayRefundAmount || 0)
+    };
+
+    return ResponseUtil.success(res, result, 'Refund statistics retrieved successfully');
+  } catch (error) {
+    console.error('Error fetching refund stats:', error);
+    return ResponseUtil.error(res, 'Failed to fetch refund statistics', 500);
+  }
+}
+
+/**
+ * Initiate refund with payment gateway first, then create refund record
+ * This is the new gateway-first refund flow
+ */
+async function initiateRefundWithGateway(req, res) {
+  try {
+    const {
+      paymentId,
+      subscriptionId,
+      refundAmount,
+      refundReason,
+      refundType
+    } = req.body;
+
+    // Validate required fields
+    if (!paymentId || !refundAmount || !refundReason || !refundType) {
+      return ResponseUtil.error(res, 'Payment ID, refund amount, reason, and type are required', 400);
+    }
+
+    // Get payment details with existing refunds
+    const payment = await Payment.findByPk(paymentId, {
+      include: [{
+        model: Refund,
+        as: 'refunds',
+        where: { status: { [Op.in]: ['completed', 'processing'] } },
+        required: false
+      }]
+    });
+
+    if (!payment) {
+      return ResponseUtil.notFoundError(res, 'Payment not found');
+    }
+
+    if (payment.status !== 'completed') {
+      return ResponseUtil.error(res, 'Cannot refund incomplete payment', 400);
+    }
+
+    // Calculate already refunded amount
+    const alreadyRefunded = payment.refunds
+      ? payment.refunds.reduce((total, refund) => total + parseFloat(refund.refundAmount), 0)
+      : 0;
+
+    const maxRefundAmount = parseFloat(payment.paymentAmount);
+    const requestedRefundAmount = parseFloat(refundAmount);
+    const totalAfterRefund = alreadyRefunded + requestedRefundAmount;
+
+    // Validate refund amount
+    if (requestedRefundAmount <= 0) {
+      return ResponseUtil.error(res, 'Refund amount must be greater than 0', 400);
+    }
+
+    if (totalAfterRefund > maxRefundAmount) {
+      return ResponseUtil.error(res, `Refund amount exceeds available balance. Available: ₹${(maxRefundAmount - alreadyRefunded).toFixed(2)}`, 400);
+    }
+
+    // Step 1: Initiate refund with payment gateway first
+    console.log('Initiating refund with gateway:', {
+      paymentId,
+      gateway: payment.gateway,
+      amount: requestedRefundAmount
+    });
+
+    let gatewayRefundResult;
+    const razorpayService = require('../services/razorpayVendorService');
+    const phonepeService = require('../services/phonepeService');
+
+    if (payment.gateway === 'razorpay') {
+      // Use Razorpay payment ID for refund
+      if (!payment.razorpayPaymentId) {
+        return ResponseUtil.error(res, 'Razorpay payment ID not found for this payment', 400);
+      }
+
+      gatewayRefundResult = await razorpayService.initiateRefund({
+        razorpayPaymentId: payment.razorpayPaymentId,
+        refundAmount: requestedRefundAmount,
+        refundReason,
+        refundId: null // Will be set after DB creation
+      });
+    } else if (payment.gateway === 'phonepe') {
+      // Use PhonePe transaction ID for refund
+      if (!payment.phonepeTransactionId) {
+        return ResponseUtil.error(res, 'PhonePe transaction ID not found for this payment', 400);
+      }
+
+      gatewayRefundResult = await phonepeService.initiateRefund({
+        phonepeTransactionId: payment.phonepeTransactionId,
+        refundAmount: requestedRefundAmount,
+        refundReason,
+        refundId: null // Will be set after DB creation
+      });
+    } else {
+      return ResponseUtil.error(res, `Unsupported payment gateway: ${payment.gateway}`, 400);
+    }
+
+    // Step 2: Only create refund record if gateway call succeeded
+    if (!gatewayRefundResult.success) {
+      return ResponseUtil.error(res, `Gateway refund failed: ${gatewayRefundResult.message || 'Unknown error'}`, 400);
+    }
+
+    console.log('Gateway refund initiated successfully:', gatewayRefundResult);
+
+    // Step 3: Create refund record in database
+    const refund = await Refund.create({
+      paymentId,
+      userEmail: payment.userEmail,
+      subscriptionId: subscriptionId || null,
+      originalAmount: payment.paymentAmount,
+      refundAmount: requestedRefundAmount,
+      refundReason,
+      refundType,
+      paymentGateway: payment.gateway,
+      status: gatewayRefundResult.status || 'processing',
+      gatewayRefundId: gatewayRefundResult.gatewayRefundId,
+      gatewayResponse: gatewayRefundResult.gatewayResponse,
+      processedBy: req.user?.email || 'system',
+      processedAt: new Date(),
+      createdBy: req.user?.email || 'system'
+    });
+
+    // Step 4: If this is a subscription refund, deactivate the subscription
+    if (subscriptionId) {
+      const { UserSubscription } = require('../models');
+      await UserSubscription.update(
+        { activeStatus: false, updatedBy: req.user?.email || 'system' },
+        { where: { id: subscriptionId } }
+      );
+    }
+
+    console.log('Refund record created successfully:', {
+      refundId: refund.id,
+      gatewayRefundId: refund.gatewayRefundId,
+      status: refund.status
+    });
+
+    // Send refund initiated email notification
+    try {
+      const mailService = require('../services/mailService');
+      
+      // Get user details and related data for email
+      const paymentWithDetails = await Payment.findByPk(paymentId, {
+        include: [
+          {
+            model: Subscription,
+            as: 'subscription',
+            include: [{
+              model: Gym,
+              as: 'gym',
+              attributes: ['name']
+            }],
+            attributes: ['title']
+          }
+        ]
+      });
+      
+      const { User } = require('../models');
+      const user = await User.findOne({ where: { email: payment.userEmail } });
+      const userName = user ? `${user.firstName} ${user.lastName}`.trim() : 'Valued Customer';
+
+      await mailService.sendRefundInitiated({
+        userEmail: payment.userEmail,
+        userName,
+        refundAmount: refund.refundAmount,
+        refundReason: refund.refundReason,
+        gatewayRefundId: refund.gatewayRefundId,
+        gymName: paymentWithDetails?.subscription?.gym?.name || 'Gym',
+        subscriptionTitle: paymentWithDetails?.subscription?.title || 'Gym Subscription',
+        gateway: payment.gateway,
+        estimatedDays: payment.gateway === 'razorpay' ? '3-5 business days' : '5-7 business days'
+      });
+
+      console.log(`Refund initiated email sent to ${payment.userEmail}`);
+    } catch (emailError) {
+      console.error('Error sending refund initiated email:', emailError);
+      // Don't fail the refund process if email fails
+    }
+
+    return ResponseUtil.success(res, {
+      refund,
+      gatewayResult: {
+        success: gatewayRefundResult.success,
+        gatewayRefundId: gatewayRefundResult.gatewayRefundId,
+        status: gatewayRefundResult.status,
+        message: gatewayRefundResult.message
+      }
+    }, 'Refund initiated successfully with payment gateway', 201);
+
+  } catch (error) {
+    console.error('Error initiating refund with gateway:', error);
+    return ResponseUtil.error(res, `Failed to initiate refund: ${error.message}`, 500);
+  }
+}
+
 module.exports = {
   createPaymentAndInvoice,
   searchOwners,
@@ -494,5 +1136,14 @@ module.exports = {
   // User Subscription Management
   getAllUserSubscriptions,
   getUserSubscriptionById,
-  getUserSubscriptionStats
+  getUserSubscriptionStats,
+  // Refund Management
+  checkPaymentRefundable,
+  getRefunds: getAllRefunds,
+  getAllRefunds,
+  getRefundById,
+  createRefund,
+  initiateRefundWithGateway, // New gateway-first refund function
+  updateRefundStatus,
+  getRefundStats
 };
