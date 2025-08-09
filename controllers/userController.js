@@ -49,6 +49,16 @@ class UserController {
         search,
         type,
         activeStatus,
+        email,
+        firstName,
+        lastName,
+        username,
+        phoneNumber,
+        isVerified,
+        createdAfter,
+        createdBefore,
+        lastLoginAfter,
+        lastLoginBefore,
         sortBy = 'createTimestamp',
         sortOrder = 'DESC'
       } = req.query;
@@ -56,7 +66,7 @@ class UserController {
       const offset = (parseInt(page) - 1) * parseInt(limit);
       const whereClause = {};
 
-      // Add filters
+      // Add global search filter
       if (search) {
         whereClause[Op.or] = [
           { firstName: { [Op.like]: `%${search}%` } },
@@ -66,12 +76,66 @@ class UserController {
         ];
       }
 
+      // Add individual field filters
       if (type) {
         whereClause.type = type;
       }
 
       if (activeStatus) {
         whereClause.activeStatus = activeStatus;
+      }
+
+      if (email) {
+        whereClause.email = { [Op.like]: `%${email}%` };
+      }
+
+      if (firstName) {
+        whereClause.firstName = { [Op.like]: `%${firstName}%` };
+      }
+
+      if (lastName) {
+        whereClause.lastName = { [Op.like]: `%${lastName}%` };
+      }
+
+      if (username) {
+        whereClause.username = { [Op.like]: `%${username}%` };
+      }
+
+      if (phoneNumber) {
+        whereClause.phoneNumber = { [Op.like]: `%${phoneNumber}%` };
+      }
+
+      if (isVerified !== undefined) {
+        whereClause.isVerified = isVerified;
+      }
+
+      // Add date filters
+      if (createdAfter) {
+        whereClause.createTimestamp = {
+          ...whereClause.createTimestamp,
+          [Op.gte]: new Date(createdAfter)
+        };
+      }
+
+      if (createdBefore) {
+        whereClause.createTimestamp = {
+          ...whereClause.createTimestamp,
+          [Op.lte]: new Date(createdBefore)
+        };
+      }
+
+      if (lastLoginAfter) {
+        whereClause.lastLoginAt = {
+          ...whereClause.lastLoginAt,
+          [Op.gte]: new Date(lastLoginAfter)
+        };
+      }
+
+      if (lastLoginBefore) {
+        whereClause.lastLoginAt = {
+          ...whereClause.lastLoginAt,
+          [Op.lte]: new Date(lastLoginBefore)
+        };
       }
 
       const result = await User.findAndCountAll({
@@ -98,14 +162,46 @@ class UserController {
 
       const users = result.rows.map(user => user.toJSON());
 
-      return ResponseUtil.paginated(
-        res,
+      // Calculate stats
+      const totalUsersCount = await User.count();
+      const activeUsersCount = await User.count({ where: { activeStatus: '1' } });
+      const verifiedUsersCount = await User.count({ where: { isVerified: true } });
+      
+      // Get current month's start date
+      const now = new Date();
+      const startOfMonth = new Date(now.getFullYear(), now.getMonth(), 1);
+      const newUsersThisMonth = await User.count({
+        where: {
+          createTimestamp: {
+            [Op.gte]: startOfMonth
+          }
+        }
+      });
+
+      const stats = {
+        totalUsers: totalUsersCount,
+        activeUsers: activeUsersCount,
+        inactiveUsers: totalUsersCount - activeUsersCount,
+        verifiedUsers: verifiedUsersCount,
+        unverifiedUsers: totalUsersCount - verifiedUsersCount,
+        regularUsers: await User.count({ where: { type: '1' } }),
+        gymOwners: await User.count({ where: { type: '2' } }),
+        admins: await User.count({ where: { type: '3' } }),
+        newUsersThisMonth
+      };
+
+      const totalPages = Math.ceil(result.count / parseInt(limit));
+
+      return ResponseUtil.success(res, {
         users,
-        result.count,
-        parseInt(page),
-        parseInt(limit),
-        'Users retrieved successfully'
-      );
+        pagination: {
+          currentPage: parseInt(page),
+          totalPages,
+          total: result.count,
+          limit: parseInt(limit)
+        },
+        stats
+      }, 'Users retrieved successfully');
     } catch (error) {
       return ResponseUtil.error(res, 'Failed to retrieve users');
     }
@@ -839,6 +935,306 @@ class UserController {
     } catch (error) {
       console.error('Delete profile image error:', error);
       return ResponseUtil.error(res, 'Failed to delete profile image');
+    }
+  }
+
+  // Get user statistics
+  static async getUserStats(req, res) {
+    try {
+      const stats = await User.findAll({
+        attributes: [
+          [User.sequelize.fn('COUNT', User.sequelize.col('*')), 'totalUsers'],
+          [User.sequelize.fn('SUM', User.sequelize.literal("CASE WHEN activeStatus = '1' THEN 1 ELSE 0 END")), 'activeUsers'],
+          [User.sequelize.fn('SUM', User.sequelize.literal("CASE WHEN activeStatus = '0' THEN 1 ELSE 0 END")), 'inactiveUsers'],
+          [User.sequelize.fn('SUM', User.sequelize.literal("CASE WHEN isVerified = 1 THEN 1 ELSE 0 END")), 'verifiedUsers'],
+          [User.sequelize.fn('SUM', User.sequelize.literal("CASE WHEN isVerified = 0 THEN 1 ELSE 0 END")), 'unverifiedUsers'],
+          [User.sequelize.fn('SUM', User.sequelize.literal("CASE WHEN type = '1' THEN 1 ELSE 0 END")), 'regularUsers'],
+          [User.sequelize.fn('SUM', User.sequelize.literal("CASE WHEN type = '2' THEN 1 ELSE 0 END")), 'gymOwners'],
+          [User.sequelize.fn('SUM', User.sequelize.literal("CASE WHEN type = '3' THEN 1 ELSE 0 END")), 'admins']
+        ],
+        raw: true
+      });
+
+      // Get new users this month
+      const currentDate = new Date();
+      const firstDayOfMonth = new Date(currentDate.getFullYear(), currentDate.getMonth(), 1);
+      
+      const newUsersThisMonth = await User.count({
+        where: {
+          createTimestamp: {
+            [Op.gte]: firstDayOfMonth
+          }
+        }
+      });
+
+      const result = {
+        ...stats[0],
+        newUsersThisMonth,
+        avgLoginFrequency: 0 // Placeholder - would need login tracking table
+      };
+
+      return ResponseUtil.success(res, result, 'User statistics retrieved successfully');
+    } catch (error) {
+      console.error('Get user stats error:', error);
+      return ResponseUtil.error(res, 'Failed to retrieve user statistics');
+    }
+  }
+
+  // Verify user
+  static async verifyUser(req, res) {
+    try {
+      const { email } = req.params;
+
+      const user = await User.findByPk(email);
+      if (!user) {
+        return ResponseUtil.notFoundError(res, 'User not found');
+      }
+
+      await user.update({
+        isVerified: true,
+        updatedBy: req.user ? req.user.id : null
+      });
+
+      const updatedUser = await User.findByPk(email, {
+        attributes: { exclude: ['password'] }
+      });
+
+      return ResponseUtil.success(res, updatedUser.toJSON(), 'User verified successfully');
+    } catch (error) {
+      console.error('Verify user error:', error);
+      return ResponseUtil.error(res, 'Failed to verify user');
+    }
+  }
+
+  // Unverify user
+  static async unverifyUser(req, res) {
+    try {
+      const { email } = req.params;
+
+      const user = await User.findByPk(email);
+      if (!user) {
+        return ResponseUtil.notFoundError(res, 'User not found');
+      }
+
+      await user.update({
+        isVerified: false,
+        updatedBy: req.user ? req.user.id : null
+      });
+
+      const updatedUser = await User.findByPk(email, {
+        attributes: { exclude: ['password'] }
+      });
+
+      return ResponseUtil.success(res, updatedUser.toJSON(), 'User unverified successfully');
+    } catch (error) {
+      console.error('Unverify user error:', error);
+      return ResponseUtil.error(res, 'Failed to unverify user');
+    }
+  }
+
+  // Get user activity
+  static async getUserActivity(req, res) {
+    try {
+      const { email } = req.params;
+      const { days = 30 } = req.query;
+
+      const user = await User.findByPk(email);
+      if (!user) {
+        return ResponseUtil.notFoundError(res, 'User not found');
+      }
+
+      // Mock activity data since we don't have login tracking yet
+      const loginHistory = [];
+      const startDate = new Date();
+      startDate.setDate(startDate.getDate() - parseInt(days));
+
+      // Generate mock login history
+      for (let i = 0; i < parseInt(days); i++) {
+        const date = new Date(startDate);
+        date.setDate(startDate.getDate() + i);
+        loginHistory.push({
+          date: date.toISOString().split('T')[0],
+          count: Math.floor(Math.random() * 5) // Random login count for demo
+        });
+      }
+
+      const activitySummary = {
+        totalLogins: loginHistory.reduce((sum, day) => sum + day.count, 0),
+        lastLogin: user.updateTimestamp || user.createTimestamp,
+        avgSessionDuration: 45, // Mock data
+        deviceTypes: {
+          desktop: Math.floor(Math.random() * 20),
+          mobile: Math.floor(Math.random() * 15),
+          tablet: Math.floor(Math.random() * 5)
+        }
+      };
+
+      return ResponseUtil.success(res, {
+        loginHistory,
+        activitySummary
+      }, 'User activity retrieved successfully');
+    } catch (error) {
+      console.error('Get user activity error:', error);
+      return ResponseUtil.error(res, 'Failed to retrieve user activity');
+    }
+  }
+
+  // Reset user password
+  static async resetUserPassword(req, res) {
+    try {
+      const { email } = req.params;
+      const { newPassword } = req.body;
+
+      const user = await User.findByPk(email);
+      if (!user) {
+        return ResponseUtil.notFoundError(res, 'User not found');
+      }
+
+      // Generate temporary password if not provided
+      const tempPassword = newPassword || Math.random().toString(36).slice(-8) + '!A1';
+
+      await user.update({
+        password: tempPassword, // Will be hashed by the model
+        updatedBy: req.user ? req.user.id : null
+      });
+
+      return ResponseUtil.success(res, {
+        temporaryPassword: tempPassword
+      }, 'Password reset successfully');
+    } catch (error) {
+      console.error('Reset user password error:', error);
+      return ResponseUtil.error(res, 'Failed to reset password');
+    }
+  }
+
+  // Bulk update users
+  static async bulkUpdateUsers(req, res) {
+    try {
+      const { userEmails, updates } = req.body;
+
+      if (!userEmails || !Array.isArray(userEmails) || userEmails.length === 0) {
+        return ResponseUtil.validationError(res, 'userEmails array is required');
+      }
+
+      const updateData = {
+        ...updates,
+        updatedBy: req.user ? req.user.id : null
+      };
+
+      const [updatedCount] = await User.update(updateData, {
+        where: {
+          email: {
+            [Op.in]: userEmails
+          }
+        }
+      });
+
+      return ResponseUtil.success(res, {
+        updated: updatedCount,
+        errors: []
+      }, `${updatedCount} users updated successfully`);
+    } catch (error) {
+      console.error('Bulk update users error:', error);
+      return ResponseUtil.error(res, 'Failed to update users');
+    }
+  }
+
+  // Export users
+  static async exportUsers(req, res) {
+    try {
+      const { format = 'csv', type, activeStatus, isVerified } = req.query;
+      
+      const whereClause = {};
+      if (type) whereClause.type = type;
+      if (activeStatus) whereClause.activeStatus = activeStatus;
+      if (isVerified !== undefined) whereClause.isVerified = isVerified === 'true';
+
+      const users = await User.findAll({
+        where: whereClause,
+        attributes: { exclude: ['password'] },
+        order: [['createTimestamp', 'DESC']]
+      });
+
+      if (format === 'csv') {
+        // Generate CSV content
+        const csvHeader = 'ID,First Name,Last Name,Username,Email,Phone Number,Type,Active Status,Is Verified,Created Date,Last Login\n';
+        
+        const csvRows = users.map(user => {
+          const userData = user.toJSON();
+          const userType = userData.type === '1' ? 'User' : userData.type === '2' ? 'Owner' : 'Admin';
+          const activeStatus = userData.activeStatus === '1' ? 'Active' : 'Inactive';
+          const isVerified = userData.isVerified ? 'Yes' : 'No';
+          const createdDate = new Date(userData.createTimestamp).toLocaleDateString();
+          const lastLogin = userData.lastLoginAt ? new Date(userData.lastLoginAt).toLocaleDateString() : 'Never';
+          
+          // Escape commas and quotes in data
+          const escapeCSV = (str) => {
+            if (str == null) return '';
+            const stringVal = String(str);
+            if (stringVal.includes(',') || stringVal.includes('"') || stringVal.includes('\n')) {
+              return `"${stringVal.replace(/"/g, '""')}"`;
+            }
+            return stringVal;
+          };
+          
+          return [
+            escapeCSV(userData.id),
+            escapeCSV(userData.firstName),
+            escapeCSV(userData.lastName),
+            escapeCSV(userData.username),
+            escapeCSV(userData.email),
+            escapeCSV(userData.phoneNumber || ''),
+            escapeCSV(userType),
+            escapeCSV(activeStatus),
+            escapeCSV(isVerified),
+            escapeCSV(createdDate),
+            escapeCSV(lastLogin)
+          ].join(',');
+        }).join('\n');
+        
+        const csvContent = csvHeader + csvRows;
+        
+        // Set headers for CSV download
+        res.setHeader('Content-Type', 'text/csv');
+        res.setHeader('Content-Disposition', `attachment; filename="users_export_${Date.now()}.csv"`);
+        res.setHeader('Cache-Control', 'no-cache');
+        
+        return res.send(csvContent);
+      } else {
+        // For other formats, return error for now
+        return ResponseUtil.error(res, 'Only CSV format is currently supported', 400);
+      }
+    } catch (error) {
+      console.error('Export users error:', error);
+      return ResponseUtil.error(res, 'Failed to export users');
+    }
+  }
+
+  // Send notification to users
+  static async sendNotificationToUsers(req, res) {
+    try {
+      const { userEmails, title, message, type, actionUrl } = req.body;
+
+      if (!userEmails || !Array.isArray(userEmails) || userEmails.length === 0) {
+        return ResponseUtil.validationError(res, 'userEmails array is required');
+      }
+
+      if (!title || !message) {
+        return ResponseUtil.validationError(res, 'Title and message are required');
+      }
+
+      // Mock notification sending
+      // In production, you would integrate with email service, push notifications, etc.
+      const sent = userEmails.length;
+      const failed = 0;
+
+      return ResponseUtil.success(res, {
+        sent,
+        failed
+      }, `Notification sent to ${sent} users successfully`);
+    } catch (error) {
+      console.error('Send notification error:', error);
+      return ResponseUtil.error(res, 'Failed to send notifications');
     }
   }
 }

@@ -156,6 +156,61 @@ const queryParamsSchema = Joi.object({
     'any.only': 'Active status must be 0 (inactive) or 1 (active)'
   }),
   
+  // Individual filter fields
+  email: Joi.string().email().allow('').messages({
+    'string.email': 'Email must be a valid email address'
+  }),
+  
+  firstName: Joi.string().allow('').messages({
+    'string.base': 'First name must be a string'
+  }),
+  
+  lastName: Joi.string().allow('').messages({
+    'string.base': 'Last name must be a string'
+  }),
+  
+  username: Joi.string().allow('').messages({
+    'string.base': 'Username must be a string'
+  }),
+  
+  phoneNumber: Joi.string().allow('').messages({
+    'string.base': 'Phone number must be a string'
+  }),
+  
+  isVerified: Joi.boolean().messages({
+    'boolean.base': 'isVerified must be a boolean'
+  }),
+  
+  // Date filters
+  createdAfter: Joi.string().isoDate().allow('').messages({
+    'string.isoDate': 'createdAfter must be a valid ISO date'
+  }),
+  
+  createdBefore: Joi.string().isoDate().allow('').messages({
+    'string.isoDate': 'createdBefore must be a valid ISO date'
+  }),
+  
+  lastLoginAfter: Joi.string().isoDate().allow('').messages({
+    'string.isoDate': 'lastLoginAfter must be a valid ISO date'
+  }),
+  
+  lastLoginBefore: Joi.string().isoDate().allow('').messages({
+    'string.isoDate': 'lastLoginBefore must be a valid ISO date'
+  }),
+  
+  // Export format
+  format: Joi.string().valid('csv', 'xlsx').default('csv').messages({
+    'any.only': 'Format must be csv or xlsx'
+  }),
+  
+  // Activity days filter
+  days: Joi.number().integer().min(1).max(365).default(30).messages({
+    'number.base': 'Days must be a number',
+    'number.integer': 'Days must be an integer',
+    'number.min': 'Days must be at least 1',
+    'number.max': 'Days must not exceed 365'
+  }),
+  
   sortBy: Joi.string().valid(
     'createTimestamp', 
     'updateTimestamp', 

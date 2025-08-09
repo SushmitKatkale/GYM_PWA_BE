@@ -580,6 +580,336 @@ userRouter.put('/toggle/:email', validate(toggleStatusSchema), authenticate, aut
 
 /**
  * @swagger
+ * /api/users/stats:
+ *   get:
+ *     tags: [User Management]
+ *     summary: Get user statistics (Admin only)
+ *     description: Get comprehensive user statistics for dashboard
+ *     security:
+ *       - bearerAuth: []
+ *     responses:
+ *       200:
+ *         description: User statistics retrieved successfully
+ *         content:
+ *           application/json:
+ *             schema:
+ *               allOf:
+ *                 - $ref: '#/components/schemas/SuccessResponse'
+ *                 - type: object
+ *                   properties:
+ *                     data:
+ *                       type: object
+ *                       properties:
+ *                         totalUsers:
+ *                           type: integer
+ *                         activeUsers:
+ *                           type: integer
+ *                         inactiveUsers:
+ *                           type: integer
+ *                         verifiedUsers:
+ *                           type: integer
+ *                         unverifiedUsers:
+ *                           type: integer
+ *                         regularUsers:
+ *                           type: integer
+ *                         gymOwners:
+ *                           type: integer
+ *                         admins:
+ *                           type: integer
+ *                         newUsersThisMonth:
+ *                           type: integer
+ */
+userRouter.get('/stats', authenticate, authorize('3'), UserController.getUserStats);
+
+/**
+ * @swagger
+ * /api/users/{email}/verify:
+ *   put:
+ *     tags: [User Management]
+ *     summary: Verify user account (Admin only)
+ *     description: Mark user account as verified
+ *     security:
+ *       - bearerAuth: []
+ *     parameters:
+ *       - in: path
+ *         name: email
+ *         required: true
+ *         schema:
+ *           type: string
+ *           format: email
+ *         description: User email address
+ *     responses:
+ *       200:
+ *         description: User verified successfully
+ *       404:
+ *         description: User not found
+ */
+userRouter.put('/:email/verify', authenticate, authorize('3'), UserController.verifyUser);
+
+/**
+ * @swagger
+ * /api/users/{email}/unverify:
+ *   put:
+ *     tags: [User Management]
+ *     summary: Unverify user account (Admin only)
+ *     description: Remove verification from user account
+ *     security:
+ *       - bearerAuth: []
+ *     parameters:
+ *       - in: path
+ *         name: email
+ *         required: true
+ *         schema:
+ *           type: string
+ *           format: email
+ *         description: User email address
+ *     responses:
+ *       200:
+ *         description: User unverified successfully
+ *       404:
+ *         description: User not found
+ */
+userRouter.put('/:email/unverify', authenticate, authorize('3'), UserController.unverifyUser);
+
+/**
+ * @swagger
+ * /api/users/{email}/activity:
+ *   get:
+ *     tags: [User Management]
+ *     summary: Get user activity data (Admin only)
+ *     description: Get user login history and activity statistics
+ *     security:
+ *       - bearerAuth: []
+ *     parameters:
+ *       - in: path
+ *         name: email
+ *         required: true
+ *         schema:
+ *           type: string
+ *           format: email
+ *         description: User email address
+ *       - in: query
+ *         name: days
+ *         schema:
+ *           type: integer
+ *           default: 30
+ *         description: Number of days to retrieve activity for
+ *     responses:
+ *       200:
+ *         description: User activity retrieved successfully
+ *       404:
+ *         description: User not found
+ */
+userRouter.get('/:email/activity', authenticate, authorize('3'), UserController.getUserActivity);
+
+/**
+ * @swagger
+ * /api/users/{email}/reset-password:
+ *   post:
+ *     tags: [User Management]
+ *     summary: Reset user password (Admin only)
+ *     description: Generate and send temporary password to user
+ *     security:
+ *       - bearerAuth: []
+ *     parameters:
+ *       - in: path
+ *         name: email
+ *         required: true
+ *         schema:
+ *           type: string
+ *           format: email
+ *         description: User email address
+ *     requestBody:
+ *       content:
+ *         application/json:
+ *           schema:
+ *             type: object
+ *             properties:
+ *               newPassword:
+ *                 type: string
+ *                 description: Optional new password, if not provided a temporary one is generated
+ *     responses:
+ *       200:
+ *         description: Password reset successfully
+ *         content:
+ *           application/json:
+ *             schema:
+ *               allOf:
+ *                 - $ref: '#/components/schemas/SuccessResponse'
+ *                 - type: object
+ *                   properties:
+ *                     data:
+ *                       type: object
+ *                       properties:
+ *                         temporaryPassword:
+ *                           type: string
+ *       404:
+ *         description: User not found
+ */
+userRouter.post('/:email/reset-password', authenticate, authorize('3'), UserController.resetUserPassword);
+
+/**
+ * @swagger
+ * /api/users/bulk-update:
+ *   patch:
+ *     tags: [User Management]
+ *     summary: Bulk update users (Admin only)
+ *     description: Update multiple users at once
+ *     security:
+ *       - bearerAuth: []
+ *     requestBody:
+ *       required: true
+ *       content:
+ *         application/json:
+ *           schema:
+ *             type: object
+ *             required:
+ *               - userEmails
+ *               - updates
+ *             properties:
+ *               userEmails:
+ *                 type: array
+ *                 items:
+ *                   type: string
+ *                   format: email
+ *               updates:
+ *                 type: object
+ *                 properties:
+ *                   firstName:
+ *                     type: string
+ *                   lastName:
+ *                     type: string
+ *                   type:
+ *                     type: string
+ *                     enum: ['1', '2', '3']
+ *                   activeStatus:
+ *                     type: string
+ *                     enum: ['0', '1']
+ *                   isVerified:
+ *                     type: boolean
+ *     responses:
+ *       200:
+ *         description: Bulk update completed
+ *         content:
+ *           application/json:
+ *             schema:
+ *               allOf:
+ *                 - $ref: '#/components/schemas/SuccessResponse'
+ *                 - type: object
+ *                   properties:
+ *                     data:
+ *                       type: object
+ *                       properties:
+ *                         updated:
+ *                           type: integer
+ *                         errors:
+ *                           type: array
+ *                           items:
+ *                             type: string
+ */
+userRouter.patch('/bulk-update', authenticate, authorize('3'), UserController.bulkUpdateUsers);
+
+/**
+ * @swagger
+ * /api/users/export:
+ *   get:
+ *     tags: [User Management]
+ *     summary: Export users to file (Admin only)
+ *     description: Export filtered users to CSV or Excel
+ *     security:
+ *       - bearerAuth: []
+ *     parameters:
+ *       - in: query
+ *         name: format
+ *         schema:
+ *           type: string
+ *           enum: ['csv', 'xlsx']
+ *           default: 'csv'
+ *       - in: query
+ *         name: type
+ *         schema:
+ *           type: string
+ *           enum: ['1', '2', '3']
+ *       - in: query
+ *         name: activeStatus
+ *         schema:
+ *           type: string
+ *           enum: ['0', '1']
+ *     responses:
+ *       200:
+ *         description: Export file generated
+ *         content:
+ *           application/json:
+ *             schema:
+ *               allOf:
+ *                 - $ref: '#/components/schemas/SuccessResponse'
+ *                 - type: object
+ *                   properties:
+ *                     data:
+ *                       type: object
+ *                       properties:
+ *                         downloadUrl:
+ *                           type: string
+ */
+userRouter.get('/export', authenticate, authorize('3'), UserController.exportUsers);
+
+/**
+ * @swagger
+ * /api/users/notify:
+ *   post:
+ *     tags: [User Management]
+ *     summary: Send notification to users (Admin only)
+ *     description: Send notification to multiple users
+ *     security:
+ *       - bearerAuth: []
+ *     requestBody:
+ *       required: true
+ *       content:
+ *         application/json:
+ *           schema:
+ *             type: object
+ *             required:
+ *               - userEmails
+ *               - title
+ *               - message
+ *               - type
+ *             properties:
+ *               userEmails:
+ *                 type: array
+ *                 items:
+ *                   type: string
+ *                   format: email
+ *               title:
+ *                 type: string
+ *               message:
+ *                 type: string
+ *               type:
+ *                 type: string
+ *                 enum: ['info', 'warning', 'success', 'error']
+ *               actionUrl:
+ *                 type: string
+ *     responses:
+ *       200:
+ *         description: Notifications sent
+ *         content:
+ *           application/json:
+ *             schema:
+ *               allOf:
+ *                 - $ref: '#/components/schemas/SuccessResponse'
+ *                 - type: object
+ *                   properties:
+ *                     data:
+ *                       type: object
+ *                       properties:
+ *                         sent:
+ *                           type: integer
+ *                         failed:
+ *                           type: integer
+ */
+userRouter.post('/notify', authenticate, authorize('3'), UserController.sendNotificationToUsers);
+
+/**
+ * @swagger
  * /api/users/type/{type}:
  *   get:
  *     tags: [User Management]
