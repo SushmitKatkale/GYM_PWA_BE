@@ -94,7 +94,7 @@ router.post('/vendor-configs', vendorConfigController.createVendorConfig);
  * @swagger
  * /api/admin/vendor-configs:
  *   get:
- *     summary: Get all vendor configurations
+ *     summary: Get all vendor configurations with advanced filtering
  *     tags: [Admin Vendor Management]
  *     security:
  *       - bearerAuth: []
@@ -104,19 +104,84 @@ router.post('/vendor-configs', vendorConfigController.createVendorConfig);
  *         schema:
  *           type: integer
  *           default: 1
+ *         description: Page number for pagination
  *       - in: query
  *         name: limit
  *         schema:
  *           type: integer
  *           default: 10
+ *         description: Number of items per page
  *       - in: query
  *         name: status
  *         schema:
  *           type: string
- *           enum: [pending, in_progress, completed, rejected]
+ *           enum: [pending, in_progress, pending_verification, completed, rejected]
+ *         description: Filter by onboarding status
+ *       - in: query
+ *         name: razorpayActive
+ *         schema:
+ *           type: string
+ *           enum: [true, false]
+ *         description: Filter by Razorpay active status
+ *       - in: query
+ *         name: kycStatus
+ *         schema:
+ *           type: string
+ *           enum: [pending, submitted, verified, rejected]
+ *         description: Filter by KYC verification status
+ *       - in: query
+ *         name: razorpayVendorId
+ *         schema:
+ *           type: string
+ *         description: Filter by Razorpay vendor ID (partial matching supported)
+ *       - in: query
+ *         name: ownerEmail
+ *         schema:
+ *           type: string
+ *         description: Filter by owner email (partial matching supported)
+ *       - in: query
+ *         name: gymName
+ *         schema:
+ *           type: string
+ *         description: Filter by gym name (partial matching supported)
  *     responses:
  *       200:
  *         description: Vendor configurations retrieved successfully
+ *         content:
+ *           application/json:
+ *             schema:
+ *               type: object
+ *               properties:
+ *                 success:
+ *                   type: boolean
+ *                 message:
+ *                   type: string
+ *                 data:
+ *                   type: object
+ *                   properties:
+ *                     configs:
+ *                       type: array
+ *                       items:
+ *                         $ref: '#/components/schemas/VendorPaymentConfig'
+ *                     pagination:
+ *                       type: object
+ *                       properties:
+ *                         total:
+ *                           type: integer
+ *                         page:
+ *                           type: integer
+ *                         limit:
+ *                           type: integer
+ *                         totalPages:
+ *                           type: integer
+ *       400:
+ *         description: Invalid query parameters
+ *       401:
+ *         description: Unauthorized
+ *       403:
+ *         description: Admin access required
+ *       500:
+ *         description: Internal server error
  */
 router.get('/vendor-configs', vendorConfigController.getAllVendorConfigs);
 

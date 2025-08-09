@@ -70,26 +70,89 @@ async function createVendorConfig(req, res) {
  */
 async function getAllVendorConfigs(req, res) {
   try {
-    const { page = 1, limit = 10, status } = req.query;
+    const { 
+      page = 1, 
+      limit = 10, 
+      status, 
+      razorpayActive, 
+      kycStatus, 
+      razorpayVendorId, 
+      ownerEmail, 
+      gymName,
+      activeStatus, // Filter by active status (optional)
+      search // Combined search for gym name or owner email
+    } = req.query;
     const offset = (page - 1) * limit;
 
-    const whereClause = { activeStatus: true };
+    const whereClause = {};
+    const includeClause = [
+      {
+        model: Gym,
+        as: 'gym',
+        attributes: ['id', 'name', 'address', 'city'],
+        where: {} // Will be populated if gymName filter is provided
+      }
+    ];
+
+    // Apply filters
     if (status) {
       whereClause.onboardingStatus = status;
     }
+    
+    if (razorpayActive !== undefined) {
+      whereClause.isRazorpayActive = razorpayActive === 'true';
+    }
+    
+    if (kycStatus) {
+      whereClause.kycStatus = kycStatus;
+    }
+    
+    if (activeStatus !== undefined) {
+      whereClause.activeStatus = activeStatus === 'true';
+    }
+    
+    if (razorpayVendorId) {
+      // Support partial matching for Razorpay Vendor ID
+      const { Op } = require('sequelize');
+      whereClause.razorpayVendorId = {
+        [Op.like]: `%${razorpayVendorId}%`
+      };
+    }
+    
+    if (ownerEmail) {
+      // Support partial matching for owner email
+      const { Op } = require('sequelize');
+      whereClause.ownerEmail = {
+        [Op.like]: `%${ownerEmail}%`
+      };
+    }
+    
+    if (gymName) {
+      // Apply gym name filter to the include
+      const { Op } = require('sequelize');
+      includeClause[0].where.name = {
+        [Op.like]: `%${gymName}%`
+      };
+      // Make the include required when filtering by gym name
+      includeClause[0].required = true;
+    } else {
+      // Remove empty where clause if no gym name filter
+      delete includeClause[0].where;
+    }
+
+    console.log('🔍 Vendor config filters applied:', {
+      whereClause,
+      includeClause,
+      queryParams: req.query
+    });
 
     const vendorConfigs = await VendorPaymentConfig.findAndCountAll({
       where: whereClause,
-      include: [
-        {
-          model: Gym,
-          as: 'gym',
-          attributes: ['id', 'name', 'address', 'city']
-        }
-      ],
+      include: includeClause,
       limit: parseInt(limit),
       offset: parseInt(offset),
-      order: [['createTimestamp', 'DESC']]
+      order: [['createTimestamp', 'DESC']],
+      distinct: true // Important when using includes with potential duplicates
     });
 
     return ResponseUtil.success(res, {
