@@ -377,4 +377,71 @@ router.get('/:paymentId/process-status', paymentController.getPaymentStatusWithP
  */
 router.get('/user/:userEmail', authenticate, paymentController.getUserPayments);
 
+/**
+ * @swagger
+ * /gateway/status/{paymentId}:
+ *   get:
+ *     summary: Get payment status after gateway redirect (public endpoint)
+ *     description: This endpoint is called by the frontend after payment gateway redirect. No authentication required.
+ *     tags: [Payments]
+ *     parameters:
+ *       - in: path
+ *         name: paymentId
+ *         required: true
+ *         schema:
+ *           type: integer
+ *         description: Payment ID from the redirect URL
+ *     responses:
+ *       200:
+ *         description: Payment status processed successfully
+ *         content:
+ *           application/json:
+ *             schema:
+ *               type: object
+ *               properties:
+ *                 success:
+ *                   type: boolean
+ *                 data:
+ *                   type: object
+ *                   properties:
+ *                     paymentId:
+ *                       type: integer
+ *                     status:
+ *                       type: string
+ *                       enum: [pending, completed, failed, cancelled]
+ *                     gateway:
+ *                       type: string
+ *                       enum: [razorpay, phonepe]
+ *                     amount:
+ *                       type: number
+ *                     userEmail:
+ *                       type: string
+ *                     subscription:
+ *                       type: object
+ *                       description: Subscription details
+ *                     gym:
+ *                       type: object
+ *                       description: Gym details
+ *                     userSubscription:
+ *                       type: object
+ *                       description: Created user subscription (if payment successful)
+ *                     message:
+ *                       type: string
+ *                       description: Human readable status message
+ *                     nextAction:
+ *                       type: string
+ *                       description: Suggested next action for the user
+ *                     createdAt:
+ *                       type: string
+ *                       format: date-time
+ *                     completedAt:
+ *                       type: string
+ *                       format: date-time
+ *       404:
+ *         description: Payment not found
+ *       500:
+ *         description: Internal server error
+ */
+router.get('/status/:paymentId', paymentController.getPaymentStatusWithProcessing);
+
 module.exports = router;

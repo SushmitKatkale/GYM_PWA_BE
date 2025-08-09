@@ -187,15 +187,104 @@ class PhonePeService {
   convertPaymentStatus(phonepeStatus) {
     switch (phonepeStatus) {
       case 'PAYMENT_SUCCESS':
+      case 'COMPLETED':
         return 'completed';
       case 'PAYMENT_ERROR':
       case 'PAYMENT_DECLINED':
+      case 'FAILED':
         return 'failed';
       case 'PAYMENT_PENDING':
       case 'PAYMENT_INITIATED':
+      case 'PENDING':
         return 'pending';
+      case 'CANCELLED':
+      case 'PAYMENT_CANCELLED':
+        return 'cancelled';
       default:
         return 'pending';
+    }
+  }
+
+  /**
+   * Extract detailed payment information from PhonePe response
+   */
+  extractPaymentDetails(phonepeResponse) {
+    try {
+      const extractedData = {
+        transactionId: null,
+        paymentMethod: null,
+        bankId: null,
+        bankTransactionId: null,
+        authorizationCode: null,
+        arn: null,
+        brn: null,
+        amount: null,
+        timestamp: null
+      };
+
+      // Extract from the detailed response structure
+      if (phonepeResponse.data && phonepeResponse.data.paymentDetails && phonepeResponse.data.paymentDetails.length > 0) {
+        const paymentDetail = phonepeResponse.data.paymentDetails[0];
+        
+        extractedData.transactionId = paymentDetail.transactionId;
+        extractedData.paymentMethod = paymentDetail.paymentMode; // CARD, UPI, etc.
+        extractedData.amount = paymentDetail.amount;
+        extractedData.timestamp = paymentDetail.timestamp;
+
+        // Extract from split instruments if available
+        if (paymentDetail.splitInstruments && paymentDetail.splitInstruments.length > 0) {
+          const instrument = paymentDetail.splitInstruments[0];
+          
+          // Extract from rail (payment gateway info)
+          if (instrument.rail) {
+            extractedData.authorizationCode = instrument.rail.authorizationCode;
+            extractedData.serviceTransactionId = instrument.rail.serviceTransactionId;
+          }
+
+          // Extract from instrument (bank/card info)
+          if (instrument.instrument) {
+            extractedData.bankId = instrument.instrument.bankId;
+            extractedData.bankTransactionId = instrument.instrument.bankTransactionId;
+            extractedData.arn = instrument.instrument.arn;
+            extractedData.brn = instrument.instrument.brn;
+            
+            // Refine payment method based on instrument type
+            if (instrument.instrument.type) {
+              extractedData.paymentMethod = instrument.instrument.type; // CREDIT_CARD, DEBIT_CARD, etc.
+            }
+          }
+        }
+      }
+
+      return extractedData;
+    } catch (error) {
+      console.error('Error extracting PhonePe payment details:', error);
+      return {};
+    }
+  }
+
+  /**
+   * Convert PhonePe payment method to standard format
+   */
+  convertPaymentMethod(phonepeMethod) {
+    if (!phonepeMethod) return null;
+    
+    const method = phonepeMethod.toUpperCase();
+    switch (method) {
+      case 'CREDIT_CARD':
+        return 'credit_card';
+      case 'DEBIT_CARD':
+      case 'CARD':
+        return 'debit_card';
+      case 'UPI':
+        return 'upi';
+      case 'NET_BANKING':
+      case 'NETBANKING':
+        return 'net_banking';
+      case 'WALLET':
+        return 'wallet';
+      default:
+        return phonepeMethod.toLowerCase();
     }
   }
 }

@@ -250,6 +250,18 @@ UserSubscription.belongsTo(Payment, {
   as: 'payment',
 });
 
+// Payment to Subscription relationship
+Payment.belongsTo(Subscription, {
+  foreignKey: 'subscriptionId',
+  as: 'subscription',
+});
+
+Subscription.hasMany(Payment, {
+  foreignKey: 'subscriptionId',
+  as: 'payments',
+  onDelete: 'CASCADE',
+});
+
 // Invoice relationships
 Payment.hasOne(Invoice, {
   foreignKey: 'paymentId',

@@ -124,6 +124,9 @@ app.use('/api/slots', slotRoutes);
 app.use('/api/advertisements', advertisementRoutes);
 app.use('/api/dashboard', dashboardRoutes);
 
+// Gateway status route for frontend payment redirect (no authentication required)
+app.use('/gateway', paymentRoutes);
+
 // 404 handler
 app.use(notFoundHandler);
 

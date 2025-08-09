@@ -203,6 +203,7 @@ async function createRazorpayPayment({ subscription, vendorConfig, amount, userE
   // Save payment record
   const payment = await Payment.create({
     paymentAmount: amount,
+    paymentRefNo: order.receipt, // Use Razorpay receipt as payment reference
     razorpayOrderId: order.id,
     vendorConfigId: vendorConfig.id,
     subscriptionId: subscription.id,
@@ -292,8 +293,10 @@ async function handleRazorpayCallback(paymentData) {
     if (payment) {
       await payment.update({
         razorpayPaymentId: razorpay_payment_id,
+        transactionId: razorpay_payment_id,
         status: 'completed',
-        completedAt: new Date()
+        completedAt: new Date(),
+        gatewayResponse: JSON.stringify(paymentData)
       });
     }
 
@@ -324,11 +327,43 @@ async function handlePhonepeCallback(webhookData, xVerifyHeader) {
     });
 
     if (payment) {
-      await payment.update({
+      // Prepare update object with all available data from PhonePe webhook response
+      const updateData = {
         phonepePaymentId: data.transactionId,
+        transactionId: data.transactionId,
         status: paymentStatus,
-        completedAt: paymentStatus === 'completed' ? new Date() : null
+        completedAt: paymentStatus === 'completed' ? new Date() : null,
+        gatewayResponse: JSON.stringify(data)
+      };
+      
+      // Extract additional fields if available
+      if (data.bankRefNo || data.referenceId) {
+        updateData.bankRefNo = data.bankRefNo || data.referenceId;
+      }
+      
+      // Update payment method if available
+      if (data.paymentMethod) {
+        const paymentMethod = data.paymentMethod.toLowerCase();
+        if (['credit_card', 'debit_card', 'upi', 'net_banking', 'wallet'].includes(paymentMethod)) {
+          updateData.paidVia = paymentMethod;
+        } else if (paymentMethod.includes('upi')) {
+          updateData.paidVia = 'upi';
+        } else if (paymentMethod.includes('card')) {
+          updateData.paidVia = data.paymentMethod.includes('credit') ? 'credit_card' : 'debit_card';
+        } else if (paymentMethod.includes('net') || paymentMethod.includes('bank')) {
+          updateData.paidVia = 'net_banking';
+        } else if (paymentMethod.includes('wallet')) {
+          updateData.paidVia = 'wallet';
+        }
+      }
+      
+      console.log('Updating payment with PhonePe webhook data:', {
+        paymentId: payment.id,
+        status: paymentStatus,
+        updateFields: Object.keys(updateData)
       });
+      
+      await payment.update(updateData);
     }
 
     return { success: true, payment, status: paymentStatus };
@@ -345,18 +380,16 @@ async function processPaymentStatus(paymentId) {
   try {
     const { UserSubscription } = require('../models');
     
-    // Get payment with related data
+    // Get payment with related data including subscription and gym information
     const payment = await Payment.findByPk(paymentId, {
-      include: [
-        {
-          model: Subscription,
-          as: 'subscription',
-          include: [{
-            model: Gym,
-            as: 'gym'
-          }]
-        }
-      ]
+      include: [{
+        model: Subscription,
+        as: 'subscription',
+        include: [{
+          model: Gym,
+          as: 'gym'
+        }]
+      }]
     });
 
     if (!payment) {
@@ -375,13 +408,75 @@ async function processPaymentStatus(paymentId) {
         const statusCheck = await phonepeService.checkPaymentStatus(payment.phonepeTransactionId);
         
         if (statusCheck.success && statusCheck.data) {
-          const newStatus = phonepeService.convertPaymentStatus(statusCheck.data.code);
+          const responseData = statusCheck.data;
+          const newStatus = phonepeService.convertPaymentStatus(responseData.state);
           
-          // Update payment status
-          await payment.update({
+          // Extract detailed payment information
+          const paymentDetails = phonepeService.extractPaymentDetails(responseData);
+          
+          // Prepare update object with all available data from PhonePe response
+          const updateData = {
             status: newStatus,
-            completedAt: newStatus === 'completed' ? new Date() : null
+            completedAt: newStatus === 'completed' ? new Date() : null,
+            gatewayResponse: JSON.stringify(responseData)
+          };
+          
+          // Update with extracted payment details
+          if (paymentDetails.transactionId) {
+            updateData.phonepePaymentId = paymentDetails.transactionId;
+            updateData.transactionId = paymentDetails.transactionId;
+          }
+          
+          // Update payment method
+          if (paymentDetails.paymentMethod) {
+            updateData.paidVia = phonepeService.convertPaymentMethod(paymentDetails.paymentMethod);
+          }
+          
+          // Update bank information
+          if (paymentDetails.bankId) {
+            updateData.bankId = paymentDetails.bankId;
+          }
+          
+          if (paymentDetails.bankTransactionId) {
+            updateData.bankRefNo = paymentDetails.bankTransactionId;
+          }
+          
+          // Update authorization and reference codes
+          if (paymentDetails.authorizationCode) {
+            updateData.authorizationCode = paymentDetails.authorizationCode;
+          }
+          
+          if (paymentDetails.arn) {
+            updateData.arn = paymentDetails.arn;
+          }
+          
+          if (paymentDetails.brn) {
+            updateData.brn = paymentDetails.brn;
+          }
+          
+          if (paymentDetails.serviceTransactionId) {
+            updateData.serviceTransactionId = paymentDetails.serviceTransactionId;
+          }
+          
+          // Update payment reference number if not already set
+          if (!payment.paymentRefNo) {
+            updateData.paymentRefNo = payment.phonepeTransactionId;
+          }
+          
+          console.log('Updating payment with detailed PhonePe response data:', {
+            paymentId: payment.id,
+            newStatus,
+            updateFields: Object.keys(updateData),
+            paymentDetails: {
+              transactionId: paymentDetails.transactionId,
+              paymentMethod: paymentDetails.paymentMethod,
+              bankId: paymentDetails.bankId,
+              amount: paymentDetails.amount
+            }
           });
+          
+          // Update payment record
+          await payment.update(updateData);
           
           paymentStatus = newStatus;
         }
