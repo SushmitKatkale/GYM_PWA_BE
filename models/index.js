@@ -173,6 +173,9 @@ const UserSlotBooking = require('./UserSlotBooking');
 const SlotChangeHistory = require('./SlotChangeHistory');
 const SlotWaitlist = require('./SlotWaitlist');
 const VendorPaymentConfig = require('./VendorPaymentConfig');
+const Advertisement = require('./Advertisement');
+const AdvertisementMedia = require('./AdvertisementMedia');
+const AdvertisementAnalytics = require('./AdvertisementAnalytics');
 
 // Define relationships
 // Gym-User owner relationship
@@ -401,6 +404,58 @@ VendorPaymentConfig.hasMany(Payment, {
   onDelete: 'SET NULL',
 });
 
+// Advertisement relationships
+Advertisement.hasMany(AdvertisementMedia, {
+  foreignKey: 'advertisementId',
+  as: 'media',
+  onDelete: 'CASCADE',
+});
+
+AdvertisementMedia.belongsTo(Advertisement, {
+  foreignKey: 'advertisementId',
+  as: 'advertisement',
+});
+
+Advertisement.hasMany(AdvertisementAnalytics, {
+  foreignKey: 'advertisementId',
+  as: 'analytics',
+  onDelete: 'CASCADE',
+});
+
+AdvertisementAnalytics.belongsTo(Advertisement, {
+  foreignKey: 'advertisementId',
+  as: 'advertisement',
+});
+
+// User relationships for advertisements
+User.hasMany(Advertisement, {
+  foreignKey: 'createdBy',
+  sourceKey: 'id',
+  as: 'createdAdvertisements',
+  onDelete: 'SET NULL',
+});
+
+User.hasMany(Advertisement, {
+  foreignKey: 'updatedBy',
+  sourceKey: 'id',
+  as: 'updatedAdvertisements',
+  onDelete: 'SET NULL',
+});
+
+Advertisement.belongsTo(User, {
+  foreignKey: 'createdBy',
+  targetKey: 'id',
+  as: 'creator',
+  constraints: false
+});
+
+Advertisement.belongsTo(User, {
+  foreignKey: 'updatedBy',
+  targetKey: 'id',
+  as: 'updater',
+  constraints: false
+});
+
 // Sync models with database (in development)
 const syncDatabase = async () => {
   try {
@@ -539,6 +594,9 @@ module.exports = {
   SlotChangeHistory,
   SlotWaitlist,
   VendorPaymentConfig,
+  Advertisement,
+  AdvertisementMedia,
+  AdvertisementAnalytics,
   syncDatabase,
   testConnection,
   createDefaultAdmin,

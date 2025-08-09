@@ -15,9 +15,11 @@ const subscriptionFeatureRoutes = require('./routes/subscriptionFeatures');
 const slotRoutes = require('./routes/slots');
 const ownerRoutes = require('./routes/owners');
 const adminPaymentRoutes = require('./routes/adminPayments');
+const advertisementRoutes = require('./routes/advertisements');
 const { errorHandler, notFoundHandler } = require('./middleware/errorHandler');
 const { specs, swaggerUi, swaggerOptions } = require('./config/swagger');
 const { testConnection, syncDatabase } = require('./models');
+const AdvertisementScheduler = require('./middleware/advertisementScheduler');
 
 // Load environment variables
 dotenv.config();
@@ -116,6 +118,7 @@ app.use('/api/owners', ownerRoutes);
 app.use('/api/admin', adminPaymentRoutes);
 // Note: /api/user-subscriptions, /api/payments, and /api/invoices routes removed (were empty)
 app.use('/api/slots', slotRoutes);
+app.use('/api/advertisements', advertisementRoutes);
 
 // 404 handler
 app.use(notFoundHandler);
@@ -128,6 +131,9 @@ const PORT = process.env.PORT || 3000;
 // Test DB connection and sync models
 testConnection();
 syncDatabase();
+
+// Initialize advertisement scheduler
+AdvertisementScheduler.init();
 
 app.listen(PORT, () => {
   console.log(`🚀 Server running on port ${PORT}`);
