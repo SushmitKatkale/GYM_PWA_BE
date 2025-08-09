@@ -1,10 +1,52 @@
 const Razorpay = require('razorpay');
+const axios = require('axios');
 const { VendorPaymentConfig, Gym, User } = require('../models');
 
 const razorpayInstance = new Razorpay({
   key_id: process.env.RAZORPAY_KEY_ID,
   key_secret: process.env.RAZORPAY_KEY_SECRET,
 });
+
+// Extend the Razorpay SDK to add missing methods
+if (!razorpayInstance.accounts.addBankAccount) {
+  razorpayInstance.accounts.addBankAccount = async function(accountId, bankAccountData) {
+    const authHeader = Buffer.from(
+      `${process.env.RAZORPAY_KEY_ID}:${process.env.RAZORPAY_KEY_SECRET}`
+    ).toString('base64');
+    
+    const response = await axios.post(
+      `https://api.razorpay.com/v2/accounts/${accountId}/bank_account`,
+      bankAccountData,
+      {
+        headers: {
+          'Authorization': `Basic ${authHeader}`,
+          'Content-Type': 'application/json'
+        }
+      }
+    );
+    return response.data;
+  };
+}
+
+if (!razorpayInstance.accounts.addStakeholder) {
+  razorpayInstance.accounts.addStakeholder = async function(accountId, stakeholderData) {
+    const authHeader = Buffer.from(
+      `${process.env.RAZORPAY_KEY_ID}:${process.env.RAZORPAY_KEY_SECRET}`
+    ).toString('base64');
+    
+    const response = await axios.post(
+      `https://api.razorpay.com/v2/accounts/${accountId}/stakeholders`,
+      stakeholderData,
+      {
+        headers: {
+          'Authorization': `Basic ${authHeader}`,
+          'Content-Type': 'application/json'
+        }
+      }
+    );
+    return response.data;
+  };
+}
 
 /**
  * Onboard vendor to Razorpay
@@ -71,9 +113,9 @@ async function onboardVendor(vendorConfigId, bankDetails) {
       email: vendorConfig.ownerEmail,
       phone: owner.phoneNumber,
       type: 'route',
-      reference_id: `vendor_${vendorConfigId}`,
+      reference_id: `VEN${vendorConfigId}`,
       legal_business_name: vendorConfig.gym?.name || 'Gym Business',
-      business_type: 'proprietorship',
+      business_type: bankDetails?.gst?.length == 0 ? 'individual' : 'proprietorship',
       customer_facing_business_name: vendorConfig.gym?.name || 'Gym',
       profile: {
         category: 'education',
@@ -98,16 +140,87 @@ async function onboardVendor(vendorConfigId, bankDetails) {
     
     console.log('Razorpay account payload:', accountPayload);
     
-    // Create Razorpay linked account
-    const account = await razorpayInstance.accounts.create(accountPayload);
+    // Check if Razorpay account already exists in our database
+    let account;
+    if (vendorConfig.razorpayVendorId) {
+      // Account ID exists in DB, fetch from Razorpay to verify
+      account = await razorpayInstance.accounts.fetch(vendorConfig.razorpayVendorId);
+      console.log('Using existing Razorpay account from database:', account.id);
+    } else {
+      // No account ID in database, create new account
+      account = await razorpayInstance.accounts.create(accountPayload);
+      console.log('New account created:', account.id);
+      
+      // IMMEDIATELY save the account ID to database
+      await vendorConfig.update({
+        razorpayVendorId: account.id,
+        onboardingStatus: 'in_progress',
+        onboardingDate: new Date()
+      });
+      console.log('Razorpay account ID saved to database:', account.id);
+    }
 
-    // Update vendor config with Razorpay account ID
+    // Add bank account to the created account
+    const bankAccountPayload = {
+      ifsc_code: bankDetails.ifsc,
+      account_number: bankDetails.accountNumber,
+      beneficiary_name: bankDetails.accountHolderName
+    };
+    
+    console.log('Adding bank account for account:', account.id);
+    console.log('Bank account payload:', { ...bankAccountPayload, account_number: '***HIDDEN***' });
+    
+    let bankAccount;
+    try {
+      bankAccount = await razorpayInstance.accounts.addBankAccount(account.id, bankAccountPayload);
+      console.log('Bank account added successfully:', bankAccount.id);
+    } catch (bankError) {
+      console.error('Bank account API error details:', {
+        message: bankError.message,
+        status: bankError.response?.status,
+        statusText: bankError.response?.statusText,
+        data: bankError.response?.data,
+        accountId: account.id,
+        payload: { ...bankAccountPayload, account_number: '***HIDDEN***' }
+      });
+      throw new Error(`Failed to add bank account: ${bankError.message}. Details: ${JSON.stringify(bankError.response?.data)}`);
+    }
+
+    // Add stakeholder (account holder) details
+    const stakeholderPayload = {
+      name: `${owner.firstName} ${owner.lastName}`,
+      email: vendorConfig.ownerEmail,
+      phone: {
+        primary: owner.phoneNumber
+      },
+      addresses: {
+        residential: {
+          street: vendorConfig.gym?.address || 'Address Line 1',
+          city: vendorConfig.gym?.city || 'City',
+          state: getFullStateName(vendorConfig.gym?.state) || 'Karnataka',
+          postal_code: vendorConfig.gym?.zipCode || '560001',
+          country: 'IN'
+        }
+      },
+      kyc: {
+        pan: bankDetails.pan
+      },
+      percentage_ownership: 100
+    };
+    
+    console.log('Adding stakeholder for account:', account.id);
+    const stakeholder = await razorpayInstance.accounts.addStakeholder(account.id, stakeholderPayload);
+    console.log('Stakeholder added:', stakeholder.id);
+
+    // Update vendor config with Razorpay account ID and other details
     await vendorConfig.update({
       razorpayVendorId: account.id,
-      onboardingStatus: 'completed',
+      razorpayBankAccountId: bankAccount.id,
+      razorpayStakeholderId: stakeholder.id,
+      onboardingStatus: 'pending_verification',
       onboardingDate: new Date(),
-      isRazorpayActive: true,
-      bankAccountVerified: true
+      isRazorpayActive: false, // Will be activated after verification
+      bankAccountVerified: false // Will be verified by Razorpay
     });
 
     return {
@@ -161,6 +274,41 @@ async function checkVendorAccountStatus(razorpayVendorId) {
     };
   } catch (error) {
     throw new Error(`Failed to check account status: ${error.message}`);
+  }
+}
+
+/**
+ * Helper function to make Razorpay API calls
+ */
+async function makeRazorpayApiCall(url, method = 'GET', data = null) {
+  const authHeader = Buffer.from(
+    `${process.env.RAZORPAY_KEY_ID}:${process.env.RAZORPAY_KEY_SECRET}`
+  ).toString('base64');
+
+  const config = {
+    method,
+    url,
+    headers: {
+      'Authorization': `Basic ${authHeader}`,
+      'Content-Type': 'application/json'
+    }
+  };
+
+  if (data && (method === 'POST' || method === 'PUT' || method === 'PATCH')) {
+    config.data = data;
+  }
+
+  try {
+    const response = await axios(config);
+    return response.data;
+  } catch (error) {
+    console.error('Razorpay API call failed:', {
+      url,
+      method,
+      status: error.response?.status,
+      data: error.response?.data
+    });
+    throw error;
   }
 }
 

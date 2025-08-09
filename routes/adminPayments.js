@@ -123,6 +123,28 @@ router.get('/vendor-configs', vendorConfigController.getAllVendorConfigs);
 /**
  * @swagger
  * /api/admin/vendor-configs/{id}:
+ *   get:
+ *     summary: Get vendor configuration by ID
+ *     tags: [Admin Vendor Management]
+ *     security:
+ *       - bearerAuth: []
+ *     parameters:
+ *       - in: path
+ *         name: id
+ *         required: true
+ *         schema:
+ *           type: integer
+ *     responses:
+ *       200:
+ *         description: Vendor configuration retrieved successfully
+ *       404:
+ *         description: Vendor configuration not found
+ */
+router.get('/vendor-configs/:id', vendorConfigController.getVendorConfig);
+
+/**
+ * @swagger
+ * /api/admin/vendor-configs/{id}:
  *   put:
  *     summary: Update vendor configuration
  *     tags: [Admin Vendor Management]
@@ -218,6 +240,79 @@ router.post('/vendor-configs/:id/onboard', vendorConfigController.onboardVendor)
  *         description: Vendor status retrieved successfully
  */
 router.get('/vendor-configs/:id/status', vendorConfigController.checkVendorStatus);
+
+/**
+ * @swagger
+ * /api/admin/vendor-configs/{id}/complete:
+ *   put:
+ *     summary: Update vendor configuration (comprehensive - all fields)
+ *     tags: [Admin Vendor Management]
+ *     security:
+ *       - bearerAuth: []
+ *     parameters:
+ *       - in: path
+ *         name: id
+ *         required: true
+ *         schema:
+ *           type: integer
+ *     requestBody:
+ *       content:
+ *         application/json:
+ *           schema:
+ *             type: object
+ *             properties:
+ *               razorpayVendorId:
+ *                 type: string
+ *                 description: Razorpay vendor account ID
+ *               cutValue:
+ *                 type: number
+ *                 format: float
+ *                 description: Commission value
+ *               cutType:
+ *                 type: string
+ *                 enum: [percentage, flat]
+ *                 description: Commission type
+ *               isRazorpayActive:
+ *                 type: boolean
+ *                 description: Whether Razorpay integration is active
+ *               onboardingStatus:
+ *                 type: string
+ *                 enum: [pending, in_progress, pending_verification, completed, rejected]
+ *                 description: Vendor onboarding status
+ *               onboardingDate:
+ *                 type: string
+ *                 format: date-time
+ *                 description: Date when vendor was onboarded
+ *               bankAccountVerified:
+ *                 type: boolean
+ *                 description: Whether bank account is verified
+ *               kycStatus:
+ *                 type: string
+ *                 enum: [pending, submitted, verified, rejected]
+ *                 description: KYC verification status
+ *               activeStatus:
+ *                 type: boolean
+ *                 description: Whether configuration is active
+ *               razorpayBankAccountId:
+ *                 type: string
+ *                 description: Razorpay bank account ID
+ *               razorpayStakeholderId:
+ *                 type: string
+ *                 description: Razorpay stakeholder ID
+ *               updatedBy:
+ *                 type: string
+ *                 description: Email of the user updating the record
+ *     responses:
+ *       200:
+ *         description: Vendor configuration updated successfully
+ *       400:
+ *         description: Invalid input data
+ *       404:
+ *         description: Vendor configuration not found
+ *       500:
+ *         description: Internal server error
+ */
+router.put('/vendor-configs/:id/complete', vendorConfigController.updateVendorConfigComplete);
 
 /**
  * @swagger

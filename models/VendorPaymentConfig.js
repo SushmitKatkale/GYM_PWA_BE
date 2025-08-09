@@ -29,6 +29,16 @@ const VendorPaymentConfig = sequelize.define('VendorPaymentConfig', {
     allowNull: true,
     field: 'razorpay_vendor_id'
   },
+  razorpayBankAccountId: {
+    type: DataTypes.STRING(255),
+    allowNull: true,
+    field: 'razorpay_bank_account_id'
+  },
+  razorpayStakeholderId: {
+    type: DataTypes.STRING(255),
+    allowNull: true,
+    field: 'razorpay_stakeholder_id'
+  },
   cutValue: {
     type: DataTypes.DECIMAL(10, 2),
     allowNull: false,
@@ -50,7 +60,7 @@ const VendorPaymentConfig = sequelize.define('VendorPaymentConfig', {
     field: 'is_razorpay_active'
   },
   onboardingStatus: {
-    type: DataTypes.ENUM('pending', 'in_progress', 'completed', 'rejected'),
+    type: DataTypes.ENUM('pending', 'in_progress', 'pending_verification', 'completed', 'rejected'),
     allowNull: false,
     defaultValue: 'pending',
     field: 'onboarding_status'
