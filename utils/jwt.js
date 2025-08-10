@@ -26,8 +26,8 @@ class JWTUtils {
   }
 
   // Get token expiration date for refresh token
-  static getRefreshTokenExpiration() {
-    const expirationTime = process.env.JWT_REFRESH_EXPIRES_IN || '30d';
+  static getRefreshTokenExpiration(isAdmin = false) {
+    const expirationTime = isAdmin ? '15m' : process.env.JWT_REFRESH_EXPIRES_IN || '30d';
     const match = expirationTime.match(/^(\d+)([smhd])$/);
     
     if (!match) {

@@ -338,7 +338,7 @@ authRouter.post('/login', validate(loginSchema), async (req, res) => {
 
     const accessToken = JWTUtils.generateAccessToken({ userEmail: user.email });
     const refreshTokenValue = JWTUtils.generateRefreshToken();
-    const refreshTokenExpiration = JWTUtils.getRefreshTokenExpiration();
+    const refreshTokenExpiration = JWTUtils.getRefreshTokenExpiration(user.type == 3);
 
     await RefreshToken.createToken(user.email, refreshTokenValue, refreshTokenExpiration);
 
