@@ -163,7 +163,7 @@ This document outlines the authentication and authorization requirements for all
 // Typical middleware chain for owner-restricted endpoints
 router.put('/:id', 
   authenticate,                    // Verify JWT token
-  authorize(['admin', 'owner']),   // Check user role
+  authorize('3', '2'),   // Check user role
   checkOwnership,                  // Verify ownership (owners only)
   controllerFunction               // Execute business logic
 );

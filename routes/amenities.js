@@ -52,7 +52,7 @@ const { checkAmenityOwnership, checkGymOwnershipForCreation } = require('../midd
  *             schema:
  *               $ref: '#/components/schemas/ErrorResponse'
  */
-router.post('/', authenticate, authorize(['admin', 'owner']), checkGymOwnershipForCreation, createAmenity);
+router.post('/', authenticate, authorize('3', '2'), checkGymOwnershipForCreation, createAmenity);
 
 /**
  * @swagger
@@ -230,7 +230,7 @@ router.get('/:id', getAmenityById);
  *             schema:
  *               $ref: '#/components/schemas/ErrorResponse'
  */
-router.put('/:id', authenticate, authorize(['admin', 'owner']), checkAmenityOwnership, updateAmenity);
+router.put('/:id', authenticate, authorize('3', '2'), checkAmenityOwnership, updateAmenity);
 
 /**
  * @swagger
@@ -268,6 +268,6 @@ router.put('/:id', authenticate, authorize(['admin', 'owner']), checkAmenityOwne
  *             schema:
  *               $ref: '#/components/schemas/ErrorResponse'
  */
-router.delete('/:id', authenticate, authorize(['admin', 'owner']), checkAmenityOwnership, deleteAmenity);
+router.delete('/:id', authenticate, authorize('3', '2'), checkAmenityOwnership, deleteAmenity);
 
 module.exports = router;

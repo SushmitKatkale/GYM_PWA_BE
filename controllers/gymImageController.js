@@ -12,12 +12,12 @@ const uploadGymImage = async (req, res) => {
     // Check if gym exists
     const gym = await Gym.findByPk(gymId);
     if (!gym) {
-      return errorResponse(res, 'Gym not found', 404);
+      return ResponseUtil.error(res, 'Gym not found', 404);
     }
 
     // Check if file was uploaded
     if (!req.file) {
-      return errorResponse(res, 'No image file provided', 400);
+      return ResponseUtil.error(res, 'No image file provided', 400);
     }
 
     // Create relative path for storing in database
@@ -31,10 +31,10 @@ const uploadGymImage = async (req, res) => {
       activeStatus: true
     });
 
-    return successResponse(res, 'Image uploaded successfully', {
+    return ResponseUtil.success(res, {
       ...gymImage.toJSON(),
       fullUrl: `${req.protocol}://${req.get('host')}${relativePath}`
-    }, 201);
+    }, 'Image uploaded successfully', 201);
   } catch (error) {
     console.error('Error uploading gym image:', error);
     
@@ -46,7 +46,7 @@ const uploadGymImage = async (req, res) => {
       }
     }
     
-    return errorResponse(res, 'Failed to upload image', 500);
+    return ResponseUtil.error(res, 'Failed to upload image', 500);
   }
 };
 
@@ -79,10 +79,10 @@ const getImagesByGym = async (req, res) => {
       fullUrl: `${req.protocol}://${req.get('host')}${image.path}`
     }));
 
-    return successResponse(res, 'Images retrieved successfully', imagesWithUrl);
+    return ResponseUtil.success(res, imagesWithUrl, 'Images retrieved successfully');
   } catch (error) {
     console.error('Error fetching gym images:', error);
-    return errorResponse(res, 'Failed to fetch images', 500);
+    return ResponseUtil.error(res, 'Failed to fetch images', 500);
   }
 };
 
@@ -122,7 +122,7 @@ const getAllGymImages = async (req, res) => {
       fullUrl: `${req.protocol}://${req.get('host')}${image.path}`
     }));
 
-    return successResponse(res, 'Images retrieved successfully', {
+    return ResponseUtil.success(res, {
       images: imagesWithUrl,
       pagination: {
         currentPage: parseInt(page),
@@ -130,10 +130,10 @@ const getAllGymImages = async (req, res) => {
         totalItems: count,
         itemsPerPage: parseInt(limit)
       }
-    });
+    }, 'Images retrieved successfully');
   } catch (error) {
     console.error('Error fetching gym images:', error);
-    return errorResponse(res, 'Failed to fetch images', 500);
+    return ResponseUtil.error(res, 'Failed to fetch images', 500);
   }
 };
 
@@ -153,7 +153,7 @@ const getGymImageById = async (req, res) => {
     });
 
     if (!image) {
-      return errorResponse(res, 'Image not found', 404);
+      return ResponseUtil.error(res, 'Image not found', 404);
     }
 
     const imageWithUrl = {
@@ -161,10 +161,10 @@ const getGymImageById = async (req, res) => {
       fullUrl: `${req.protocol}://${req.get('host')}${image.path}`
     };
 
-    return successResponse(res, 'Image retrieved successfully', imageWithUrl);
+    return ResponseUtil.success(res, imageWithUrl, 'Image retrieved successfully');
   } catch (error) {
     console.error('Error fetching gym image:', error);
-    return errorResponse(res, 'Failed to fetch image', 500);
+    return ResponseUtil.error(res, 'Failed to fetch image', 500);
   }
 };
 
@@ -176,7 +176,7 @@ const updateGymImage = async (req, res) => {
 
     const image = await GymImage.findByPk(id);
     if (!image) {
-      return errorResponse(res, 'Image not found', 404);
+      return ResponseUtil.error(res, 'Image not found', 404);
     }
 
     await image.update({
@@ -200,10 +200,10 @@ const updateGymImage = async (req, res) => {
       fullUrl: `${req.protocol}://${req.get('host')}${updatedImage.path}`
     };
 
-    return successResponse(res, 'Image updated successfully', imageWithUrl);
+    return ResponseUtil.success(res, imageWithUrl, 'Image updated successfully');
   } catch (error) {
     console.error('Error updating gym image:', error);
-    return errorResponse(res, 'Failed to update image', 500);
+    return ResponseUtil.error(res, 'Failed to update image', 500);
   }
 };
 
@@ -215,7 +215,7 @@ const deleteGymImage = async (req, res) => {
 
     const image = await GymImage.findByPk(id);
     if (!image) {
-      return errorResponse(res, 'Image not found', 404);
+      return ResponseUtil.error(res, 'Image not found', 404);
     }
 
     await image.update({
@@ -224,10 +224,10 @@ const deleteGymImage = async (req, res) => {
       updateTimestamp: new Date()
     });
 
-    return successResponse(res, 'Image deleted successfully');
+    return ResponseUtil.success(res, null, 'Image deleted successfully');
   } catch (error) {
     console.error('Error deleting gym image:', error);
-    return errorResponse(res, 'Failed to delete image', 500);
+    return ResponseUtil.error(res, 'Failed to delete image', 500);
   }
 };
 
@@ -238,7 +238,7 @@ const hardDeleteGymImage = async (req, res) => {
 
     const image = await GymImage.findByPk(id);
     if (!image) {
-      return errorResponse(res, 'Image not found', 404);
+      return ResponseUtil.error(res, 'Image not found', 404);
     }
 
     // Delete file from file system
@@ -250,10 +250,10 @@ const hardDeleteGymImage = async (req, res) => {
     // Delete from database
     await image.destroy();
 
-    return successResponse(res, 'Image permanently deleted');
+    return ResponseUtil.success(res, null, 'Image permanently deleted');
   } catch (error) {
     console.error('Error hard deleting gym image:', error);
-    return errorResponse(res, 'Failed to permanently delete image', 500);
+    return ResponseUtil.error(res, 'Failed to permanently delete image', 500);
   }
 };
 
@@ -264,7 +264,7 @@ const uploadGymImageGeneral = async (req, res) => {
 
     // Check if file was uploaded
     if (!req.file) {
-      return errorResponse(res, 'No image file provided', 400);
+      return ResponseUtil.error(res, 'No image file provided', 400);
     }
 
     // Create relative path for storing in database
@@ -278,10 +278,10 @@ const uploadGymImageGeneral = async (req, res) => {
       activeStatus: true
     });
 
-    return successResponse(res, 'Image uploaded successfully', {
+    return ResponseUtil.success(res, {
       ...gymImage.toJSON(),
       fullUrl: `${req.protocol}://${req.get('host')}${relativePath}`
-    }, 201);
+    }, 'Image uploaded successfully', 201);
   } catch (error) {
     console.error('Error uploading gym image:', error);
     
@@ -293,7 +293,7 @@ const uploadGymImageGeneral = async (req, res) => {
       }
     }
     
-    return errorResponse(res, 'Failed to upload image', 500);
+    return ResponseUtil.error(res, 'Failed to upload image', 500);
   }
 };
 

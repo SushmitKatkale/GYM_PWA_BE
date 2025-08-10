@@ -140,7 +140,7 @@ const availabilityValidation = [
  */
 router.post('/', 
   authenticate, 
-  authorize(['admin', 'owner']), 
+  authorize('3', '2'), 
   createGymSlotValidation,
   checkGymOwnershipForCreation, 
   createGymSlot
@@ -497,7 +497,7 @@ router.get('/availability',
  */
 router.put('/:id', 
   authenticate, 
-  authorize(['admin', 'owner']),
+  authorize('3', '2'),
   checkSlotOwnership,
   updateGymSlot
 );
@@ -531,7 +531,7 @@ router.put('/:id',
  */
 router.delete('/:id', 
   authenticate, 
-  authorize(['admin', 'owner']),
+  authorize('3', '2'),
   checkSlotOwnership,
   deleteGymSlot
 );

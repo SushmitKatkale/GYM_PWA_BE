@@ -98,7 +98,7 @@ const checkSubscriptionOwnershipForCreation = async (req, res, next) => {
  *             schema:
  *               $ref: '#/components/schemas/ErrorResponse'
  */
-router.post('/', authenticate, authorize(['admin', 'owner']), checkSubscriptionOwnershipForCreation, createSubscriptionFeature);
+router.post('/', authenticate, authorize('3', '2'), checkSubscriptionOwnershipForCreation, createSubscriptionFeature);
 
 /**
  * @swagger
@@ -281,7 +281,7 @@ router.get('/:id', getSubscriptionFeatureById);
  *             schema:
  *               $ref: '#/components/schemas/ErrorResponse'
  */
-router.put('/:id', authenticate, authorize(['admin', 'owner']), checkSubscriptionFeatureOwnership, updateSubscriptionFeature);
+router.put('/:id', authenticate, authorize('3', '2'), checkSubscriptionFeatureOwnership, updateSubscriptionFeature);
 
 /**
  * @swagger
@@ -319,6 +319,6 @@ router.put('/:id', authenticate, authorize(['admin', 'owner']), checkSubscriptio
  *             schema:
  *               $ref: '#/components/schemas/ErrorResponse'
  */
-router.delete('/:id', authenticate, authorize(['admin', 'owner']), checkSubscriptionFeatureOwnership, deleteSubscriptionFeature);
+router.delete('/:id', authenticate, authorize('3', '2'), checkSubscriptionFeatureOwnership, deleteSubscriptionFeature);
 
 module.exports = router;

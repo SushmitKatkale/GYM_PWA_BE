@@ -52,7 +52,7 @@ const { checkSubscriptionOwnership, checkGymOwnershipForCreation } = require('..
  *             schema:
  *               $ref: '#/components/schemas/ErrorResponse'
  */
-router.post('/', authenticate, authorize(['admin', 'owner']), checkGymOwnershipForCreation, createSubscription);
+router.post('/', authenticate, authorize('3', '2'), checkGymOwnershipForCreation, createSubscription);
 
 /**
  * @swagger
@@ -235,7 +235,7 @@ router.get('/:id', getSubscriptionById);
  *             schema:
  *               $ref: '#/components/schemas/ErrorResponse'
  */
-router.put('/:id', authenticate, authorize(['admin', 'owner']), checkSubscriptionOwnership, updateSubscription);
+router.put('/:id', authenticate, authorize('3', '2'), checkSubscriptionOwnership, updateSubscription);
 
 /**
  * @swagger
@@ -273,6 +273,6 @@ router.put('/:id', authenticate, authorize(['admin', 'owner']), checkSubscriptio
  *             schema:
  *               $ref: '#/components/schemas/ErrorResponse'
  */
-router.delete('/:id', authenticate, authorize(['admin', 'owner']), checkSubscriptionOwnership, deleteSubscription);
+router.delete('/:id', authenticate, authorize('3', '2'), checkSubscriptionOwnership, deleteSubscription);
 
 module.exports = router;
