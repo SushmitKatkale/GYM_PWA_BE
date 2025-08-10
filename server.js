@@ -19,6 +19,7 @@ const paymentRoutes = require('./routes/payments');
 const advertisementRoutes = require('./routes/advertisements');
 const dashboardRoutes = require('./routes/dashboard');
 const invoiceRoutes = require('./routes/invoices');
+// const reviewRoutes = require('./routes/reviews');
 const { errorHandler, notFoundHandler } = require('./middleware/errorHandler');
 const { specs, swaggerUi, swaggerOptions } = require('./config/swagger');
 const { testConnection, syncDatabase } = require('./models');
@@ -125,6 +126,7 @@ app.use('/api/slots', slotRoutes);
 app.use('/api/advertisements', advertisementRoutes);
 app.use('/api/dashboard', dashboardRoutes);
 app.use('/api/invoices', invoiceRoutes);
+// app.use('/api/reviews', reviewRoutes);
 
 // Gateway status route for frontend payment redirect (no authentication required)
 app.use('/gateway', paymentRoutes);
@@ -135,7 +137,7 @@ app.use(notFoundHandler);
 // Error handler
 app.use(errorHandler);
 
-const PORT = process.env.PORT || 3000;
+const PORT = process.env.PORT || 3001;
 
 // Test DB connection and sync models
 testConnection();

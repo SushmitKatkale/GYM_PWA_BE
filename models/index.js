@@ -177,6 +177,7 @@ const Advertisement = require('./Advertisement');
 const AdvertisementMedia = require('./AdvertisementMedia');
 const AdvertisementAnalytics = require('./AdvertisementAnalytics');
 const Refund = require('./Refund');
+// const Review = require('./Review');
 
 // Define relationships
 // Gym-User owner relationship
@@ -505,6 +506,31 @@ Advertisement.belongsTo(User, {
   constraints: false
 });
 
+// Review relationships (temporarily disabled)
+// User.hasMany(Review, {
+//   foreignKey: 'userEmail',
+//   sourceKey: 'email',
+//   as: 'reviews',
+//   onDelete: 'CASCADE'
+// });
+
+// Review.belongsTo(User, {
+//   foreignKey: 'userEmail',
+//   targetKey: 'email',
+//   as: 'user'
+// });
+
+// Gym.hasMany(Review, {
+//   foreignKey: 'gymId',
+//   as: 'reviews',
+//   onDelete: 'CASCADE'
+// });
+
+// Review.belongsTo(Gym, {
+//   foreignKey: 'gymId',
+//   as: 'gym'
+// });
+
 // Sync models with database (in development)
 const syncDatabase = async () => {
   try {
@@ -644,6 +670,7 @@ module.exports = {
   SlotWaitlist,
   VendorPaymentConfig,
   Refund,
+  // Review,
   Advertisement,
   AdvertisementMedia,
   AdvertisementAnalytics,
