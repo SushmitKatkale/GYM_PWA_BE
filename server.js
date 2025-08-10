@@ -19,6 +19,7 @@ const paymentRoutes = require('./routes/payments');
 const advertisementRoutes = require('./routes/advertisements');
 const dashboardRoutes = require('./routes/dashboard');
 const invoiceRoutes = require('./routes/invoices');
+const notificationRoutes = require('./routes/notifications');
 // const reviewRoutes = require('./routes/reviews');
 const { errorHandler, notFoundHandler } = require('./middleware/errorHandler');
 const { specs, swaggerUi, swaggerOptions } = require('./config/swagger');
@@ -126,6 +127,7 @@ app.use('/api/slots', slotRoutes);
 app.use('/api/advertisements', advertisementRoutes);
 app.use('/api/dashboard', dashboardRoutes);
 app.use('/api/invoices', invoiceRoutes);
+app.use('/api/notifications', notificationRoutes);
 // app.use('/api/reviews', reviewRoutes);
 
 // Gateway status route for frontend payment redirect (no authentication required)

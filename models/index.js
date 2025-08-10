@@ -177,6 +177,8 @@ const Advertisement = require('./Advertisement');
 const AdvertisementMedia = require('./AdvertisementMedia');
 const AdvertisementAnalytics = require('./AdvertisementAnalytics');
 const Refund = require('./Refund');
+const Notification = require('./Notification');
+const PushSubscription = require('./PushSubscription');
 // const Review = require('./Review');
 
 // Define relationships
@@ -506,6 +508,58 @@ Advertisement.belongsTo(User, {
   constraints: false
 });
 
+// Notification relationships
+User.hasMany(Notification, {
+  foreignKey: 'recipientEmail',
+  sourceKey: 'email',
+  as: 'receivedNotifications',
+  onDelete: 'CASCADE'
+});
+
+Notification.belongsTo(User, {
+  foreignKey: 'recipientEmail',
+  targetKey: 'email',
+  as: 'recipient'
+});
+
+User.hasMany(Notification, {
+  foreignKey: 'senderEmail',
+  sourceKey: 'email',
+  as: 'sentNotifications',
+  onDelete: 'SET NULL'
+});
+
+Notification.belongsTo(User, {
+  foreignKey: 'senderEmail',
+  targetKey: 'email',
+  as: 'sender'
+});
+
+Gym.hasMany(Notification, {
+  foreignKey: 'gymId',
+  as: 'notifications',
+  onDelete: 'CASCADE'
+});
+
+Notification.belongsTo(Gym, {
+  foreignKey: 'gymId',
+  as: 'gym'
+});
+
+// Push Subscription relationships
+User.hasMany(PushSubscription, {
+  foreignKey: 'userEmail',
+  sourceKey: 'email',
+  as: 'pushSubscriptions',
+  onDelete: 'CASCADE'
+});
+
+PushSubscription.belongsTo(User, {
+  foreignKey: 'userEmail',
+  targetKey: 'email',
+  as: 'user'
+});
+
 // Review relationships (temporarily disabled)
 // User.hasMany(Review, {
 //   foreignKey: 'userEmail',
@@ -670,6 +724,8 @@ module.exports = {
   SlotWaitlist,
   VendorPaymentConfig,
   Refund,
+  Notification,
+  PushSubscription,
   // Review,
   Advertisement,
   AdvertisementMedia,
