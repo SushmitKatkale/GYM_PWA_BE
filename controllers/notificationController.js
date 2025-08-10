@@ -184,8 +184,19 @@ class NotificationController {
         return ResponseUtil.success(res, existing.toJSON(), 'Push subscription updated successfully');
       }
 
+      // Generate unique ID for subscription
+      const generateId = () => {
+        const chars = 'ABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789';
+        let result = '';
+        for (let i = 0; i < 12; i++) {
+          result += chars.charAt(Math.floor(Math.random() * chars.length));
+        }
+        return result;
+      };
+
       // Create new subscription
       const newSubscription = await PushSubscription.create({
+        id: generateId(),
         userEmail,
         endpoint: subscription.endpoint,
         p256dhKey: subscription.keys.p256dh,
@@ -197,6 +208,12 @@ class NotificationController {
       return ResponseUtil.success(res, newSubscription.toJSON(), 'Push subscription registered successfully', 201);
     } catch (error) {
       console.error('Register push subscription error:', error);
+      console.error('Error details:', {
+        message: error.message,
+        stack: error.stack,
+        name: error.name,
+        sql: error.sql || 'N/A'
+      });
       return ResponseUtil.error(res, 'Failed to register push subscription');
     }
   }
