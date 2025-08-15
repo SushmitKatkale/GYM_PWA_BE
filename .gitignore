@@ -48,4 +48,21 @@ Thumbs.db
 .env.test.local
 .env.production.local
 
-uploads/
+# Uploads - ignore content but keep directories
+uploads/*/
+!uploads/*/.gitkeep
+
+# Temporary files and archives
+*.zip
+*.tar.gz
+*.rar
+
+# Test and debug files
+test_*.js
+test_*.json
+debug_*.js
+check_*.sql
+
+# Backup files
+*.backup
+.env.backup
