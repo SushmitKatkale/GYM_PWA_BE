@@ -129,6 +129,59 @@ const User = sequelize.define('User', {
       key: 'id',
     },
   },
+  // Attendance preference fields
+  defaultGymId: {
+    type: DataTypes.INTEGER,
+    allowNull: true,
+    defaultValue: null,
+    field: 'default_gym_id',
+    references: {
+      model: 'gyms',
+      key: 'id'
+    }
+  },
+  locationSharingEnabled: {
+    type: DataTypes.BOOLEAN,
+    allowNull: false,
+    defaultValue: true,
+    field: 'location_sharing_enabled'
+  },
+  biometricEnabled: {
+    type: DataTypes.BOOLEAN,
+    allowNull: false,
+    defaultValue: false,
+    field: 'biometric_enabled'
+  },
+  autoCheckinEnabled: {
+    type: DataTypes.BOOLEAN,
+    allowNull: false,
+    defaultValue: false,
+    field: 'auto_checkin_enabled'
+  },
+  checkinNotificationEnabled: {
+    type: DataTypes.BOOLEAN,
+    allowNull: false,
+    defaultValue: true,
+    field: 'checkin_notification_enabled'
+  },
+  checkoutNotificationEnabled: {
+    type: DataTypes.BOOLEAN,
+    allowNull: false,
+    defaultValue: true,
+    field: 'checkout_notification_enabled'
+  },
+  locationAccuracyPreference: {
+    type: DataTypes.ENUM('high', 'medium', 'low'),
+    allowNull: false,
+    defaultValue: 'medium',
+    field: 'location_accuracy_preference'
+  },
+  preferredCheckinMethod: {
+    type: DataTypes.ENUM('gym_qr_scan', 'gym_code', 'quick_checkin', 'owner_scan_user', 'fingerprint', 'face_scan'),
+    allowNull: true,
+    defaultValue: 'quick_checkin',
+    field: 'preferred_checkin_method'
+  },
 }, {
   tableName: 'users',
   timestamps: false, // We're using custom timestamp fields

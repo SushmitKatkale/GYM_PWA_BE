@@ -181,6 +181,12 @@ const Notification = require('./Notification');
 const PushSubscription = require('./PushSubscription');
 // const Review = require('./Review');
 
+// Attendance system models
+const Attendance = require('./Attendance');
+const GymCheckInMethods = require('./GymCheckInMethods');
+const GymQRCodes = require('./GymQRCodes');
+const GymUniqueCodes = require('./GymUniqueCodes');
+
 // Define relationships
 // Gym-User owner relationship
 User.hasMany(Gym, {
@@ -585,6 +591,134 @@ PushSubscription.belongsTo(User, {
 //   as: 'gym'
 // });
 
+// Attendance system relationships
+// User - Attendance relationships
+User.hasMany(Attendance, {
+  foreignKey: 'userEmail',
+  sourceKey: 'email',
+  as: 'attendances',
+  onDelete: 'CASCADE'
+});
+
+Attendance.belongsTo(User, {
+  foreignKey: 'userEmail',
+  targetKey: 'email',
+  as: 'user'
+});
+
+// Gym - Attendance relationships
+Gym.hasMany(Attendance, {
+  foreignKey: 'gymId',
+  as: 'attendances',
+  onDelete: 'CASCADE'
+});
+
+Attendance.belongsTo(Gym, {
+  foreignKey: 'gymId',
+  as: 'gym'
+});
+
+// Gym - Check-in Methods relationships
+Gym.hasMany(GymCheckInMethods, {
+  foreignKey: 'gymId',
+  as: 'checkInMethods',
+  onDelete: 'CASCADE'
+});
+
+GymCheckInMethods.belongsTo(Gym, {
+  foreignKey: 'gymId',
+  as: 'gym'
+});
+
+// Gym - QR Codes relationships
+Gym.hasMany(GymQRCodes, {
+  foreignKey: 'gymId',
+  as: 'qrCodes',
+  onDelete: 'CASCADE'
+});
+
+GymQRCodes.belongsTo(Gym, {
+  foreignKey: 'gymId',
+  as: 'gym'
+});
+
+// User creator relationships for QR codes
+User.hasMany(GymQRCodes, {
+  foreignKey: 'createdBy',
+  sourceKey: 'id',
+  as: 'createdQRCodes',
+  onDelete: 'SET NULL'
+});
+
+GymQRCodes.belongsTo(User, {
+  foreignKey: 'createdBy',
+  targetKey: 'id',
+  as: 'creator',
+  constraints: false
+});
+
+User.hasMany(GymQRCodes, {
+  foreignKey: 'updatedBy',
+  sourceKey: 'id',
+  as: 'updatedQRCodes',
+  onDelete: 'SET NULL'
+});
+
+GymQRCodes.belongsTo(User, {
+  foreignKey: 'updatedBy',
+  targetKey: 'id',
+  as: 'updater',
+  constraints: false
+});
+
+// Gym - Unique Codes relationships
+Gym.hasMany(GymUniqueCodes, {
+  foreignKey: 'gymId',
+  as: 'uniqueCodes',
+  onDelete: 'CASCADE'
+});
+
+GymUniqueCodes.belongsTo(Gym, {
+  foreignKey: 'gymId',
+  as: 'gym'
+});
+
+// User creator relationships for unique codes
+User.hasMany(GymUniqueCodes, {
+  foreignKey: 'createdBy',
+  sourceKey: 'id',
+  as: 'createdUniqueCodes',
+  onDelete: 'SET NULL'
+});
+
+GymUniqueCodes.belongsTo(User, {
+  foreignKey: 'createdBy',
+  targetKey: 'id',
+  as: 'creator',
+  constraints: false
+});
+
+User.hasMany(GymUniqueCodes, {
+  foreignKey: 'updatedBy',
+  sourceKey: 'id',
+  as: 'updatedUniqueCodes',
+  onDelete: 'SET NULL'
+});
+
+GymUniqueCodes.belongsTo(User, {
+  foreignKey: 'updatedBy',
+  targetKey: 'id',
+  as: 'updater',
+  constraints: false
+});
+
+// User default gym relationship
+User.belongsTo(Gym, {
+  foreignKey: 'defaultGymId',
+  as: 'defaultGym',
+  constraints: false
+});
+
 // Sync models with database (in development)
 const syncDatabase = async () => {
   try {
@@ -730,6 +864,11 @@ module.exports = {
   Advertisement,
   AdvertisementMedia,
   AdvertisementAnalytics,
+  // Attendance system models
+  Attendance,
+  GymCheckInMethods,
+  GymQRCodes,
+  GymUniqueCodes,
   syncDatabase,
   testConnection,
   createDefaultAdmin,

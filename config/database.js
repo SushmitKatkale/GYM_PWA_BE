@@ -36,4 +36,38 @@ const testConnection = async () => {
   }
 };
 
-module.exports = { sequelize, testConnection };
+module.exports = { 
+  sequelize, 
+  testConnection,
+  // Configuration for sequelize-cli
+  development: {
+    dialect: 'mysql',
+    host: process.env.DB_HOST || 'localhost',
+    port: process.env.DB_PORT || 3306,
+    username: process.env.DB_USER || 'root',
+    password: process.env.DB_PASSWORD,
+    database: process.env.DB_NAME || 'gym_pwa_db',
+    logging: process.env.NODE_ENV === 'development' ? console.log : false,
+    define: {
+      timestamps: true,
+      underscored: true,
+      createdAt: 'created_at',
+      updatedAt: 'updated_at',
+    },
+  },
+  production: {
+    dialect: 'mysql',
+    host: process.env.DB_HOST,
+    port: process.env.DB_PORT || 3306,
+    username: process.env.DB_USER,
+    password: process.env.DB_PASSWORD,
+    database: process.env.DB_NAME,
+    logging: false,
+    define: {
+      timestamps: true,
+      underscored: true,
+      createdAt: 'created_at',
+      updatedAt: 'updated_at',
+    },
+  }
+};
