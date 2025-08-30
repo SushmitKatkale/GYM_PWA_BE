@@ -22,7 +22,7 @@ class OTPService {
       attempts: 0,
       userData // Store temporary user data for registration
     });
-    
+
     // Auto-cleanup expired OTP after expiry time
     setTimeout(() => {
       this.otpStorage.delete(email);
@@ -32,7 +32,7 @@ class OTPService {
   // Verify OTP
   verifyOTP(email, providedOTP) {
     const otpData = this.otpStorage.get(email);
-    
+
     if (!otpData) {
       return { success: false, message: 'OTP not found or expired' };
     }
@@ -95,7 +95,7 @@ GYM PWA Team`;
     if (!otpData) {
       return null;
     }
-    
+
     // Return data without the actual OTP for security
     return {
       userData: otpData.userData,

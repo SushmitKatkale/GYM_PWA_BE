@@ -3,168 +3,72 @@ const { sequelize } = require('../config/database');
 
 const Refund = sequelize.define('Refund', {
   id: {
-    type: DataTypes.INTEGER,
+    type: DataTypes.BIGINT,
     primaryKey: true,
     autoIncrement: true
   },
   paymentId: {
-    type: DataTypes.INTEGER,
+    type: DataTypes.BIGINT,
     allowNull: false,
+    field: 'payment_id',
     references: {
       model: 'payments',
       key: 'id'
-    },
-    field: 'payment_id'
+    }
   },
-  userEmail: {
+  amount: {
+    type: DataTypes.DECIMAL(10, 2),
+    allowNull: false,
+    validate: {
+      min: 0
+    }
+  },
+  reason: {
     type: DataTypes.STRING(255),
-    allowNull: false,
-    validate: {
-      isEmail: true
-    },
-    references: {
-      model: 'users',
-      key: 'email'
-    },
-    field: 'user_email'
-  },
-  subscriptionId: {
-    type: DataTypes.INTEGER,
-    allowNull: true,
-    references: {
-      model: 'user_subscriptions',
-      key: 'id'
-    },
-    field: 'subscription_id'
-  },
-  originalAmount: {
-    type: DataTypes.DECIMAL(10, 2),
-    allowNull: false,
-    validate: {
-      min: 0
-    },
-    field: 'original_amount'
-  },
-  refundAmount: {
-    type: DataTypes.DECIMAL(10, 2),
-    allowNull: false,
-    validate: {
-      min: 0
-    },
-    field: 'refund_amount'
-  },
-  refundReason: {
-    type: DataTypes.TEXT,
-    allowNull: true,
-    field: 'refund_reason'
-  },
-  refundType: {
-    type: DataTypes.ENUM('full', 'partial'),
-    allowNull: false,
-    defaultValue: 'full',
-    field: 'refund_type'
+    allowNull: true
   },
   status: {
-    type: DataTypes.ENUM('pending', 'processing', 'completed', 'failed', 'cancelled'),
+    type: DataTypes.ENUM('pending', 'processed', 'failed'),
     allowNull: false,
     defaultValue: 'pending'
   },
-  refundId: {
-    type: DataTypes.STRING(255),
-    allowNull: true,
-    field: 'refund_id',
-    comment: 'Gateway refund ID (Razorpay/PhonePe)'
-  },
-  gatewayRefundId: {
-    type: DataTypes.STRING(255),
-    allowNull: true,
-    field: 'gateway_refund_id'
-  },
-  gatewayResponse: {
-    type: DataTypes.JSON,
-    allowNull: true,
-    field: 'gateway_response'
-  },
-  paymentGateway: {
-    type: DataTypes.ENUM('razorpay', 'phonepe'),
-    allowNull: false,
-    field: 'payment_gateway'
-  },
-  processedBy: {
-    type: DataTypes.STRING(255),
-    allowNull: true,
-    field: 'processed_by',
-    comment: 'Email of admin who processed the refund'
-  },
-  processedAt: {
-    type: DataTypes.DATE,
-    allowNull: true,
-    field: 'processed_at'
-  },
-  notes: {
-    type: DataTypes.TEXT,
-    allowNull: true,
-    comment: 'Admin notes or additional information'
-  },
-  activeStatus: {
-    type: DataTypes.BOOLEAN,
-    allowNull: false,
-    defaultValue: true,
-    field: 'active_status'
-  },
-  createTimestamp: {
-    type: DataTypes.DATE,
-    allowNull: false,
-    defaultValue: DataTypes.NOW,
-    field: 'create_timestamp'
-  },
   createdBy: {
-    type: DataTypes.STRING(255),
+    type: DataTypes.BIGINT,
     allowNull: true,
-    field: 'created_by'
-  },
-  updateTimestamp: {
-    type: DataTypes.DATE,
-    allowNull: false,
-    defaultValue: DataTypes.NOW,
-    field: 'update_timestamp'
+    field: 'created_by',
+    comment: 'User ID who created this record'
   },
   updatedBy: {
-    type: DataTypes.STRING(255),
+    type: DataTypes.BIGINT,
     allowNull: true,
-    field: 'updated_by'
+    field: 'updated_by',
+    comment: 'User ID who last updated this record'
+  },
+  recordStatus: {
+    type: DataTypes.TINYINT(1),
+    allowNull: false,
+    defaultValue: 1,
+    field: 'record_status',
+    comment: '1=active, 0=inactive'
+  },
+  createdBy: {
+    type: DataTypes.BIGINT,
+    allowNull: true,
+    field: 'created_by',
+    comment: 'User ID who created this record'
+  },
+  updatedBy: {
+    type: DataTypes.BIGINT,
+    allowNull: true,
+    field: 'updated_by',
+    comment: 'User ID who last updated this record'
   }
 }, {
   tableName: 'refunds',
-  timestamps: false,
-  indexes: [
-    {
-      fields: ['payment_id']
-    },
-    {
-      fields: ['user_email']
-    },
-    {
-      fields: ['status']
-    },
-    {
-      fields: ['refund_id'],
-      unique: true,
-      where: {
-        refund_id: {
-          [Op.ne]: null
-        }
-      }
-    },
-    {
-      fields: ['create_timestamp']
-    }
-  ],
-  hooks: {
-    beforeUpdate: (refund) => {
-      refund.updateTimestamp = new Date();
-    }
-  }
+  timestamps: true,
+  createdAt: 'created_at',
+  updatedAt: 'updated_at',
+  underscored: true
 });
 
 module.exports = Refund;

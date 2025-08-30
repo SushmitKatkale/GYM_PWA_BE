@@ -8,7 +8,8 @@ class NotificationController {
   // Get notifications for current user
   static async getUserNotifications(req, res) {
     try {
-      const userEmail = req.user.email;
+      const userId = req.user.id; // Use user ID as primary identifier
+      const userEmail = req.user.email; // Keep for backward compatibility
       const { 
         page = 1, 
         limit = 20, 
@@ -19,7 +20,7 @@ class NotificationController {
 
       const offset = (parseInt(page) - 1) * parseInt(limit);
       
-      const notifications = await Notification.findForUser(userEmail, {
+      const notifications = await Notification.findForUser(userId, userEmail, {
         limit: parseInt(limit),
         offset,
         type,
@@ -30,7 +31,8 @@ class NotificationController {
       const totalCount = await Notification.count({
         where: {
           [Op.or]: [
-            { recipientEmail: userEmail },
+            { recipient_id: userId }, // Use user ID
+            { recipientEmail: userEmail }, // Keep for backward compatibility
             { isGlobal: true }
           ],
           ...(type && { type }),
@@ -45,7 +47,7 @@ class NotificationController {
         }
       });
 
-      const unreadCount = await Notification.getUnreadCount(userEmail);
+      const unreadCount = await Notification.getUnreadCount(userId, userEmail);
 
       return ResponseUtil.success(res, {
         notifications: notifications.map(n => n.toJSON()),
@@ -67,8 +69,9 @@ class NotificationController {
   // Get unread notification count
   static async getUnreadCount(req, res) {
     try {
-      const userEmail = req.user.email;
-      const unreadCount = await Notification.getUnreadCount(userEmail);
+      const userId = req.user.id; // Use user ID as primary identifier
+      const userEmail = req.user.email; // Keep for backward compatibility
+      const unreadCount = await Notification.getUnreadCount(userId, userEmail);
 
       return ResponseUtil.success(res, { unreadCount }, 'Unread count retrieved successfully');
     } catch (error) {
@@ -81,13 +84,15 @@ class NotificationController {
   static async markAsRead(req, res) {
     try {
       const { notificationId } = req.params;
-      const userEmail = req.user.email;
+      const userId = req.user.id; // Use user ID as primary identifier
+      const userEmail = req.user.email; // Keep for backward compatibility
 
       const notification = await Notification.findOne({
         where: {
           id: notificationId,
           [Op.or]: [
-            { recipientEmail: userEmail },
+            { recipient_id: userId }, // Use user ID
+            { recipientEmail: userEmail }, // Keep for backward compatibility
             { isGlobal: true }
           ]
         }
@@ -111,8 +116,9 @@ class NotificationController {
   // Mark all notifications as read
   static async markAllAsRead(req, res) {
     try {
-      const userEmail = req.user.email;
-      const [updatedCount] = await Notification.markAllAsReadForUser(userEmail);
+      const userId = req.user.id; // Use user ID as primary identifier
+      const userEmail = req.user.email; // Keep for backward compatibility
+      const [updatedCount] = await Notification.markAllAsReadForUser(userId, userEmail);
 
       return ResponseUtil.success(res, { 
         updatedCount 
@@ -127,13 +133,15 @@ class NotificationController {
   static async deleteNotification(req, res) {
     try {
       const { notificationId } = req.params;
-      const userEmail = req.user.email;
+      const userId = req.user.id; // Use user ID as primary identifier
+      const userEmail = req.user.email; // Keep for backward compatibility
 
       const notification = await Notification.findOne({
         where: {
           id: notificationId,
           [Op.or]: [
-            { recipientEmail: userEmail },
+            { recipient_id: userId }, // Use user ID
+            { recipientEmail: userEmail }, // Keep for backward compatibility
             { isGlobal: true }
           ]
         }
@@ -155,17 +163,21 @@ class NotificationController {
   // Register push subscription
   static async registerPushSubscription(req, res) {
     try {
-      const userEmail = req.user.email;
+      const userId = req.user.id; // Use user ID as primary identifier
+      const userEmail = req.user.email; // Keep for backward compatibility
       const { subscription, deviceInfo } = req.body;
 
       if (!subscription || !subscription.endpoint) {
         return ResponseUtil.validationError(res, 'Invalid subscription data');
       }
 
-      // Check if subscription already exists
+      // Check if subscription already exists (support both user_id and userEmail)
       const existing = await PushSubscription.findOne({
         where: {
-          userEmail,
+          [Op.or]: [
+            { user_id: userId },
+            { userEmail: userEmail }
+          ],
           endpoint: subscription.endpoint
         }
       });
@@ -197,7 +209,8 @@ class NotificationController {
       // Create new subscription
       const newSubscription = await PushSubscription.create({
         id: generateId(),
-        userEmail,
+        user_id: userId, // Use user ID
+        userEmail, // Keep for backward compatibility
         endpoint: subscription.endpoint,
         p256dhKey: subscription.keys.p256dh,
         authKey: subscription.keys.auth,
@@ -261,7 +274,7 @@ class NotificationController {
           deviceType: s.deviceType,
           platform: s.platform,
           lastUsed: s.lastUsed,
-          createTimestamp: s.createTimestamp
+          created_at: s.created_at // Updated field name
         }))
       }, 'Push subscriptions retrieved successfully');
     } catch (error) {
@@ -426,7 +439,7 @@ class NotificationController {
             required: false
           }
         ],
-        order: [['createTimestamp', 'DESC']],
+        order: [['created_at', 'DESC']], // Updated field name
         limit: parseInt(limit),
         offset
       });
@@ -475,7 +488,7 @@ class NotificationController {
         targetUsers = userEmails;
       } else if (role) {
         const users = await User.findAll({
-          where: { type: role },
+          where: { role: role }, // Updated field name to use role
           attributes: ['email']
         });
         targetUsers = users.map(u => u.email);
@@ -580,7 +593,7 @@ class NotificationController {
   // Helper method to send notification to role
   static async sendNotificationToRole(notification, role) {
     const users = await User.findAll({
-      where: { type: role },
+      where: { role: role }, // Updated field name to use role
       attributes: ['email']
     });
 

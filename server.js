@@ -7,10 +7,9 @@ const authRoutes = require('./routes/auth');
 const userRoutes = require('./routes/users');
 const gymRoutes = require('./routes/gyms');
 const amenityRoutes = require('./routes/amenities');
-const gymImageRoutes = require('./routes/gymImages');
 const uploadRoutes = require('./routes/upload');
+const gymImageRoutes = require('./routes/gymImages');
 const subscriptionRoutes = require('./routes/subscriptions');
-const subscriptionFeatureRoutes = require('./routes/subscriptionFeatures');
 const userSubscriptionRoutes = require('./routes/userSubscriptions');
 const slotRoutes = require('./routes/slots');
 const ownerRoutes = require('./routes/owners');
@@ -23,7 +22,6 @@ const notificationRoutes = require('./routes/notifications');
 // const reviewRoutes = require('./routes/reviews');
 const attendanceRoutes = require('./routes/attendance');
 const qrCodeRoutes = require('./routes/qrCodes');
-const uniqueCodeRoutes = require('./routes/uniqueCodes');
 const checkInMethodsRoutes = require('./routes/checkInMethods');
 const attendanceAnalyticsRoutes = require('./routes/attendanceAnalytics');
 const { errorHandler, notFoundHandler } = require('./middleware/errorHandler');
@@ -120,10 +118,9 @@ app.use('/api/auth', authRoutes);
 app.use('/api/users', userRoutes);
 app.use('/api/gyms', gymRoutes);
 app.use('/api/amenities', amenityRoutes);
-app.use('/api/gym-images', gymImageRoutes);
 app.use('/api/upload', uploadRoutes);
+app.use('/api/gym-images', gymImageRoutes);
 app.use('/api/subscriptions', subscriptionRoutes);
-app.use('/api/subscription-features', subscriptionFeatureRoutes);
 app.use('/api/user-subscriptions', userSubscriptionRoutes);
 app.use('/api/owners', ownerRoutes);
 app.use('/api/admin', adminPaymentRoutes);
@@ -138,7 +135,6 @@ app.use('/api/notifications', notificationRoutes);
 // Attendance system routes
 app.use('/api/attendance', attendanceRoutes);
 app.use('/api/qr-codes', qrCodeRoutes);
-app.use('/api/unique-codes', uniqueCodeRoutes);
 app.use('/api/checkin-methods', checkInMethodsRoutes);
 app.use('/api/attendance-analytics', attendanceAnalyticsRoutes);
 
@@ -151,7 +147,7 @@ app.use(notFoundHandler);
 // Error handler
 app.use(errorHandler);
 
-const PORT = process.env.PORT || 3001;
+const PORT = process.env.PORT || 3000;
 
 // Test DB connection and sync models
 testConnection();
@@ -164,5 +160,5 @@ app.listen(PORT, () => {
   console.log(`🚀 Server running on port ${PORT}`);
   console.log(`📊 Environment: ${process.env.NODE_ENV || 'development'}`);
   console.log(`📚 API Documentation: http://localhost:${PORT}/api-docs`);
-  console.log(`❤️  Health Check: http://localhost:${PORT}/health`);
+  console.log(`❤️ Health Check: http://localhost:${PORT}/health`);
 });

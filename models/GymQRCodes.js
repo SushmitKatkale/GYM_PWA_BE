@@ -9,7 +9,7 @@ const GymQRCodes = sequelize.define('GymQRCodes', {
     autoIncrement: true
   },
   gymId: {
-    type: DataTypes.INTEGER,
+    type: DataTypes.BIGINT,
     allowNull: false,
     references: {
       model: 'gyms',
@@ -77,38 +77,41 @@ const GymQRCodes = sequelize.define('GymQRCodes', {
     field: 'location_name'
   },
   createdBy: {
-    type: DataTypes.STRING(255),
+    type: DataTypes.BIGINT,
     allowNull: true,
-    references: {
-      model: 'users',
-      key: 'email'
-    },
-    field: 'created_by'
-  },
-  createTimestamp: {
-    type: DataTypes.DATE,
-    allowNull: false,
-    defaultValue: DataTypes.NOW,
-    field: 'create_timestamp'
-  },
-  updateTimestamp: {
-    type: DataTypes.DATE,
-    allowNull: false,
-    defaultValue: DataTypes.NOW,
-    field: 'update_timestamp'
+    field: 'created_by',
+    comment: 'User ID who created this record'
   },
   updatedBy: {
-    type: DataTypes.STRING(255),
+    type: DataTypes.BIGINT,
     allowNull: true,
-    references: {
-      model: 'users',
-      key: 'email'
-    },
-    field: 'updated_by'
+    field: 'updated_by',
+    comment: 'User ID who last updated this record'
+  },
+  recordStatus: {
+    type: DataTypes.TINYINT(1),
+    allowNull: false,
+    defaultValue: 1,
+    field: 'record_status',
+    comment: '1=active, 0=inactive'
+  },
+  createdBy: {
+    type: DataTypes.BIGINT,
+    allowNull: true,
+    field: 'created_by',
+    comment: 'User ID who created this record'
+  },
+  updatedBy: {
+    type: DataTypes.BIGINT,
+    allowNull: true,
+    field: 'updated_by',
+    comment: 'User ID who last updated this record'
   }
 }, {
   tableName: 'gym_qr_codes',
-  timestamps: false,
+    timestamps: true,
+  createdAt: 'created_at',
+  updatedAt: 'updated_at',
   indexes: [
     {
       name: 'idx_gym_active_qr',

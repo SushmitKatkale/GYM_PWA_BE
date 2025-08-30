@@ -8,7 +8,7 @@ const SlotAvailability = sequelize.define('SlotAvailability', {
     autoIncrement: true
   },
   gymSlotId: {
-    type: DataTypes.INTEGER,
+    type: DataTypes.BIGINT,
     allowNull: false,
     references: {
       model: 'gym_slots',

@@ -1,7 +1,7 @@
 const express = require('express');
 const router = express.Router();
 const NotificationController = require('../controllers/notificationController');
-const { authenticate } = require('../middleware/auth');
+const { authenticate, authorize } = require('../middleware/auth');
 const adminAuth = require('../middleware/adminAuth');
 const { body, param, query } = require('express-validator');
 
@@ -542,7 +542,7 @@ router.post('/admin/create', NotificationController.createNotificationValidation
  *       200:
  *         description: All notifications retrieved successfully
  */
-router.get('/admin/all', NotificationController.getAllNotifications);
+router.get('/admin/all', authenticate, authorize('3'), NotificationController.getAllNotifications);
 
 /**
  * @swagger

@@ -15,7 +15,7 @@ async function createVendorConfig(req, res) {
     }
 
     // Validate owner and gym exist
-    const owner = await User.findOne({ where: { email: ownerEmail, type: '2' } });
+    const owner = await User.findOne({ where: { email: ownerEmail, role: 2 } }); // Updated to use role field
     if (!owner) {
       return ResponseUtil.notFoundError(res, 'Owner not found or invalid owner type');
     }
@@ -79,7 +79,7 @@ async function getAllVendorConfigs(req, res) {
       razorpayVendorId, 
       ownerEmail, 
       gymName,
-      activeStatus, // Filter by active status (optional)
+      recordStatus, // Filter by active status (optional)
       search // Combined search for gym name or owner email
     } = req.query;
     const offset = (page - 1) * limit;
@@ -107,8 +107,8 @@ async function getAllVendorConfigs(req, res) {
       whereClause.kycStatus = kycStatus;
     }
     
-    if (activeStatus !== undefined) {
-      whereClause.activeStatus = activeStatus === 'true';
+    if (recordStatus !== undefined) {
+      whereClause.record_status = recordStatus === 'true' ? 1 : 0; // Updated field name
     }
     
     if (razorpayVendorId) {
@@ -151,8 +151,8 @@ async function getAllVendorConfigs(req, res) {
       include: includeClause,
       limit: parseInt(limit),
       offset: parseInt(offset),
-      order: [['createTimestamp', 'DESC']],
-      distinct: true // Important when using includes with potential duplicates
+      order: [['created_at', 'DESC']], // Updated field name
+      distinct: true
     });
 
     return ResponseUtil.success(res, {
@@ -279,7 +279,7 @@ async function updateVendorConfigComplete(req, res) {
       onboardingDate,
       bankAccountVerified,
       kycStatus,
-      activeStatus,
+      recordStatus,
       razorpayBankAccountId,
       razorpayStakeholderId,
       updatedBy
@@ -345,9 +345,9 @@ async function updateVendorConfigComplete(req, res) {
       updateData.kycStatus = kycStatus;
       console.log('📝 Setting kycStatus:', updateData.kycStatus);
     }
-    if (activeStatus !== undefined) {
-      updateData.activeStatus = Boolean(activeStatus);
-      console.log('📝 Setting activeStatus:', updateData.activeStatus);
+    if (recordStatus !== undefined) {
+      updateData.record_status = Boolean(recordStatus) ? 1 : 0; // Updated field name
+      console.log('📝 Setting record_status:', updateData.record_status);
     }
 
     // Validate enum values

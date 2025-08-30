@@ -3,42 +3,51 @@ const { sequelize } = require('../config/database');
 
 const Advertisement = sequelize.define('Advertisement', {
   id: {
-    type: DataTypes.STRING(50),
+    type: DataTypes.BIGINT,
     primaryKey: true,
-    allowNull: false,
-    defaultValue: () => `AD${Date.now()}${Math.floor(Math.random() * 1000)}`,
+    autoIncrement: true
   },
   title: {
-    type: DataTypes.STRING(255),
+    type: DataTypes.STRING(150),
     allowNull: false,
     validate: {
       notEmpty: true,
-      len: [1, 255]
+      len: [1, 150]
     }
   },
   description: {
     type: DataTypes.TEXT,
+    allowNull: true
+  },
+  targetUrl: {
+    type: DataTypes.STRING(255),
     allowNull: true,
+    field: 'target_url'
   },
-  content: {
-    type: DataTypes.TEXT,
-    allowNull: true,
-  },
-  adType: {
-    type: DataTypes.ENUM('banner', 'popup', 'card', 'video', 'carousel'),
+  type: {
+    type: DataTypes.ENUM('banner', 'popup', 'carousel'),
     allowNull: false,
-    field: 'ad_type'
+    defaultValue: 'banner'
   },
-  status: {
-    type: DataTypes.ENUM('active', 'inactive', 'draft', 'expired'),
-    defaultValue: 'draft',
+  targetRole: {
+    type: DataTypes.ENUM('all', 'member', 'owner', 'trainer', 'admin'),
     allowNull: false,
-  },
-  targetAudience: {
-    type: DataTypes.ENUM('all', 'members', 'gym_owners', 'specific_gyms', 'location_based'),
     defaultValue: 'all',
-    allowNull: false,
-    field: 'target_audience'
+    field: 'target_role'
+  },
+  targetGymId: {
+    type: DataTypes.BIGINT,
+    allowNull: true,
+    field: 'target_gym_id',
+    references: {
+      model: 'gyms',
+      key: 'id'
+    }
+  },
+  targetLocation: {
+    type: DataTypes.STRING(100),
+    allowNull: true,
+    field: 'target_location'
   },
   priority: {
     type: DataTypes.INTEGER,
@@ -50,13 +59,13 @@ const Advertisement = sequelize.define('Advertisement', {
     }
   },
   startDate: {
-    type: DataTypes.DATE,
-    allowNull: true,
+    type: DataTypes.DATEONLY,
+    allowNull: false,
     field: 'start_date'
   },
   endDate: {
-    type: DataTypes.DATE,
-    allowNull: true,
+    type: DataTypes.DATEONLY,
+    allowNull: false,
     field: 'end_date',
     validate: {
       isAfterStart(value) {
@@ -66,65 +75,54 @@ const Advertisement = sequelize.define('Advertisement', {
       }
     }
   },
-  budget: {
-    type: DataTypes.DECIMAL(10, 2),
-    allowNull: true,
-    validate: {
-      min: 0
-    }
-  },
-  clicks: {
-    type: DataTypes.INTEGER,
-    defaultValue: 0,
-    allowNull: false,
-    validate: {
-      min: 0
-    }
-  },
-  impressions: {
-    type: DataTypes.INTEGER,
-    defaultValue: 0,
-    allowNull: false,
-    validate: {
-      min: 0
-    }
+  status: {
+    type: DataTypes.ENUM('draft', 'active', 'expired'),
+    defaultValue: 'draft',
+    allowNull: false
   },
   createdBy: {
-    type: DataTypes.STRING(50),
+    type: DataTypes.BIGINT,
     allowNull: true,
-    field: 'created_by'
+    field: 'created_by',
+    comment: 'User ID who created this record'
   },
   updatedBy: {
-    type: DataTypes.STRING(50),
+    type: DataTypes.BIGINT,
     allowNull: true,
-    field: 'updated_by'
+    field: 'updated_by',
+    comment: 'User ID who last updated this record'
   },
-  createTimestamp: {
-    type: DataTypes.DATE,
-    defaultValue: DataTypes.NOW,
+  recordStatus: {
+    type: DataTypes.TINYINT(1),
     allowNull: false,
-    field: 'create_timestamp'
+    defaultValue: 1,
+    field: 'record_status',
+    comment: '1=active, 0=inactive'
   },
-  updateTimestamp: {
-    type: DataTypes.DATE,
-    defaultValue: DataTypes.NOW,
-    allowNull: false,
-    field: 'update_timestamp'
+  createdBy: {
+    type: DataTypes.BIGINT,
+    allowNull: true,
+    field: 'created_by',
+    comment: 'User ID who created this record'
+  },
+  updatedBy: {
+    type: DataTypes.BIGINT,
+    allowNull: true,
+    field: 'updated_by',
+    comment: 'User ID who last updated this record'
   }
 }, {
   tableName: 'advertisements',
-  timestamps: false,
-  hooks: {
-    beforeUpdate: (advertisement) => {
-      advertisement.updateTimestamp = new Date();
-    }
-  },
+  timestamps: true,
+  createdAt: 'created_at',
+  updatedAt: 'updated_at',
+  underscored: true,
   indexes: [
     {
       fields: ['status']
     },
     {
-      fields: ['ad_type']
+      fields: ['type']
     },
     {
       fields: ['start_date', 'end_date']
@@ -133,9 +131,90 @@ const Advertisement = sequelize.define('Advertisement', {
       fields: ['priority']
     },
     {
-      fields: ['create_timestamp']
+      fields: ['target_role', 'target_gym_id', 'target_location']
     }
   ]
 });
+
+// Instance methods
+Advertisement.prototype.isActive = function () {
+  const now = new Date();
+  const startDate = new Date(this.startDate);
+  const endDate = new Date(this.endDate);
+
+  return this.status === 'active' && now >= startDate && now <= endDate;
+};
+
+Advertisement.prototype.isExpired = function () {
+  const now = new Date();
+  const endDate = new Date(this.endDate);
+
+  return now > endDate;
+};
+
+// Static methods
+Advertisement.getActiveAds = async function (userRole = 'all', gymId = null, location = null) {
+  const where = {
+    status: 'active',
+    startDate: {
+      [sequelize.Sequelize.Op.lte]: new Date()
+    },
+    endDate: {
+      [sequelize.Sequelize.Op.gte]: new Date()
+    }
+  };
+
+  // Target role filtering
+  where[sequelize.Sequelize.Op.or] = [
+    { targetRole: 'all' },
+    { targetRole: userRole }
+  ];
+
+  // Target gym filtering
+  if (gymId) {
+    where[sequelize.Sequelize.Op.and] = [
+      ...(where[sequelize.Sequelize.Op.and] || []),
+      {
+        [sequelize.Sequelize.Op.or]: [
+          { targetGymId: null },
+          { targetGymId: gymId }
+        ]
+      }
+    ];
+  }
+
+  // Target location filtering
+  if (location) {
+    where[sequelize.Sequelize.Op.and] = [
+      ...(where[sequelize.Sequelize.Op.and] || []),
+      {
+        [sequelize.Sequelize.Op.or]: [
+          { targetLocation: null },
+          { targetLocation: location }
+        ]
+      }
+    ];
+  }
+
+  return await this.findAll({
+    where,
+    order: [['priority', 'DESC'], ['createdAt', 'DESC']]
+  });
+};
+
+Advertisement.expireOldAds = async function () {
+  return await this.update(
+    { status: 'expired' },
+    {
+      where: {
+        status: 'active',
+        endDate: {
+          [sequelize.Sequelize.Op.lt]: new Date()
+        }
+      }
+    }
+  );
+};
+
 
 module.exports = Advertisement;

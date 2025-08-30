@@ -7,7 +7,8 @@ const ResponseUtil = require('../utils/response');
 async function initiatePayment(req, res) {
   try {
     const { gymId, subscriptionId, amount } = req.body;
-    const userEmail = req.user.email; // Get from authenticated user
+    const userId = req.user.id; // Updated to use user ID
+    const userEmail = req.user.email; // Keep for backward compatibility
 
     // Validation
     if (!gymId || !subscriptionId || !amount) {
@@ -32,7 +33,8 @@ async function initiatePayment(req, res) {
       baseAmount,
       gstAmount,
       totalAmount: totalAmountWithGST,
-      userEmail
+      userEmail,
+      userId // Add user ID to payment data
     });
 
     return ResponseUtil.success(res, paymentData, 'Payment initiated successfully with 18% GST included');
@@ -159,7 +161,7 @@ async function verifyPaymentStatus(req, res) {
       status: payment.status,
       gateway: payment.gateway,
       amount: payment.paymentAmount,
-      createdAt: payment.createdAt,
+      createdAt: payment.created_at || payment.createdAt, // Support both field names
       completedAt: payment.completedAt
     };
 
@@ -192,10 +194,11 @@ async function getPaymentStatusWithProcessing(req, res) {
       gateway: result.payment.gateway,
       amount: result.payment.paymentAmount,
       userEmail: result.payment.userEmail,
+      userId: result.payment.userId, // Add user ID to response
       subscription: result.subscription,
       gym: result.gym,
       userSubscription: result.userSubscription,
-      createdAt: result.payment.createdAt,
+      createdAt: result.payment.created_at || result.payment.createdAt, // Support both field names
       completedAt: result.payment.completedAt,
       message: result.message,
       nextAction: result.nextAction
@@ -214,18 +217,27 @@ async function getPaymentStatusWithProcessing(req, res) {
  */
 async function getUserPayments(req, res) {
   try {
-    const { userEmail } = req.params;
+    const { userEmail, userId } = req.params;
     const { page = 1, limit = 10 } = req.query;
 
-    if (!userEmail) {
-      return ResponseUtil.error(res, 'User email is required', 400);
+    // Support both user ID and email for backward compatibility
+    if (!userEmail && !userId) {
+      return ResponseUtil.error(res, 'User email or user ID is required', 400);
     }
 
     const { Payment, Subscription, Gym } = require('../models');
     const offset = (page - 1) * limit;
 
+    // Build where clause based on available identifier
+    const whereClause = {};
+    if (userId) {
+      whereClause.userId = userId; // Use user ID if available
+    } else {
+      whereClause.userEmail = userEmail; // Fall back to email
+    }
+
     const payments = await Payment.findAndCountAll({
-      where: { userEmail },
+      where: whereClause,
       include: [
         {
           model: Subscription,
@@ -239,7 +251,7 @@ async function getUserPayments(req, res) {
           ]
         }
       ],
-      order: [['createdAt', 'DESC']],
+      order: [['created_at', 'DESC']], // Updated field name
       limit: parseInt(limit),
       offset: parseInt(offset)
     });
@@ -251,7 +263,7 @@ async function getUserPayments(req, res) {
         status: payment.status,
         gateway: payment.gateway,
         gym: payment.subscription?.gym || null,
-        createdAt: payment.createdAt,
+        createdAt: payment.created_at || payment.createdAt, // Support both field names
         completedAt: payment.completedAt
       })),
       pagination: {

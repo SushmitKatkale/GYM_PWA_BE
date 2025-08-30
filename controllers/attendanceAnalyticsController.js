@@ -23,7 +23,7 @@ const getUserAttendanceHistory = async (req, res) => {
       status = 'all' 
     } = req.query;
     const userEmail = req.user.email;
-    const userType = req.user.type;
+    const userRole = req.user.role; // Updated to use role field
 
     // Authorization check
     let targetUserEmail;
@@ -36,11 +36,11 @@ const getUserAttendanceHistory = async (req, res) => {
       targetUserEmail = targetUser.email;
 
       // Check permissions
-      if (userType !== '3' && targetUserEmail !== userEmail) {
+      if (userRole !== 4 && targetUserEmail !== userEmail) { // Updated role values
         // Check if current user is gym owner and target user has attendance at their gyms
-        if (userType === '2') {
+        if (userRole === 2) { // Updated role value
           const ownerGyms = await Gym.findAll({
-            where: { ownerId: userEmail },
+            where: { owner_id: req.user.id }, // Updated to use owner_id field and user ID
             attributes: ['id']
           });
           const gymIds = ownerGyms.map(gym => gym.id);
@@ -84,9 +84,9 @@ const getUserAttendanceHistory = async (req, res) => {
     }
 
     // Apply gym ownership filter for gym owners
-    if (userType === '2' && targetUserEmail !== userEmail) {
+    if (userRole === 2 && targetUserEmail !== userEmail) { // Updated role value
       const ownerGyms = await Gym.findAll({
-        where: { ownerId: userEmail },
+        where: { owner_id: req.user.id }, // Updated to use owner_id field and user ID
         attributes: ['id']
       });
       whereClause.gymId = { [Op.in]: ownerGyms.map(gym => gym.id) };
@@ -151,7 +151,7 @@ const getGymAttendanceAnalytics = async (req, res) => {
       endDate 
     } = req.query;
     const userEmail = req.user.email;
-    const userType = req.user.type;
+    const userRole = req.user.role; // Updated to use role field
 
     // Verify gym exists and user has permission
     const gym = await Gym.findByPk(gymId);
@@ -159,8 +159,8 @@ const getGymAttendanceAnalytics = async (req, res) => {
       return ResponseUtil.notFoundError(res, 'Gym not found');
     }
 
-    // Authorization check
-    if (userType !== '3' && gym.ownerId !== userEmail) {
+    // Authorization check - updated to use role and owner_id
+    if (userRole !== 4 && gym.owner_id !== req.user.id) { // Updated role value and owner_id field
       return ResponseUtil.forbiddenError(res, 'You are not authorized to view analytics for this gym');
     }
 
@@ -398,10 +398,10 @@ const getGymOccupancy = async (req, res) => {
  */
 const getMultiGymAttendanceSummary = async (req, res) => {
   try {
-    const userType = req.user.type;
+    const userRole = req.user.role; // Updated to use role field
 
     // Only admins can view multi-gym summary
-    if (userType !== '3') {
+    if (userRole !== 4) { // Updated role value
       return ResponseUtil.forbiddenError(res, 'Only administrators can view multi-gym attendance summary');
     }
 
@@ -430,7 +430,7 @@ const getMultiGymAttendanceSummary = async (req, res) => {
 
     // Get all gyms with their stats
     const gyms = await Gym.findAll({
-      attributes: ['id', 'name', 'capacity', 'currentOccupancy', 'ownerId'],
+      attributes: ['id', 'name', 'capacity', 'currentOccupancy', 'owner_id'], // Updated field name
       include: [{
         model: User,
         as: 'owner',
@@ -519,7 +519,7 @@ const exportAttendanceData = async (req, res) => {
     const { gymId } = req.params;
     const { startDate, endDate, format = 'json' } = req.query;
     const userEmail = req.user.email;
-    const userType = req.user.type;
+    const userRole = req.user.role; // Updated to use role field
 
     // Verify gym exists and user has permission
     const gym = await Gym.findByPk(gymId);
@@ -527,8 +527,8 @@ const exportAttendanceData = async (req, res) => {
       return ResponseUtil.notFoundError(res, 'Gym not found');
     }
 
-    // Authorization check
-    if (userType !== '3' && gym.ownerId !== userEmail) {
+    // Authorization check - updated to use role and owner_id
+    if (userRole !== 4 && gym.owner_id !== req.user.id) { // Updated role value and owner_id field
       return ResponseUtil.forbiddenError(res, 'You are not authorized to export attendance data for this gym');
     }
 

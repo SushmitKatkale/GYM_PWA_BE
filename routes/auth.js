@@ -1,18 +1,18 @@
 const express = require('express');
-const { User, RefreshToken } = require('../models');
+const { User } = require('../models');
 const JWTUtils = require('../utils/jwt');
 const ResponseUtil = require('../utils/response');
 const otpService = require('../services/otpService');
-const { 
-  registerSchema, 
-  loginSchema, 
+const {
+  registerSchema,
+  loginSchema,
   sendOtpSchema,
   verifyOtpSchema,
-  validate 
+  validate
 } = require('../utils/validation');
-const { 
-  errorHandler, 
-  notFoundHandler 
+const {
+  errorHandler,
+  notFoundHandler
 } = require('../middleware/errorHandler');
 
 const authRouter = express.Router();
@@ -31,12 +31,11 @@ const authRouter = express.Router();
  *           schema:
  *             $ref: '#/components/schemas/UserRegistration'
  *           example:
- *             username: 'johndoe'
- *             email: 'john@example.com'
+ *             username: 'Sushmit'
+ *             email: 'katkalesushmit@gmail.com'
  *             password: 'SecurePass123!'
- *             firstName: 'John'
- *             lastName: 'Doe'
- *             role: 'user'
+ *             firstName: 'Sushmit'
+ *             lastName: 'Katkale'
  *     responses:
  *       201:
  *         description: User registered successfully
@@ -84,8 +83,8 @@ const authRouter = express.Router();
  *             required:
  *               - email
  *           example:
- *             email: 'john@example.com'
- *             firstName: 'John'
+ *             email: 'katkalesushmit@gmail.com'
+ *             firstName: 'Sushmit'
  *     responses:
  *       200:
  *         description: OTP sent successfully
@@ -97,7 +96,7 @@ const authRouter = express.Router();
 authRouter.post('/send-otp', validate(sendOtpSchema), async (req, res) => {
   try {
     const { email, firstName } = req.body;
-    
+
     if (!email) {
       return ResponseUtil.validationError(res, ['Email is required']);
     }
@@ -110,7 +109,7 @@ authRouter.post('/send-otp', validate(sendOtpSchema), async (req, res) => {
 
     // Send OTP
     const result = await otpService.sendOTP(email, firstName || '');
-    
+
     if (result.success) {
       return ResponseUtil.success(res, null, result.message);
     } else {
@@ -145,7 +144,7 @@ authRouter.post('/send-otp', validate(sendOtpSchema), async (req, res) => {
  *               - email
  *               - otp
  *           example:
- *             email: 'john@example.com'
+ *             email: 'katkalesushmit@gmail.com'
  *             otp: '123456'
  *     responses:
  *       200:
@@ -156,22 +155,17 @@ authRouter.post('/send-otp', validate(sendOtpSchema), async (req, res) => {
 authRouter.post('/verify-otp', validate(verifyOtpSchema), async (req, res) => {
   try {
     const { email, otp } = req.body;
-    console.log('=== VERIFY OTP REQUEST ===');
-    console.log('Email:', email);
-    console.log('OTP:', otp);
-    
+
     if (!email || !otp) {
-      console.log('Validation failed: Missing email or OTP');
       return ResponseUtil.validationError(res, ['Email and OTP are required']);
     }
 
     const result = await otpService.verifyOTP(email, otp);
-    console.log('OTP verification result:', result);
-    
-if (result.success) {
+
+    if (result.success) {
       // Check if we have user data from registration flow
       if (result.userData) {
-        console.log('User data found:', result.userData);
+        
         // Create user account upon successful OTP verification
         const userData = { ...result.userData, isVerified: true };
         console.log('Creating user with data:', userData);
@@ -216,7 +210,7 @@ if (result.success) {
  *             required:
  *               - email
  *           example:
- *             email: 'john@example.com'
+ *             email: 'katkalesushmit@gmail.com'
  *     responses:
  *       200:
  *         description: OTP resent successfully
@@ -256,26 +250,18 @@ authRouter.post('/resend-otp', async (req, res) => {
 authRouter.post('/register', validate(registerSchema), async (req, res) => {
   try {
     const { email, firstName, lastName, username, password } = req.body;
-    console.log('=== REGISTER REQUEST ===');
-    console.log('Email:', email);
-    console.log('FirstName:', firstName);
-    console.log('LastName:', lastName);
-    console.log('Username:', username);
-    
+
     // Check if user already exists
     const existingUser = await User.findOne({ where: { email } });
     if (existingUser) {
-      console.log('User already exists:', email);
       return ResponseUtil.conflictError(res, 'Email already exists');
     }
 
     // Prepare user data for temporary storage
     const userData = { email, firstName, lastName, username, password };
-    console.log('Prepared user data:', userData);
 
     // Send OTP for email verification with user data
     const otpResult = await otpService.sendOTP(email, firstName, userData);
-    console.log('OTP send result:', otpResult);
 
     return ResponseUtil.success(res, {
       otpSent: otpResult.success
@@ -300,7 +286,7 @@ authRouter.post('/register', validate(registerSchema), async (req, res) => {
  *           schema:
  *             $ref: '#/components/schemas/UserLogin'
  *           example:
- *             email: 'john@example.com'
+ *             email: 'katkalesushmit@gmail.com'
  *             password: 'SecurePass123!'
  *     responses:
  *       200:
@@ -332,32 +318,51 @@ authRouter.post('/login', validate(loginSchema), async (req, res) => {
     const { email, password } = req.body;
     const user = await User.findByEmail(email);
 
-    if (!user || user.activeStatus === '0' || !(await user.verifyPassword(password))) {
+    if (!user || user.recordStatus === 0 || !(await user.verifyPassword(password))) {
       return ResponseUtil.authError(res, 'Invalid email or password');
     }
 
-    const accessToken = JWTUtils.generateAccessToken({ userEmail: user.email });
-    const refreshTokenValue = JWTUtils.generateRefreshToken();
-    const refreshTokenExpiration = JWTUtils.getRefreshTokenExpiration(user.type == 3);
+    // Generate access token
+    const accessToken = JWTUtils.generateAccessToken({ 
+      id: user.id,
+      email: user.email,
+      role: user.role
+    });
 
-    await RefreshToken.createToken(user.email, refreshTokenValue, refreshTokenExpiration);
+    // Generate refresh token and store in database
+    const deviceInfo = {
+      platform: req.headers['user-agent'] ? 'web' : 'unknown',
+      version: '1.0'
+    };
+    
+    const refreshToken = await JWTUtils.createRefreshToken(
+      user.id,
+      deviceInfo,
+      req.ip || req.connection.remoteAddress,
+      req.headers['user-agent']
+    );
+
+    // Update user's last login timestamp
+    await user.update({ lastLoginAt: new Date() });
 
     return ResponseUtil.success(res, {
       accessToken,
-      refreshToken: refreshTokenValue
+      refreshToken,
+      user: user.toJSON()
     }, 'Login successful');
   } catch (error) {
+    console.error('Login error:', error);
     return ResponseUtil.error(res, 'Login failed');
   }
 });
 
 /**
  * @swagger
- * /api/auth/refresh-token:
+ * /api/auth/refresh:
  *   post:
  *     tags: [Authentication]
  *     summary: Refresh access token
- *     description: Get a new access token using refresh token
+ *     description: Generate new access token using refresh token
  *     requestBody:
  *       required: true
  *       content:
@@ -365,10 +370,10 @@ authRouter.post('/login', validate(loginSchema), async (req, res) => {
  *           schema:
  *             $ref: '#/components/schemas/RefreshTokenRequest'
  *           example:
- *             refreshToken: 'a1b2c3d4e5f6...'
+ *             refreshToken: 'your_refresh_token_here'
  *     responses:
  *       200:
- *         description: Access token refreshed
+ *         description: Token refreshed successfully
  *         content:
  *           application/json:
  *             schema:
@@ -389,73 +394,42 @@ authRouter.post('/login', validate(loginSchema), async (req, res) => {
  *             schema:
  *               $ref: '#/components/schemas/ErrorResponse'
  */
-authRouter.post('/refresh-token', async (req, res) => {
+authRouter.post('/refresh', async (req, res) => {
   try {
     const { refreshToken } = req.body;
-    const storedToken = await RefreshToken.findByToken(refreshToken);
 
-    if (!storedToken || storedToken.isExpired()) {
+    if (!refreshToken) {
+      return ResponseUtil.validationError(res, ['Refresh token is required']);
+    }
+
+    // Validate refresh token
+    const tokenRecord = await JWTUtils.validateRefreshToken(refreshToken);
+    
+    if (!tokenRecord || !tokenRecord.user) {
       return ResponseUtil.authError(res, 'Invalid or expired refresh token');
     }
 
-    const user = await User.findByPk(storedToken.userId);
-
-    if (!user || user.activeStatus === '0') {
-      return ResponseUtil.authError(res, 'User not found or inactive');
+    // Check if user is still active
+    if (tokenRecord.user.recordStatus === 0) {
+      return ResponseUtil.authError(res, 'User account is inactive');
     }
 
-    const newAccessToken = JWTUtils.generateAccessToken({ userEmail: user.email });
+    // Generate new access token
+    const accessToken = JWTUtils.generateAccessToken({
+      id: tokenRecord.user.id,
+      email: tokenRecord.user.email,
+      role: tokenRecord.user.role
+    });
+
     return ResponseUtil.success(res, {
-      accessToken: newAccessToken
-    }, 'Access token refreshed');
+      accessToken
+    }, 'Token refreshed successfully');
   } catch (error) {
-    return ResponseUtil.error(res, 'Failed to refresh token');
+    console.error('Refresh token error:', error);
+    return ResponseUtil.authError(res, 'Invalid or expired refresh token');
   }
 });
 
-/**
- * @swagger
- * /api/auth/logout:
- *   post:
- *     tags: [Authentication]
- *     summary: User logout
- *     description: Invalidate refresh token and logout user
- *     requestBody:
- *       required: true
- *       content:
- *         application/json:
- *           schema:
- *             $ref: '#/components/schemas/RefreshTokenRequest'
- *           example:
- *             refreshToken: 'a1b2c3d4e5f6...'
- *     responses:
- *       200:
- *         description: Logged out successfully
- *         content:
- *           application/json:
- *             schema:
- *               $ref: '#/components/schemas/SuccessResponse'
- *       404:
- *         description: Refresh token not found
- *         content:
- *           application/json:
- *             schema:
- *               $ref: '#/components/schemas/ErrorResponse'
- */
-authRouter.post('/logout', async (req, res) => {
-  try {
-    const { refreshToken } = req.body;
-    const storedToken = await RefreshToken.findByToken(refreshToken);
-
-    if (!storedToken) {
-      return ResponseUtil.notFoundError(res, 'Refresh token not found');
-    }
-
-    await storedToken.destroy();
-    return ResponseUtil.success(res, null, 'Logged out successfully');
-  } catch (error) {
-    return ResponseUtil.error(res, 'Logout failed');
-  }
-});
+// RefreshToken functionality now implemented
 
 module.exports = authRouter;

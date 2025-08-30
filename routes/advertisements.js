@@ -50,68 +50,70 @@ const upload = multer({
  *       type: object
  *       required:
  *         - title
- *         - adType
+ *         - type
+ *         - startDate
+ *         - endDate
  *       properties:
  *         id:
- *           type: string
+ *           type: integer
  *           description: Auto-generated unique identifier
  *         title:
  *           type: string
+ *           maxLength: 150
  *           description: Advertisement title
  *         description:
  *           type: string
- *           description: Brief description
- *         content:
+ *           description: Advertisement description
+ *         targetUrl:
  *           type: string
- *           description: Advertisement content
- *         adType:
+ *           maxLength: 255
+ *           description: URL to redirect when clicked
+ *         type:
  *           type: string
- *           enum: [banner, popup, card, video, carousel]
+ *           enum: [banner, popup, carousel]
  *           description: Type of advertisement
+ *         targetRole:
+ *           type: string
+ *           enum: [all, member, owner, trainer, admin]
+ *           description: Target role for the advertisement
+ *         targetGymId:
+ *           type: integer
+ *           description: ID of target gym (null for all gyms)
+ *         targetLocation:
+ *           type: string
+ *           maxLength: 100
+ *           description: Target location
  *         status:
  *           type: string
- *           enum: [active, inactive, draft, expired]
+ *           enum: [draft, active, expired]
  *           description: Advertisement status
- *         targetAudience:
- *           type: string
- *           enum: [all, members, gym_owners, specific_gyms, location_based]
- *           description: Target audience
  *         priority:
  *           type: integer
  *           minimum: 0
  *           maximum: 10
- *           description: Advertisement priority
+ *           description: Advertisement priority (0-10)
  *         startDate:
  *           type: string
- *           format: date-time
- *           description: Start date
+ *           format: date
+ *           description: Start date (YYYY-MM-DD)
  *         endDate:
  *           type: string
- *           format: date-time
- *           description: End date
- *         budget:
- *           type: number
- *           description: Advertisement budget
- *         clicks:
+ *           format: date
+ *           description: End date (YYYY-MM-DD)
+ *         recordStatus:
  *           type: integer
- *           description: Total clicks
- *         impressions:
- *           type: integer
- *           description: Total impressions
- *     AdvertisementMedia:
- *       type: object
- *       properties:
- *         id:
- *           type: string
- *         mediaType:
- *           type: string
- *           enum: [image, video, gif]
- *         mediaUrl:
- *           type: string
- *         mediaAltText:
- *           type: string
- *         mediaOrder:
- *           type: integer
+ *           enum: [0, 1]
+ *           description: Record status (0=inactive, 1=active)
+ *         media:
+ *           type: array
+ *           items:
+ *             $ref: '#/components/schemas/Media'
+ *           description: Associated media files
+ *         analytics:
+ *           type: array
+ *           items:
+ *             $ref: '#/components/schemas/AdvertisementAnalytics'
+ *           description: Analytics data
  */
 
 // Public routes (no authentication required)

@@ -4,12 +4,12 @@ const crypto = require('crypto');
 
 const GymUniqueCodes = sequelize.define('GymUniqueCodes', {
   id: {
-    type: DataTypes.INTEGER,
+    type: DataTypes.BIGINT,
     primaryKey: true,
     autoIncrement: true
   },
   gymId: {
-    type: DataTypes.INTEGER,
+    type: DataTypes.BIGINT,
     allowNull: false,
     references: {
       model: 'gyms',

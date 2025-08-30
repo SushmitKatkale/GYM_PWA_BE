@@ -21,7 +21,8 @@ const quickCheckIn = async (req, res) => {
   try {
     const { location, accuracy, gymId } = req.body;
     const { latitude, longitude } = location;
-    const userEmail = req.user.email;
+    const userId = req.user.id; // Updated to use user ID
+    const userEmail = req.user.email; // Keep for backward compatibility
 
     // Validate required fields
     if (!latitude || !longitude) {
@@ -40,13 +41,19 @@ const quickCheckIn = async (req, res) => {
       });
     }
 
-    // Check if user has an active check-in
+    // Check if user has an active check-in - support both user ID and email
+    const activeCheckInWhere = {
+      checkOutTime: null,
+      isActive: true
+    };
+    if (userId) {
+      activeCheckInWhere.userId = userId;
+    } else {
+      activeCheckInWhere.userEmail = userEmail;
+    }
+    
     const activeCheckIn = await Attendance.findOne({
-      where: {
-        userEmail,
-        checkOutTime: null,
-        isActive: true
-      }
+      where: activeCheckInWhere
     });
 
     if (activeCheckIn) {
@@ -56,12 +63,18 @@ const quickCheckIn = async (req, res) => {
 
     // Get user's active subscriptions (subscriptions that haven't expired)
     const { UserSubscription, Subscription } = require('../models');
+    const subscriptionWhere = {
+      record_status: 1, // Updated field name
+      validTo: { [Op.gte]: new Date() } // Only check if subscription hasn't expired
+    };
+    if (userId) {
+      subscriptionWhere.userId = userId;
+    } else {
+      subscriptionWhere.userEmail = userEmail;
+    }
+    
     const activeSubscriptions = await UserSubscription.findAll({
-      where: {
-        userEmail: userEmail,
-        activeStatus: true,
-        validTo: { [Op.gte]: new Date() } // Only check if subscription hasn't expired
-      },
+      where: subscriptionWhere,
       include: [{
         model: Subscription,
         as: 'subscription',
@@ -71,7 +84,7 @@ const quickCheckIn = async (req, res) => {
           as: 'gym',
           required: true,
           where: {
-            activeStatus: true,
+            record_status: 1, // Updated field name
             attendanceTrackingEnabled: true
           }
         }]
@@ -133,8 +146,7 @@ const quickCheckIn = async (req, res) => {
     );
 
     // Create attendance record
-    const attendance = await Attendance.create({
-      userEmail,
+    const attendanceData = {
       gymId: selectedGym.gym.id,
       checkInTime: new Date(),
       checkInMethod: 'quick_checkin',
@@ -142,9 +154,17 @@ const quickCheckIn = async (req, res) => {
       userLocationLng: longitude,
       distanceFromGym: selectedGym.distance,
       isActive: true,
-      createdBy: userEmail,
-      updatedBy: userEmail
-    }, { transaction });
+      createdBy: userId || userEmail,
+      updatedBy: userId || userEmail
+    };
+    if (userId) {
+      attendanceData.userId = userId;
+    }
+    if (userEmail) {
+      attendanceData.userEmail = userEmail; // Keep for compatibility
+    }
+    
+    const attendance = await Attendance.create(attendanceData, { transaction });
 
     await transaction.commit();
 
@@ -173,7 +193,8 @@ const qrCodeCheckIn = async (req, res) => {
 
   try {
     const { qrCode, latitude, longitude, accuracy } = req.body;
-    const userEmail = req.user.email;
+    const userId = req.user.id; // Updated to use user ID
+    const userEmail = req.user.email; // Keep for backward compatibility
 
     // Validate required fields
     if (!qrCode) {
@@ -183,13 +204,19 @@ const qrCodeCheckIn = async (req, res) => {
       });
     }
 
-    // Check if user has an active check-in
+    // Check if user has an active check-in - support both user ID and email
+    const activeCheckInWhere = {
+      checkOutTime: null,
+      isActive: true
+    };
+    if (userId) {
+      activeCheckInWhere.userId = userId;
+    } else {
+      activeCheckInWhere.userEmail = userEmail;
+    }
+    
     const activeCheckIn = await Attendance.findOne({
-      where: {
-        userEmail,
-        checkOutTime: null,
-        isActive: true
-      }
+      where: activeCheckInWhere
     });
 
     if (activeCheckIn) {
@@ -252,8 +279,7 @@ const qrCodeCheckIn = async (req, res) => {
     }
 
     // Create attendance record
-    const attendance = await Attendance.create({
-      userEmail,
+    const attendanceData = {
       gymId: gymQRCode.gymId,
       checkInTime: new Date(),
       checkInMethod: 'gym_qr_scan',
@@ -261,9 +287,17 @@ const qrCodeCheckIn = async (req, res) => {
       userLocationLng: longitude,
       qrCodeUsed: qrCode,
       isActive: true,
-      createdBy: userEmail,
-      updatedBy: userEmail
-    }, { transaction });
+      createdBy: userId || userEmail,
+      updatedBy: userId || userEmail
+    };
+    if (userId) {
+      attendanceData.userId = userId;
+    }
+    if (userEmail) {
+      attendanceData.userEmail = userEmail; // Keep for compatibility
+    }
+    
+    const attendance = await Attendance.create(attendanceData, { transaction });
 
     // Update QR code usage
     await gymQRCode.increment('usageCount', { transaction });
@@ -292,7 +326,8 @@ const uniqueCodeCheckIn = async (req, res) => {
 
   try {
     const { uniqueCode, latitude, longitude, accuracy } = req.body;
-    const userEmail = req.user.email;
+    const userId = req.user.id; // Updated to use user ID
+    const userEmail = req.user.email; // Keep for backward compatibility
 
     // Validate required fields
     if (!uniqueCode) {
@@ -302,13 +337,19 @@ const uniqueCodeCheckIn = async (req, res) => {
       });
     }
 
-    // Check if user has an active check-in
+    // Check if user has an active check-in - support both user ID and email
+    const activeCheckInWhere = {
+      checkOutTime: null,
+      isActive: true
+    };
+    if (userId) {
+      activeCheckInWhere.userId = userId;
+    } else {
+      activeCheckInWhere.userEmail = userEmail;
+    }
+    
     const activeCheckIn = await Attendance.findOne({
-      where: {
-        userEmail,
-        checkOutTime: null,
-        isActive: true
-      }
+      where: activeCheckInWhere
     });
 
     if (activeCheckIn) {
@@ -371,17 +412,24 @@ const uniqueCodeCheckIn = async (req, res) => {
     }
 
     // Create attendance record
-    const attendance = await Attendance.create({
-      userEmail,
+    const attendanceData = {
       gymId: gymUniqueCode.gymId,
       checkInTime: new Date(),
       checkInMethod: 'gym_code',
       userLocationLat: latitude,
       userLocationLng: longitude,
       isActive: true,
-      createdBy: userEmail,
-      updatedBy: userEmail
-    }, { transaction });
+      createdBy: userId || userEmail,
+      updatedBy: userId || userEmail
+    };
+    if (userId) {
+      attendanceData.userId = userId;
+    }
+    if (userEmail) {
+      attendanceData.userEmail = userEmail; // Keep for compatibility
+    }
+    
+    const attendance = await Attendance.create(attendanceData, { transaction });
 
     // Update unique code usage
     await gymUniqueCode.increment('usageCount', { transaction });
@@ -425,7 +473,7 @@ const ownerScanCheckIn = async (req, res) => {
     const gym = await Gym.findOne({
       where: {
         id: gymId,
-        ownerId: ownerEmail
+        owner_id: req.user.id // Updated to use owner_id field and user ID
       }
     });
 
@@ -546,10 +594,10 @@ const checkOut = async (req, res) => {
       return ResponseUtil.notFoundError(res, 'No active check-in found');
     }
 
-    // Authorization check
-    const isOwner = userType === '2' && attendance.gym.ownerId === userEmail;
-    const isUser = attendance.userEmail === userEmail;
-    const isAdmin = userType === '3';
+    // Authorization check - updated to use role field and user ID
+    const isOwner = req.user.role === 2 && attendance.gym.owner_id === req.user.id;
+    const isUser = attendance.userEmail === userEmail || attendance.userId === req.user.id;
+    const isAdmin = req.user.role === 4; // Updated role value
 
     if (!isOwner && !isUser && !isAdmin) {
       await transaction.rollback();
@@ -596,14 +644,22 @@ const checkOut = async (req, res) => {
  */
 const getCheckInStatus = async (req, res) => {
   try {
+    const userId = req.user.id;
     const userEmail = req.user.email;
 
+    // Support both user ID and email
+    const whereClause = {
+      checkOutTime: null,
+      isActive: true
+    };
+    if (userId) {
+      whereClause.userId = userId;
+    } else {
+      whereClause.userEmail = userEmail;
+    }
+
     const activeCheckIn = await Attendance.findOne({
-      where: {
-        userEmail,
-        checkOutTime: null,
-        isActive: true
-      },
+      where: whereClause,
       include: [{
         model: Gym,
         as: 'gym',

@@ -19,8 +19,8 @@ const options = {
     },
     servers: [
       {
-        url: process.env.NODE_ENV === 'production' 
-          ? 'https://your-production-domain.com/' 
+        url: process.env.NODE_ENV === 'production'
+          ? 'https://your-production-domain.com/'
           : `http://localhost:${process.env.PORT || 3000}/`,
         description: process.env.NODE_ENV === 'production' ? 'Production server' : 'Development server'
       }
@@ -60,9 +60,9 @@ const options = {
               description: 'Last name'
             },
             role: {
-              type: 'string',
-              enum: ['admin', 'user'],
-              description: 'User role'
+              type: 'integer',
+              enum: [1, 2, 3, 4],
+              description: 'User role (1=User, 2=Owner, 3=Trainer, 4=Admin)'
             },
             isActive: {
               type: 'boolean',
@@ -114,11 +114,6 @@ const options = {
               minLength: 2,
               maxLength: 50,
               description: 'Last name'
-            },
-            role: {
-              type: 'string',
-              enum: ['admin', 'user'],
-              description: 'User role (optional, defaults to user)'
             }
           }
         },
@@ -177,6 +172,123 @@ const options = {
             }
           }
         },
+        UserNew: {
+          type: 'object',
+          required: ['username', 'email', 'password', 'firstName', 'lastName', 'role'],
+          properties: {
+            username: {
+              type: 'string',
+              minLength: 3,
+              maxLength: 50,
+              pattern: '^[a-zA-Z0-9]+$',
+              description: 'Username (alphanumeric only)'
+            },
+            email: {
+              type: 'string',
+              format: 'email',
+              description: 'User email'
+            },
+            password: {
+              type: 'string',
+              minLength: 8,
+              maxLength: 100,
+              description: 'User password'
+            },
+            firstName: {
+              type: 'string',
+              minLength: 2,
+              maxLength: 50,
+              description: 'First name'
+            },
+            lastName: {
+              type: 'string',
+              minLength: 2,
+              maxLength: 50,
+              description: 'Last name'
+            },
+            phoneNumber: {
+              type: 'string',
+              description: 'Phone number'
+            },
+            role: {
+              type: 'integer',
+              enum: [1, 2, 3, 4],
+              description: 'User role (1=User, 2=Owner, 3=Trainer, 4=Admin)'
+            },
+            record_status: {
+              type: 'integer',
+              enum: [0, 1],
+              description: 'Record status (0=inactive, 1=active)'
+            }
+          }
+        },
+        UserResponse: {
+          type: 'object',
+          properties: {
+            id: {
+              type: 'integer',
+              description: 'User ID'
+            },
+            username: {
+              type: 'string',
+              description: 'Username'
+            },
+            email: {
+              type: 'string',
+              format: 'email',
+              description: 'User email'
+            },
+            firstName: {
+              type: 'string',
+              description: 'First name'
+            },
+            lastName: {
+              type: 'string',
+              description: 'Last name'
+            },
+            phoneNumber: {
+              type: 'string',
+              description: 'Phone number'
+            },
+            role: {
+              type: 'integer',
+              enum: [1, 2, 3, 4],
+              description: 'User role (1=User, 2=Owner, 3=Trainer, 4=Admin)'
+            },
+            record_status: {
+              type: 'integer',
+              enum: [0, 1],
+              description: 'Record status (0=inactive, 1=active)'
+            },
+            isVerified: {
+              type: 'boolean',
+              description: 'Whether user is verified'
+            },
+            lastLoginAt: {
+              type: 'string',
+              format: 'date-time',
+              description: 'Last login timestamp'
+            },
+            created_at: {
+              type: 'string',
+              format: 'date-time',
+              description: 'Creation timestamp'
+            },
+            updated_at: {
+              type: 'string',
+              format: 'date-time',
+              description: 'Last update timestamp'
+            },
+            created_by: {
+              type: 'integer',
+              description: 'ID of user who created this record'
+            },
+            updated_by: {
+              type: 'integer',
+              description: 'ID of user who last updated this record'
+            }
+          }
+        },
         UpdateUser: {
           type: 'object',
           properties: {
@@ -204,10 +316,19 @@ const options = {
               maxLength: 50,
               description: 'Last name'
             },
-            role: {
+            phoneNumber: {
               type: 'string',
-              enum: ['admin', 'user'],
-              description: 'User role'
+              description: 'Phone number'
+            },
+            role: {
+              type: 'integer',
+              enum: [1, 2, 3, 4],
+              description: 'User role (1=User, 2=Owner, 3=Trainer, 4=Admin)'
+            },
+            record_status: {
+              type: 'integer',
+              enum: [0, 1],
+              description: 'Record status (0=inactive, 1=active)'
             }
           }
         },
@@ -342,18 +463,18 @@ const options = {
               },
               description: 'List of gym amenities'
             },
-            images: {
+            media: {
               type: 'array',
               items: {
-                $ref: '#/components/schemas/GymImage'
+                $ref: '#/components/schemas/Media'
               },
-              description: 'List of gym images'
+              description: 'List of gym media (images, videos, etc.)'
             }
           }
         },
         CreateGym: {
           type: 'object',
-          required: ['name', 'capacity', 'address', 'openingTime', 'closingTime'],
+          required: ['name', 'address', 'latitude', 'longitude', 'ownerId'],
           properties: {
             name: {
               type: 'string',
@@ -361,11 +482,10 @@ const options = {
               maxLength: 100,
               description: 'Gym name'
             },
-            capacity: {
+            ownerId: {
               type: 'integer',
               minimum: 1,
-              maximum: 10000,
-              description: 'Maximum capacity of the gym'
+              description: 'Gym owner id'
             },
             address: {
               type: 'string',
@@ -373,28 +493,15 @@ const options = {
               maxLength: 500,
               description: 'Gym address'
             },
-            description: {
+            latitude: {
               type: 'string',
               maxLength: 1000,
               description: 'Gym description'
             },
-            openingTime: {
+            longitude: {
               type: 'string',
-              pattern: '^([01]?[0-9]|2[0-3]):[0-5][0-9]$',
-              description: 'Opening time (HH:MM format, 24-hour)'
-            },
-            closingTime: {
-              type: 'string',
-              pattern: '^([01]?[0-9]|2[0-3]):[0-5][0-9]$',
-              description: 'Closing time (HH:MM format, 24-hour)'
-            },
-            createdBy: {
-              type: 'string',
-              description: 'User who is creating the gym'
-            },
-            ownerId: {
-              type: 'integer',
-              description: 'ID of the user who will own this gym'
+              maxLength: 1000,
+              description: 'Gym description'
             }
           }
         },
@@ -540,62 +647,85 @@ const options = {
             }
           }
         },
-        GymImage: {
+        Media: {
           type: 'object',
           properties: {
             id: {
               type: 'integer',
-              description: 'Image ID'
+              description: 'Media ID'
             },
-            title: {
+            entity_type: {
               type: 'string',
-              description: 'Image title'
+              enum: ['gym', 'advertisement', 'user', 'subscription'],
+              description: 'Type of entity this media belongs to'
             },
-            path: {
-              type: 'string',
-              description: 'Image file path'
-            },
-            fullUrl: {
-              type: 'string',
-              description: 'Full URL to access the image'
-            },
-            gymId: {
+            entity_id: {
               type: 'integer',
-              description: 'ID of the gym this image belongs to'
+              description: 'ID of the entity this media belongs to'
             },
-            activeStatus: {
-              type: 'boolean',
-              description: 'Active status of the image'
+            media_type: {
+              type: 'string',
+              enum: ['image', 'video', 'audio', 'document'],
+              description: 'Type of media'
             },
-            createTimestamp: {
+            url: {
+              type: 'string',
+              description: 'Media URL'
+            },
+            location: {
+              type: 'string',
+              description: 'Media file location/path'
+            },
+            alt_text: {
+              type: 'string',
+              description: 'Alternative text for the media'
+            },
+            mime_type: {
+              type: 'string',
+              description: 'MIME type of the media file'
+            },
+            file_size: {
+              type: 'integer',
+              description: 'File size in bytes'
+            },
+            width: {
+              type: 'integer',
+              description: 'Width in pixels (for images/videos)'
+            },
+            height: {
+              type: 'integer',
+              description: 'Height in pixels (for images/videos)'
+            },
+            duration: {
+              type: 'number',
+              description: 'Duration in seconds (for videos/audio)'
+            },
+            record_status: {
+              type: 'integer',
+              enum: [0, 1],
+              description: 'Record status (0=deleted, 1=active)'
+            },
+            created_at: {
               type: 'string',
               format: 'date-time',
               description: 'Creation timestamp'
             },
-            createdBy: {
-              type: 'string',
-              description: 'User who uploaded the image'
-            },
-            updateTimestamp: {
+            updated_at: {
               type: 'string',
               format: 'date-time',
               description: 'Last update timestamp'
             },
-            updatedBy: {
-              type: 'string',
-              description: 'User who last updated the image'
+            created_by: {
+              type: 'integer',
+              description: 'ID of user who created the media'
             },
-            gym: {
-              type: 'object',
-              properties: {
-                id: {
-                  type: 'integer'
-                },
-                name: {
-                  type: 'string'
-                }
-              },
-              description: 'Associated gym details'
+            updated_by: {
+              type: 'integer',
+              description: 'ID of user who last updated the media'
+            },
+            fullUrl: {
+              type: 'string',
+              description: 'Full URL to access the media (computed field)'
             }
           }
         },
@@ -1592,17 +1722,409 @@ const options = {
               description: 'Type of booking (defaults to regular)'
             }
           }
+        },
+        Advertisement: {
+          type: 'object',
+          properties: {
+            id: {
+              type: 'integer',
+              description: 'Advertisement ID'
+            },
+            title: {
+              type: 'string',
+              maxLength: 150,
+              description: 'Advertisement title'
+            },
+            description: {
+              type: 'string',
+              description: 'Advertisement description'
+            },
+            targetUrl: {
+              type: 'string',
+              maxLength: 255,
+              description: 'URL to redirect when advertisement is clicked'
+            },
+            type: {
+              type: 'string',
+              enum: ['banner', 'popup', 'carousel'],
+              description: 'Type of advertisement'
+            },
+            targetRole: {
+              type: 'string',
+              enum: ['all', 'member', 'owner', 'trainer', 'admin'],
+              description: 'Target role for the advertisement'
+            },
+            targetGymId: {
+              type: 'integer',
+              description: 'ID of the target gym (null for all gyms)'
+            },
+            targetLocation: {
+              type: 'string',
+              maxLength: 100,
+              description: 'Target location for the advertisement'
+            },
+            priority: {
+              type: 'integer',
+              minimum: 0,
+              maximum: 10,
+              description: 'Advertisement display priority (0-10, higher = more priority)'
+            },
+            startDate: {
+              type: 'string',
+              format: 'date',
+              description: 'Advertisement start date (YYYY-MM-DD)'
+            },
+            endDate: {
+              type: 'string',
+              format: 'date',
+              description: 'Advertisement end date (YYYY-MM-DD)'
+            },
+            status: {
+              type: 'string',
+              enum: ['draft', 'active', 'expired'],
+              description: 'Advertisement status'
+            },
+            recordStatus: {
+              type: 'integer',
+              enum: [0, 1],
+              description: 'Record status (0=inactive, 1=active)'
+            },
+            created_at: {
+              type: 'string',
+              format: 'date-time',
+              description: 'Creation timestamp'
+            },
+            updated_at: {
+              type: 'string',
+              format: 'date-time',
+              description: 'Last update timestamp'
+            },
+            created_by: {
+              type: 'integer',
+              description: 'ID of user who created the advertisement'
+            },
+            updated_by: {
+              type: 'integer',
+              description: 'ID of user who last updated the advertisement'
+            },
+            media: {
+              type: 'array',
+              items: {
+                $ref: '#/components/schemas/Media'
+              },
+              description: 'List of advertisement media (polymorphic Media association)'
+            },
+            analytics: {
+              type: 'array',
+              items: {
+                $ref: '#/components/schemas/AdvertisementAnalytics'
+              },
+              description: 'Advertisement analytics data'
+            }
+          }
+        },
+        CreateAdvertisement: {
+          type: 'object',
+          required: ['title', 'adType', 'status'],
+          properties: {
+            title: {
+              type: 'string',
+              minLength: 2,
+              maxLength: 200,
+              description: 'Advertisement title'
+            },
+            description: {
+              type: 'string',
+              maxLength: 500,
+              description: 'Advertisement description'
+            },
+            content: {
+              type: 'string',
+              maxLength: 2000,
+              description: 'Advertisement content/body'
+            },
+            adType: {
+              type: 'string',
+              enum: ['banner', 'popup', 'inline', 'video'],
+              description: 'Type of advertisement'
+            },
+            targetAudience: {
+              type: 'string',
+              enum: ['all', 'members', 'owners', 'trainers'],
+              default: 'all',
+              description: 'Target audience for the advertisement'
+            },
+            status: {
+              type: 'string',
+              enum: ['draft', 'active', 'paused'],
+              default: 'draft',
+              description: 'Advertisement status'
+            },
+            budget: {
+              type: 'number',
+              format: 'decimal',
+              minimum: 0,
+              description: 'Advertisement budget'
+            },
+            startDate: {
+              type: 'string',
+              format: 'date-time',
+              description: 'Advertisement start date'
+            },
+            endDate: {
+              type: 'string',
+              format: 'date-time',
+              description: 'Advertisement end date'
+            },
+            clickUrl: {
+              type: 'string',
+              format: 'uri',
+              description: 'URL to redirect when advertisement is clicked'
+            },
+            priority: {
+              type: 'integer',
+              minimum: 1,
+              maximum: 100,
+              default: 1,
+              description: 'Advertisement display priority'
+            },
+            maxImpressions: {
+              type: 'integer',
+              minimum: 1,
+              description: 'Maximum number of impressions'
+            },
+            maxClicks: {
+              type: 'integer',
+              minimum: 1,
+              description: 'Maximum number of clicks'
+            },
+            media: {
+              type: 'array',
+              items: {
+                type: 'object',
+                properties: {
+                  mediaType: {
+                    type: 'string',
+                    enum: ['image', 'video', 'audio'],
+                    description: 'Type of media'
+                  },
+                  location: {
+                    type: 'string',
+                    description: 'Media file location/path'
+                  },
+                  url: {
+                    type: 'string',
+                    description: 'Media URL'
+                  },
+                  altText: {
+                    type: 'string',
+                    description: 'Alternative text for the media'
+                  },
+                  mimeType: {
+                    type: 'string',
+                    description: 'MIME type of the media file'
+                  }
+                }
+              },
+              description: 'List of advertisement media'
+            }
+          }
+        },
+        UpdateAdvertisement: {
+          type: 'object',
+          properties: {
+            title: {
+              type: 'string',
+              minLength: 2,
+              maxLength: 200,
+              description: 'Advertisement title'
+            },
+            description: {
+              type: 'string',
+              maxLength: 500,
+              description: 'Advertisement description'
+            },
+            content: {
+              type: 'string',
+              maxLength: 2000,
+              description: 'Advertisement content/body'
+            },
+            adType: {
+              type: 'string',
+              enum: ['banner', 'popup', 'inline', 'video'],
+              description: 'Type of advertisement'
+            },
+            targetAudience: {
+              type: 'string',
+              enum: ['all', 'members', 'owners', 'trainers'],
+              description: 'Target audience for the advertisement'
+            },
+            status: {
+              type: 'string',
+              enum: ['draft', 'active', 'paused', 'completed', 'cancelled'],
+              description: 'Advertisement status'
+            },
+            budget: {
+              type: 'number',
+              format: 'decimal',
+              minimum: 0,
+              description: 'Advertisement budget'
+            },
+            startDate: {
+              type: 'string',
+              format: 'date-time',
+              description: 'Advertisement start date'
+            },
+            endDate: {
+              type: 'string',
+              format: 'date-time',
+              description: 'Advertisement end date'
+            },
+            clickUrl: {
+              type: 'string',
+              format: 'uri',
+              description: 'URL to redirect when advertisement is clicked'
+            },
+            priority: {
+              type: 'integer',
+              minimum: 1,
+              maximum: 100,
+              description: 'Advertisement display priority'
+            },
+            maxImpressions: {
+              type: 'integer',
+              minimum: 1,
+              description: 'Maximum number of impressions'
+            },
+            maxClicks: {
+              type: 'integer',
+              minimum: 1,
+              description: 'Maximum number of clicks'
+            }
+          }
+        },
+        AdvertisementAnalytics: {
+          type: 'object',
+          properties: {
+            id: {
+              type: 'string',
+              description: 'Analytics record ID (auto-generated string)'
+            },
+            advertisementId: {
+              type: 'integer',
+              description: 'ID of the advertisement'
+            },
+            userId: {
+              type: 'string',
+              description: 'ID of the user who triggered the event (null for anonymous users)'
+            },
+            eventType: {
+              type: 'string',
+              enum: ['view', 'click', 'close', 'share'],
+              description: 'Type of analytics event'
+            },
+            userAgent: {
+              type: 'string',
+              description: 'User agent string'
+            },
+            ipAddress: {
+              type: 'string',
+              description: 'IP address of the user'
+            },
+            locationData: {
+              type: 'object',
+              description: 'Geographic location data including country, city, etc.'
+            },
+            deviceType: {
+              type: 'string',
+              enum: ['mobile', 'desktop', 'tablet'],
+              description: 'Type of device used'
+            },
+            browserType: {
+              type: 'string',
+              description: 'Browser type'
+            },
+            osType: {
+              type: 'string',
+              description: 'Operating system type'
+            },
+            referrerUrl: {
+              type: 'string',
+              maxLength: 500,
+              description: 'URL of the referring page'
+            },
+            sessionId: {
+              type: 'string',
+              maxLength: 100,
+              description: 'User session identifier'
+            },
+            viewDuration: {
+              type: 'integer',
+              description: 'Duration in seconds for view events'
+            },
+            eventTimestamp: {
+              type: 'string',
+              format: 'date-time',
+              description: 'Event timestamp'
+            },
+            recordStatus: {
+              type: 'integer',
+              enum: [0, 1],
+              description: 'Record status (0=inactive, 1=active)'
+            },
+            created_at: {
+              type: 'string',
+              format: 'date-time',
+              description: 'Creation timestamp'
+            },
+            updated_at: {
+              type: 'string',
+              format: 'date-time',
+              description: 'Last update timestamp'
+            },
+            created_by: {
+              type: 'integer',
+              description: 'ID of user who created this record'
+            },
+            updated_by: {
+              type: 'integer',
+              description: 'ID of user who last updated this record'
+            },
+            advertisement: {
+              type: 'object',
+              properties: {
+                id: {
+                  type: 'integer'
+                },
+                title: {
+                  type: 'string'
+                },
+                type: {
+                  type: 'string'
+                }
+              },
+              description: 'Associated advertisement details'
+            }
+          }
         }
       }
     },
     tags: [
       {
+        name: 'Health',
+        description: 'Health check endpoint'
+      },
+      {
         name: 'Authentication',
         description: 'User authentication endpoints'
       },
       {
-        name: 'Users',
-        description: 'User management endpoints'
+        name: 'User Management',
+        description: 'User Management endpoints'
+      },
+      {
+        name: 'User Profile Management',
+        description: 'User Profile Management endpoints'
       },
       {
         name: 'Gyms',
@@ -1641,8 +2163,8 @@ const options = {
         description: 'Gym slot booking and management endpoints'
       },
       {
-        name: 'Health',
-        description: 'Health check endpoint'
+        name: 'Advertisements',
+        description: 'Advertisement management and analytics endpoints'
       }
     ]
   },

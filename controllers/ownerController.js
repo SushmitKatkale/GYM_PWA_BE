@@ -31,7 +31,7 @@ const ResponseUtil = require('../utils/response');
 async function getOwners(req, res) {
   try {
     const owners = await User.findAll({ 
-      where: { type: '2' },
+      where: { role: 2 }, // Updated to use role field
       attributes: { exclude: ['password'] } // Never return passwords
     });
     
@@ -87,7 +87,7 @@ async function searchOwners(req, res) {
     
     const owners = await User.findAll({
       where: {
-        type: '2',
+        role: 2, // Updated to use role field
         [Op.or]: [
           { firstName: { [Op.like]: `%${query}%` } }, 
           { lastName: { [Op.like]: `%${query}%` } },
@@ -174,7 +174,7 @@ async function createOwner(req, res) {
       password,
       username,
       phoneNumber,
-      type: '2'
+      role: 2 // Updated to use role field
     });
     res.json({ success: true, data: owner });
   } catch (error) {

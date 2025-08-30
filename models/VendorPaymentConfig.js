@@ -16,7 +16,7 @@ const VendorPaymentConfig = sequelize.define('VendorPaymentConfig', {
     field: 'owner_email'
   },
   gymId: {
-    type: DataTypes.INTEGER,
+    type: DataTypes.BIGINT,
     allowNull: false,
     references: {
       model: 'gyms',

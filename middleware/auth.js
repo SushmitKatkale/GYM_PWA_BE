@@ -13,9 +13,9 @@ const authenticate = async (req, res, next) => {
     }
 
     const decoded = JWTUtils.verifyAccessToken(token);
-    const user = await User.findOne({ where: { email: decoded.userEmail } });
+    const user = await User.findByPk(decoded.id);
 
-    if (!user || user.activeStatus === '0') {
+    if (!user || user.recordStatus === 0) {
       return ResponseUtil.authError(res, 'Invalid token or user not found');
     }
 
@@ -27,13 +27,14 @@ const authenticate = async (req, res, next) => {
 };
 
 // Authorize based on user roles
+// Roles: 1=member, 2=owner, 3=trainer, 4=admin
 const authorize = (...roles) => {
   return (req, res, next) => {
     if (!req.user) {
       return ResponseUtil.authError(res, 'Authentication required');
     }
 
-    if (!roles.includes(req.user.type)) {
+    if (!roles.includes(req.user.role.toString())) {
       return ResponseUtil.forbiddenError(res, 'Insufficient permissions');
     }
 
@@ -49,9 +50,9 @@ const optionalAuth = async (req, res, next) => {
 
     if (token) {
       const decoded = JWTUtils.verifyAccessToken(token);
-      const user = await User.findOne({ where: { email: decoded.userEmail } });
+      const user = await User.findByPk(decoded.userId);
 
-      if (user && user.activeStatus === '1') {
+      if (user && user.recordStatus === 1) {
         req.user = user;
       }
     }

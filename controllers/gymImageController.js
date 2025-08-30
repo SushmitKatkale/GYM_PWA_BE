@@ -1,4 +1,4 @@
-const { GymImage, Gym } = require('../models');
+const { Media, Gym } = require('../models');
 const ResponseUtil = require('../utils/response');
 const path = require('path');
 const fs = require('fs');
@@ -23,12 +23,17 @@ const uploadGymImage = async (req, res) => {
     // Create relative path for storing in database
     const relativePath = `/uploads/gyms/${req.file.filename}`;
 
-    const gymImage = await GymImage.create({
-      title: title || req.file.originalname,
-      path: relativePath,
-      gymId,
-      createdBy,
-      activeStatus: true
+    const gymImage = await Media.create({
+      entity_type: 'gym',
+      entity_id: gymId,
+      media_type: 'image',
+      location: relativePath,
+      url: relativePath,
+      alt_text: title || req.file.originalname,
+      mime_type: req.file.mimetype,
+      file_size: req.file.size,
+      created_by: createdBy,
+      record_status: 1
     });
 
     return ResponseUtil.success(res, {
@@ -56,27 +61,29 @@ const getImagesByGym = async (req, res) => {
     const { gymId } = req.params;
     const { activeOnly = 'true' } = req.query;
 
-    const whereClause = { gymId };
+    const whereClause = {
+      entity_type: 'gym',
+      entity_id: gymId
+    };
     if (activeOnly === 'true') {
-      whereClause.activeStatus = true;
+      whereClause.record_status = 1;
     }
 
-    const images = await GymImage.findAll({
+    const images = await Media.findAll({
       where: whereClause,
-      include: [
-        {
-          model: Gym,
-          as: 'gym',
-          attributes: ['id', 'name']
-        }
-      ],
-      order: [['createTimestamp', 'DESC']]
+      order: [['created_at', 'DESC']]
     });
 
-    // Add full URL to each image
+    // Get gym details for response
+    const gym = await Gym.findByPk(gymId, {
+      attributes: ['id', 'name']
+    });
+
+    // Add full URL to each image and gym details
     const imagesWithUrl = images.map(image => ({
       ...image.toJSON(),
-      fullUrl: `${req.protocol}://${req.get('host')}${image.path}`
+      fullUrl: `${req.protocol}://${req.get('host')}${image.url || image.location}`,
+      gym: gym
     }));
 
     return ResponseUtil.success(res, imagesWithUrl, 'Images retrieved successfully');
@@ -96,30 +103,34 @@ const getAllGymImages = async (req, res) => {
     } = req.query;
 
     const offset = (page - 1) * limit;
-    const whereClause = {};
+    const whereClause = {
+      entity_type: 'gym'
+    };
 
     if (activeOnly === 'true') {
-      whereClause.activeStatus = true;
+      whereClause.record_status = 1;
     }
 
-    const { count, rows } = await GymImage.findAndCountAll({
+    const { count, rows } = await Media.findAndCountAll({
       where: whereClause,
-      include: [
-        {
-          model: Gym,
-          as: 'gym',
-          attributes: ['id', 'name']
-        }
-      ],
       limit: parseInt(limit),
       offset: parseInt(offset),
-      order: [['createTimestamp', 'DESC']]
+      order: [['created_at', 'DESC']]
     });
 
-    // Add full URL to each image
+    // Get unique gym IDs and fetch gym details
+    const gymIds = [...new Set(rows.map(image => image.entity_id))];
+    const gyms = await Gym.findAll({
+      where: { id: gymIds },
+      attributes: ['id', 'name']
+    });
+    const gymMap = Object.fromEntries(gyms.map(gym => [gym.id, gym]));
+
+    // Add full URL to each image and gym details
     const imagesWithUrl = rows.map(image => ({
       ...image.toJSON(),
-      fullUrl: `${req.protocol}://${req.get('host')}${image.path}`
+      fullUrl: `${req.protocol}://${req.get('host')}${image.url || image.location}`,
+      gym: gymMap[image.entity_id] || null
     }));
 
     return ResponseUtil.success(res, {
@@ -142,23 +153,21 @@ const getGymImageById = async (req, res) => {
   try {
     const { id } = req.params;
 
-    const image = await GymImage.findByPk(id, {
-      include: [
-        {
-          model: Gym,
-          as: 'gym',
-          attributes: ['id', 'name']
-        }
-      ]
-    });
+    const image = await Media.findByPk(id);
 
-    if (!image) {
+    if (!image || image.entity_type !== 'gym') {
       return ResponseUtil.error(res, 'Image not found', 404);
     }
 
+    // Get gym details
+    const gym = await Gym.findByPk(image.entity_id, {
+      attributes: ['id', 'name']
+    });
+
     const imageWithUrl = {
       ...image.toJSON(),
-      fullUrl: `${req.protocol}://${req.get('host')}${image.path}`
+      fullUrl: `${req.protocol}://${req.get('host')}${image.url || image.location}`,
+      gym: gym
     };
 
     return ResponseUtil.success(res, imageWithUrl, 'Image retrieved successfully');
@@ -174,30 +183,26 @@ const updateGymImage = async (req, res) => {
     const { id } = req.params;
     const { title, updatedBy } = req.body;
 
-    const image = await GymImage.findByPk(id);
-    if (!image) {
+    const image = await Media.findByPk(id);
+    if (!image || image.entity_type !== 'gym') {
       return ResponseUtil.error(res, 'Image not found', 404);
     }
 
     await image.update({
-      title,
-      updatedBy,
-      updateTimestamp: new Date()
+      alt_text: title,
+      updated_by: updatedBy,
+      updated_at: new Date()
     });
 
-    const updatedImage = await GymImage.findByPk(id, {
-      include: [
-        {
-          model: Gym,
-          as: 'gym',
-          attributes: ['id', 'name']
-        }
-      ]
+    // Get gym details
+    const gym = await Gym.findByPk(image.entity_id, {
+      attributes: ['id', 'name']
     });
 
     const imageWithUrl = {
-      ...updatedImage.toJSON(),
-      fullUrl: `${req.protocol}://${req.get('host')}${updatedImage.path}`
+      ...image.toJSON(),
+      fullUrl: `${req.protocol}://${req.get('host')}${image.url || image.location}`,
+      gym: gym
     };
 
     return ResponseUtil.success(res, imageWithUrl, 'Image updated successfully');
@@ -213,15 +218,15 @@ const deleteGymImage = async (req, res) => {
     const { id } = req.params;
     const { updatedBy } = req.body;
 
-    const image = await GymImage.findByPk(id);
-    if (!image) {
+    const image = await Media.findByPk(id);
+    if (!image || image.entity_type !== 'gym') {
       return ResponseUtil.error(res, 'Image not found', 404);
     }
 
     await image.update({
-      activeStatus: false,
-      updatedBy,
-      updateTimestamp: new Date()
+      record_status: 0,
+      updated_by: updatedBy,
+      updated_at: new Date()
     });
 
     return ResponseUtil.success(res, null, 'Image deleted successfully');
@@ -236,13 +241,13 @@ const hardDeleteGymImage = async (req, res) => {
   try {
     const { id } = req.params;
 
-    const image = await GymImage.findByPk(id);
-    if (!image) {
+    const image = await Media.findByPk(id);
+    if (!image || image.entity_type !== 'gym') {
       return ResponseUtil.error(res, 'Image not found', 404);
     }
 
     // Delete file from file system
-    const filePath = path.join(__dirname, '..', image.path);
+    const filePath = path.join(__dirname, '..', image.url || image.location);
     if (fs.existsSync(filePath)) {
       fs.unlinkSync(filePath);
     }
@@ -257,7 +262,7 @@ const hardDeleteGymImage = async (req, res) => {
   }
 };
 
-// Upload gym image without gym validation (gym_id = -1)
+// Upload gym image without gym validation (entity_id = -1)
 const uploadGymImageGeneral = async (req, res) => {
   try {
     const { title, createdBy } = req.body;
@@ -270,12 +275,17 @@ const uploadGymImageGeneral = async (req, res) => {
     // Create relative path for storing in database
     const relativePath = `/uploads/gyms/${req.file.filename}`;
 
-    const gymImage = await GymImage.create({
-      title: title || req.file.originalname,
-      path: relativePath,
-      gymId: -1, // Set gym_id to -1 as requested
-      createdBy,
-      activeStatus: true
+    const gymImage = await Media.create({
+      entity_type: 'gym',
+      entity_id: -1, // Set entity_id to -1 as requested
+      media_type: 'image',
+      location: relativePath,
+      url: relativePath,
+      alt_text: title || req.file.originalname,
+      mime_type: req.file.mimetype,
+      file_size: req.file.size,
+      created_by: createdBy,
+      record_status: 1
     });
 
     return ResponseUtil.success(res, {

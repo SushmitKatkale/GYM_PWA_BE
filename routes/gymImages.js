@@ -2,6 +2,7 @@ const express = require('express');
 const router = express.Router();
 const {
   uploadGymImage,
+  uploadGymImageGeneral,
   getImagesByGym,
   getAllGymImages,
   getGymImageById,
@@ -9,8 +10,7 @@ const {
   deleteGymImage,
   hardDeleteGymImage
 } = require('../controllers/gymImageController');
-const { authenticate, authorize } = require('../middleware/auth');
-const { checkImageOwnership } = require('../middleware/ownership');
+const { authenticate } = require('../middleware/auth');
 const upload = require('../config/multer');
 
 /**
@@ -18,8 +18,8 @@ const upload = require('../config/multer');
  * /api/gym-images/gym/{gymId}/upload:
  *   post:
  *     tags: [Gym Images]
- *     summary: Upload gym image
- *     description: Upload an image for a specific gym.
+ *     summary: Upload image for a specific gym
+ *     description: Upload an image and associate it with a specific gym ID in the Media table.
  *     security:
  *       - bearerAuth: []
  *     parameters:
@@ -28,7 +28,7 @@ const upload = require('../config/multer');
  *         required: true
  *         schema:
  *           type: integer
- *         description: Gym ID
+ *         description: ID of the gym to associate the image with
  *     requestBody:
  *       required: true
  *       content:
@@ -42,10 +42,10 @@ const upload = require('../config/multer');
  *                 description: Image file (jpeg, jpg, png, gif, webp)
  *               title:
  *                 type: string
- *                 description: Image title
+ *                 description: Image title/alt text
  *               createdBy:
  *                 type: string
- *                 description: User who is uploading the image
+ *                 description: User ID who is uploading the image
  *             required:
  *               - image
  *     responses:
@@ -74,15 +74,52 @@ const upload = require('../config/multer');
  *             schema:
  *               $ref: '#/components/schemas/ErrorResponse'
  */
-router.post('/gym/:gymId/upload', authenticate, authorize('3', '2'), checkImageOwnership, upload.single('image'), uploadGymImage);
+router.post('/gym/:gymId/upload', authenticate, upload.single('image'), uploadGymImage);
+
+/**
+ * @swagger
+ * /api/gym-images/gym/{gymId}:
+ *   get:
+ *     tags: [Gym Images]
+ *     summary: Get all images for a specific gym
+ *     description: Retrieve all images associated with a specific gym from the Media table.
+ *     parameters:
+ *       - in: path
+ *         name: gymId
+ *         required: true
+ *         schema:
+ *           type: integer
+ *         description: ID of the gym
+ *       - in: query
+ *         name: activeOnly
+ *         schema:
+ *           type: string
+ *           enum: [true, false]
+ *           default: true
+ *         description: Whether to return only active images
+ *     responses:
+ *       200:
+ *         description: Images retrieved successfully
+ *         content:
+ *           application/json:
+ *             schema:
+ *               $ref: '#/components/schemas/SuccessResponse'
+ *       500:
+ *         description: Server error
+ *         content:
+ *           application/json:
+ *             schema:
+ *               $ref: '#/components/schemas/ErrorResponse'
+ */
+router.get('/gym/:gymId', getImagesByGym);
 
 /**
  * @swagger
  * /api/gym-images:
  *   get:
  *     tags: [Gym Images]
- *     summary: Get all gym images
- *     description: Retrieve a paginated list of gym images.
+ *     summary: Get all gym images with pagination
+ *     description: Retrieve all gym images from the Media table with pagination support.
  *     parameters:
  *       - in: query
  *         name: page
@@ -95,27 +132,21 @@ router.post('/gym/:gymId/upload', authenticate, authorize('3', '2'), checkImageO
  *         schema:
  *           type: integer
  *           default: 10
- *         description: Items per page
+ *         description: Number of items per page
  *       - in: query
  *         name: activeOnly
  *         schema:
- *           type: boolean
+ *           type: string
+ *           enum: [true, false]
  *           default: true
- *         description: Filter active images only
+ *         description: Whether to return only active images
  *     responses:
  *       200:
- *         description: A list of gym images
+ *         description: Images retrieved successfully
  *         content:
  *           application/json:
  *             schema:
- *               type: object
- *               properties:
- *                 images:
- *                   type: array
- *                   items:
- *                     $ref: '#/components/schemas/GymImage'
- *                 pagination:
- *                   $ref: '#/components/schemas/PaginationResponse'
+ *               $ref: '#/components/schemas/SuccessResponse'
  *       500:
  *         description: Server error
  *         content:
@@ -127,49 +158,11 @@ router.get('/', getAllGymImages);
 
 /**
  * @swagger
- * /api/gym-images/gym/{gymId}:
- *   get:
- *     tags: [Gym Images]
- *     summary: Get images by gym ID
- *     description: Retrieve all images for a specific gym.
- *     parameters:
- *       - in: path
- *         name: gymId
- *         required: true
- *         schema:
- *           type: integer
- *         description: Gym ID
- *       - in: query
- *         name: activeOnly
- *         schema:
- *           type: boolean
- *           default: true
- *         description: Filter active images only
- *     responses:
- *       200:
- *         description: A list of images for the gym
- *         content:
- *           application/json:
- *             schema:
- *               type: array
- *               items:
- *                 $ref: '#/components/schemas/GymImage'
- *       500:
- *         description: Server error
- *         content:
- *           application/json:
- *             schema:
- *               $ref: '#/components/schemas/ErrorResponse'
- */
-router.get('/gym/:gymId', getImagesByGym);
-
-/**
- * @swagger
  * /api/gym-images/{id}:
  *   get:
  *     tags: [Gym Images]
  *     summary: Get gym image by ID
- *     description: Retrieve a specific gym image by its ID.
+ *     description: Retrieve a specific gym image by its ID from the Media table.
  *     parameters:
  *       - in: path
  *         name: id
@@ -179,11 +172,11 @@ router.get('/gym/:gymId', getImagesByGym);
  *         description: Image ID
  *     responses:
  *       200:
- *         description: Image details
+ *         description: Image retrieved successfully
  *         content:
  *           application/json:
  *             schema:
- *               $ref: '#/components/schemas/GymImage'
+ *               $ref: '#/components/schemas/SuccessResponse'
  *       404:
  *         description: Image not found
  *         content:
@@ -205,7 +198,7 @@ router.get('/:id', getGymImageById);
  *   put:
  *     tags: [Gym Images]
  *     summary: Update gym image metadata
- *     description: Update gym image title and other metadata.
+ *     description: Update metadata for a gym image in the Media table.
  *     security:
  *       - bearerAuth: []
  *     parameters:
@@ -220,7 +213,14 @@ router.get('/:id', getGymImageById);
  *       content:
  *         application/json:
  *           schema:
- *             $ref: '#/components/schemas/UpdateGymImage'
+ *             type: object
+ *             properties:
+ *               title:
+ *                 type: string
+ *                 description: New image title/alt text
+ *               updatedBy:
+ *                 type: string
+ *                 description: User ID who is updating the image
  *     responses:
  *       200:
  *         description: Image updated successfully
@@ -241,7 +241,7 @@ router.get('/:id', getGymImageById);
  *             schema:
  *               $ref: '#/components/schemas/ErrorResponse'
  */
-router.put('/:id', authenticate, authorize('3', '2'), checkImageOwnership, updateGymImage);
+router.put('/:id', authenticate, updateGymImage);
 
 /**
  * @swagger
@@ -249,7 +249,7 @@ router.put('/:id', authenticate, authorize('3', '2'), checkImageOwnership, updat
  *   delete:
  *     tags: [Gym Images]
  *     summary: Soft delete gym image
- *     description: Soft delete gym image by setting active status to false.
+ *     description: Soft delete a gym image (set record_status to 0) in the Media table.
  *     security:
  *       - bearerAuth: []
  *     parameters:
@@ -259,6 +259,16 @@ router.put('/:id', authenticate, authorize('3', '2'), checkImageOwnership, updat
  *         schema:
  *           type: integer
  *         description: Image ID
+ *     requestBody:
+ *       required: false
+ *       content:
+ *         application/json:
+ *           schema:
+ *             type: object
+ *             properties:
+ *               updatedBy:
+ *                 type: string
+ *                 description: User ID who is deleting the image
  *     responses:
  *       200:
  *         description: Image deleted successfully
@@ -279,15 +289,15 @@ router.put('/:id', authenticate, authorize('3', '2'), checkImageOwnership, updat
  *             schema:
  *               $ref: '#/components/schemas/ErrorResponse'
  */
-router.delete('/:id', authenticate, authorize('3', '2'), checkImageOwnership, deleteGymImage);
+router.delete('/:id', authenticate, deleteGymImage);
 
 /**
  * @swagger
- * /api/gym-images/{id}/permanent:
+ * /api/gym-images/{id}/hard-delete:
  *   delete:
  *     tags: [Gym Images]
- *     summary: Permanently delete gym image
- *     description: Permanently delete gym image from database and file system.
+ *     summary: Hard delete gym image
+ *     description: Permanently delete a gym image from both database and file system.
  *     security:
  *       - bearerAuth: []
  *     parameters:
@@ -317,6 +327,6 @@ router.delete('/:id', authenticate, authorize('3', '2'), checkImageOwnership, de
  *             schema:
  *               $ref: '#/components/schemas/ErrorResponse'
  */
-router.delete('/:id/permanent', authenticate, authorize('3'), checkImageOwnership, hardDeleteGymImage);
+router.delete('/:id/hard-delete', authenticate, hardDeleteGymImage);
 
 module.exports = router;

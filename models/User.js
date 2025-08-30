@@ -1,216 +1,104 @@
 const { DataTypes } = require('sequelize');
 const { sequelize } = require('../config/database');
 const bcrypt = require('bcryptjs');
-const crypto = require('crypto');
-
-// Helper function to generate unique alphanumeric ID
-const generateUniqueId = () => {
-  const chars = 'ABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789';
-  let result = '';
-  for (let i = 0; i < 8; i++) {
-    result += chars.charAt(Math.floor(Math.random() * chars.length));
-  }
-  return result;
-};
 
 const User = sequelize.define('User', {
-  email: {
-    type: DataTypes.STRING,
+  id: {
+    type: DataTypes.BIGINT,
     primaryKey: true,
+    autoIncrement: true
+  },
+  firstName: {
+    type: DataTypes.STRING(100),
+    allowNull: false,
+    field: 'first_name',
+    validate: {
+      notEmpty: true,
+      len: [1, 100]
+    }
+  },
+  lastName: {
+    type: DataTypes.STRING(100),
+    allowNull: false,
+    field: 'last_name',
+    validate: {
+      notEmpty: true,
+      len: [1, 100]
+    }
+  },
+  email: {
+    type: DataTypes.STRING(150),
     allowNull: false,
     unique: true,
     validate: {
       isEmail: true
     }
   },
-  id: {
-    type: DataTypes.STRING(8),
-    allowNull: true, // Allow null initially, will be generated in hook
-    unique: true,
-    validate: {
-      len: [8, 8],
-      isAlphanumeric: true
-    }
-  },
-  firstName: {
-    type: DataTypes.STRING(50),
-    allowNull: false,
-    field: 'first_name',
-    validate: {
-      len: [2, 50],
-      notEmpty: true,
-    },
-  },
-  lastName: {
-    type: DataTypes.STRING(50),
-    allowNull: false,
-    field: 'last_name',
-    validate: {
-      len: [2, 50],
-      notEmpty: true,
-    },
-  },
   username: {
-    type: DataTypes.STRING(50),
-    allowNull: false,
+    type: DataTypes.STRING(100),
+    allowNull: true,
     unique: true,
     validate: {
-      len: [3, 50],
-      isAlphanumeric: true,
-    },
+      len: [3, 100]
+    }
   },
   password: {
     type: DataTypes.STRING(255),
     allowNull: false,
+    field: 'password',
     validate: {
-      len: [8, 255],
-    },
-  },
-  phoneNumber: {
-    type: DataTypes.STRING(20),
-    allowNull: true,
-    field: 'phone_number',
-    validate: {
-      is: /^[+]?[0-9\s\-\(\)]+$/,
-    },
-  },
-  type: {
-    type: DataTypes.ENUM('1', '2', '3'),
-    allowNull: false,
-    defaultValue: '1',
-    comment: '1-user, 2-owner, 3-admin',
-    validate: {
-      isIn: [['1', '2', '3']],
-    },
-  },
-  activeStatus: {
-    type: DataTypes.ENUM('0', '1'),
-    allowNull: false,
-    defaultValue: '1',
-    field: 'active_status',
-    validate: {
-      isIn: [['0', '1']],
-    },
-  },
-  isVerified: {
-    type: DataTypes.BOOLEAN,
-    allowNull: false,
-    defaultValue: false,
-    field: 'is_verified',
-    comment: 'Whether the user has verified their email address'
-  },
-  createTimestamp: {
-    type: DataTypes.DATE,
-    allowNull: false,
-    defaultValue: DataTypes.NOW,
-    field: 'create_timestamp',
-  },
-  createdBy: {
-    type: DataTypes.STRING(8),
-    allowNull: true,
-    field: 'created_by',
-    references: {
-      model: 'users',
-      key: 'id',
-    },
-  },
-  updateTimestamp: {
-    type: DataTypes.DATE,
-    allowNull: false,
-    defaultValue: DataTypes.NOW,
-    field: 'update_timestamp',
-  },
-  updatedBy: {
-    type: DataTypes.STRING(8),
-    allowNull: true,
-    field: 'updated_by',
-    references: {
-      model: 'users',
-      key: 'id',
-    },
-  },
-  // Attendance preference fields
-  defaultGymId: {
-    type: DataTypes.INTEGER,
-    allowNull: true,
-    defaultValue: null,
-    field: 'default_gym_id',
-    references: {
-      model: 'gyms',
-      key: 'id'
+      len: [8, 255]
     }
   },
-  locationSharingEnabled: {
-    type: DataTypes.BOOLEAN,
-    allowNull: false,
-    defaultValue: true,
-    field: 'location_sharing_enabled'
-  },
-  biometricEnabled: {
-    type: DataTypes.BOOLEAN,
-    allowNull: false,
-    defaultValue: false,
-    field: 'biometric_enabled'
-  },
-  autoCheckinEnabled: {
-    type: DataTypes.BOOLEAN,
-    allowNull: false,
-    defaultValue: false,
-    field: 'auto_checkin_enabled'
-  },
-  checkinNotificationEnabled: {
-    type: DataTypes.BOOLEAN,
-    allowNull: false,
-    defaultValue: true,
-    field: 'checkin_notification_enabled'
-  },
-  checkoutNotificationEnabled: {
-    type: DataTypes.BOOLEAN,
-    allowNull: false,
-    defaultValue: true,
-    field: 'checkout_notification_enabled'
-  },
-  locationAccuracyPreference: {
-    type: DataTypes.ENUM('high', 'medium', 'low'),
-    allowNull: false,
-    defaultValue: 'medium',
-    field: 'location_accuracy_preference'
-  },
-  preferredCheckinMethod: {
-    type: DataTypes.ENUM('gym_qr_scan', 'gym_code', 'quick_checkin', 'owner_scan_user', 'fingerprint', 'face_scan'),
+  phone: {
+    type: DataTypes.STRING(20),
     allowNull: true,
-    defaultValue: 'quick_checkin',
-    field: 'preferred_checkin_method'
+    unique: true,
+    validate: {
+      is: /^[+]?[0-9\s\-\(\)]+$/
+    }
   },
+  role: {
+    type: DataTypes.TINYINT,
+    allowNull: false,
+    defaultValue: 1,
+    comment: '1=member,2=owner,3=trainer,4=admin',
+    validate: {
+      isIn: [[1, 2, 3, 4]]
+    }
+  },
+  recordStatus: {
+    type: DataTypes.TINYINT(1),
+    allowNull: false,
+    defaultValue: 1,
+    field: 'record_status',
+    comment: '1=active, 0=inactive'
+  },
+  createdBy: {
+    type: DataTypes.BIGINT,
+    allowNull: true,
+    field: 'created_by',
+    comment: 'User ID who created this record'
+  },
+  updatedBy: {
+    type: DataTypes.BIGINT,
+    allowNull: true,
+    field: 'updated_by',
+    comment: 'User ID who last updated this record'
+  }
 }, {
   tableName: 'users',
-  timestamps: false, // We're using custom timestamp fields
+  timestamps: true,
+  createdAt: 'created_at',
+  updatedAt: 'updated_at',
   underscored: true,
   hooks: {
     beforeCreate: async (user) => {
-      // Generate unique ID if not provided
-      if (!user.id) {
-        let uniqueId;
-        let isUnique = false;
-        while (!isUnique) {
-          uniqueId = generateUniqueId();
-          const existingUser = await User.findOne({ where: { id: uniqueId } });
-          if (!existingUser) {
-            isUnique = true;
-          }
-        }
-        user.id = uniqueId;
-      }
-      
       // Hash password
       if (user.password) {
         const saltRounds = parseInt(process.env.BCRYPT_SALT_ROUNDS) || 12;
         user.password = await bcrypt.hash(user.password, saltRounds);
       }
-      
-      // Set timestamps
-      user.createTimestamp = new Date();
-      user.updateTimestamp = new Date();
     },
     beforeUpdate: async (user) => {
       // Hash password if changed
@@ -218,11 +106,8 @@ const User = sequelize.define('User', {
         const saltRounds = parseInt(process.env.BCRYPT_SALT_ROUNDS) || 12;
         user.password = await bcrypt.hash(user.password, saltRounds);
       }
-      
-      // Update timestamp
-      user.updateTimestamp = new Date();
-    },
-  },
+    }
+  }
 });
 
 // Instance methods
@@ -236,53 +121,113 @@ User.prototype.toJSON = function() {
   return values;
 };
 
-// Self-referencing associations (will be defined in models/index.js)
+// Role helper methods
+User.prototype.isMember = function() {
+  return this.role === 1;
+};
+
+User.prototype.isOwner = function() {
+  return this.role === 2;
+};
+
+User.prototype.isTrainer = function() {
+  return this.role === 3;
+};
+
+User.prototype.isAdmin = function() {
+  return this.role === 4;
+};
+
+User.prototype.hasRole = function(roles) {
+  return Array.isArray(roles) ? roles.includes(this.role) : this.role === roles;
+};
+
+// Associations will be defined in models/index.js
 User.associate = function(models) {
-  // User who created this record
-  User.belongsTo(models.User, {
-    foreignKey: 'createdBy',
-    as: 'creator',
-    constraints: false
-  });
-  
-  // User who last updated this record
-  User.belongsTo(models.User, {
-    foreignKey: 'updatedBy',
-    as: 'updater',
-    constraints: false
-  });
-  
-  // Profile images association
-  User.hasMany(models.ProfileImage, {
+  // User Profile (One-to-One)
+  User.hasOne(models.UserProfile, {
     foreignKey: 'userId',
-    as: 'profileImages'
+    as: 'profile',
+    onDelete: 'CASCADE'
   });
-  
-  // Current active profile image association
-  User.hasOne(models.ProfileImage, {
+
+  // Emergency Contacts (One-to-Many)
+  User.hasMany(models.EmergencyContact, {
     foreignKey: 'userId',
-    as: 'currentProfileImage',
-    scope: {
-      isActive: true
-    }
+    as: 'emergencyContacts',
+    onDelete: 'CASCADE'
+  });
+
+  // Owned Gyms (Owner role)
+  User.hasMany(models.Gym, {
+    foreignKey: 'ownerId',
+    as: 'ownedGyms',
+    onDelete: 'CASCADE'
+  });
+
+  // User Subscriptions
+  User.hasMany(models.UserSubscription, {
+    foreignKey: 'userId',
+    as: 'subscriptions',
+    onDelete: 'CASCADE'
+  });
+
+  // Attendances
+  User.hasMany(models.Attendance, {
+    foreignKey: 'userId',
+    as: 'attendances',
+    onDelete: 'CASCADE'
+  });
+
+  // Payments
+  User.hasMany(models.Payment, {
+    foreignKey: 'userId',
+    as: 'payments',
+    onDelete: 'CASCADE'
+  });
+
+  // Notifications
+  User.hasMany(models.Notification, {
+    foreignKey: 'userId',
+    as: 'notifications',
+    onDelete: 'CASCADE'
+  });
+
+  // Push Subscriptions
+  User.hasMany(models.PushSubscription, {
+    foreignKey: 'userId',
+    as: 'pushSubscriptions',
+    onDelete: 'CASCADE'
+  });
+
+  // Fitness Goals (Many-to-Many)
+  User.belongsToMany(models.FitnessGoal, {
+    through: models.UserFitnessGoal,
+    foreignKey: 'userId',
+    otherKey: 'goalId',
+    as: 'fitnessGoals'
   });
 };
 
 // Class methods
 User.findByEmail = async function(email) {
-  return await this.findOne({ where: { email, activeStatus: '1' } });
+  return await this.findOne({ where: { email } });
 };
 
 User.findByUsername = async function(username) {
-  return await this.findOne({ where: { username, activeStatus: '1' } });
+  return await this.findOne({ where: { username } });
+};
+
+User.findByPhone = async function(phone) {
+  return await this.findOne({ where: { phone } });
 };
 
 User.findAllWithPagination = async function(limit = 50, offset = 0) {
   return await this.findAndCountAll({
     limit,
     offset,
-    order: [['createTimestamp', 'DESC']],
-    attributes: { exclude: ['password'] },
+    order: [['createdAt', 'DESC']],
+    attributes: { exclude: ['password'] }
   });
 };
 

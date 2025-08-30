@@ -3,21 +3,21 @@ const { sequelize } = require('../config/database');
 
 const UserFitnessGoal = sequelize.define('UserFitnessGoal', {
   id: {
-    type: DataTypes.INTEGER,
+    type: DataTypes.BIGINT,
     primaryKey: true,
     autoIncrement: true
   },
-  userEmail: {
-    type: DataTypes.STRING(100),
+  userId: {
+    type: DataTypes.BIGINT,
     allowNull: false,
-    field: 'user_email',
+    field: 'user_id',
     references: {
       model: 'users',
-      key: 'email'
+      key: 'id'
     }
   },
   goalId: {
-    type: DataTypes.INTEGER,
+    type: DataTypes.BIGINT,
     allowNull: false,
     field: 'goal_id',
     references: {
@@ -27,34 +27,43 @@ const UserFitnessGoal = sequelize.define('UserFitnessGoal', {
   },
   priority: {
     type: DataTypes.INTEGER,
-    allowNull: false,
-    defaultValue: 1,
-    comment: '1=High, 2=Medium, 3=Low',
-    validate: {
-      min: 1,
-      max: 3
-    }
+    allowNull: true,
+    defaultValue: 0
   },
   targetDate: {
-    type: DataTypes.DATE,
+    type: DataTypes.DATEONLY,
     allowNull: true,
-    field: 'target_date',
-    comment: 'Target date to achieve this fitness goal'
+    field: 'target_date'
   },
-  createTimestamp: {
-    type: DataTypes.DATE,
+  recordStatus: {
+    type: DataTypes.TINYINT(1),
     allowNull: false,
-    defaultValue: DataTypes.NOW,
-    field: 'create_timestamp'
+    defaultValue: 1,
+    field: 'record_status',
+    comment: '1=active, 0=inactive'
+  },
+  createdBy: {
+    type: DataTypes.BIGINT,
+    allowNull: true,
+    field: 'created_by',
+    comment: 'User ID who created this record'
+  },
+  updatedBy: {
+    type: DataTypes.BIGINT,
+    allowNull: true,
+    field: 'updated_by',
+    comment: 'User ID who last updated this record'
   }
 }, {
   tableName: 'user_fitness_goals',
-  timestamps: false,
+  timestamps: true,
+  createdAt: 'created_at',
+  updatedAt: 'updated_at',
   underscored: true,
   indexes: [
     {
       unique: true,
-      fields: ['user_email', 'goal_id']
+      fields: ['user_id', 'goal_id']
     }
   ]
 });
@@ -68,8 +77,7 @@ UserFitnessGoal.prototype.toJSON = function() {
 // Associations
 UserFitnessGoal.associate = function(models) {
   UserFitnessGoal.belongsTo(models.User, {
-    foreignKey: 'userEmail',
-    targetKey: 'email',
+    foreignKey: 'userId',
     as: 'user'
   });
   

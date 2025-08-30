@@ -22,6 +22,13 @@ const createSubscription = async (req, res) => {
       return ResponseUtil.notFoundError(res, 'Gym not found');
     }
 
+    // Extract buffer fields from request
+    const {
+      buffer_days = 0,
+      buffer_fee = 0.00,
+      allow_buffer = false
+    } = req.body;
+
     const subscription = await Subscription.create({
       title,
       validityDays,
@@ -30,8 +37,11 @@ const createSubscription = async (req, res) => {
       gymId,
       isMostPopular: isMostPopular || false,
       isCheapest: isCheapest || false,
+      buffer_days,
+      buffer_fee,
+      allow_buffer,
       createdBy,
-      activeStatus: true
+      record_status: 1 // Updated field name
     });
 
     return ResponseUtil.success(res, subscription, 'Subscription created successfully', 201);
@@ -56,7 +66,7 @@ const getAllSubscriptions = async (req, res) => {
     const whereClause = {};
 
     if (activeOnly === 'true') {
-      whereClause.activeStatus = true;
+      whereClause.record_status = 1; // Updated field name
     }
 
     if (gymId) {
@@ -78,13 +88,13 @@ const getAllSubscriptions = async (req, res) => {
         {
           model: SubscriptionFeature,
           as: 'features',
-          where: { activeStatus: true },
+          where: { record_status: 1 }, // Updated field name
           required: false
         }
       ],
       limit: parseInt(limit),
       offset: parseInt(offset),
-      order: [['createTimestamp', 'DESC']]
+      order: [['created_at', 'DESC']] // Updated field name
     });
 
     return ResponseUtil.success(res, {
@@ -110,7 +120,7 @@ const getSubscriptionsByGym = async (req, res) => {
 
     const whereClause = { gymId };
     if (activeOnly === 'true') {
-      whereClause.activeStatus = true;
+      whereClause.record_status = 1; // Updated field name
     }
 
     const subscriptions = await Subscription.findAll({
@@ -124,11 +134,11 @@ const getSubscriptionsByGym = async (req, res) => {
         {
           model: SubscriptionFeature,
           as: 'features',
-          where: { activeStatus: true },
+          where: { record_status: 1 }, // Updated field name
           required: false
         }
       ],
-      order: [['createTimestamp', 'DESC']]
+      order: [['created_at', 'DESC']] // Updated field name
     });
 
     return ResponseUtil.success(res, subscriptions, 'Subscriptions retrieved successfully');
@@ -153,7 +163,7 @@ const getSubscriptionById = async (req, res) => {
         {
           model: SubscriptionFeature,
           as: 'features',
-          where: { activeStatus: true },
+          where: { record_status: 1 }, // Updated field name
           required: false
         }
       ]
@@ -189,7 +199,14 @@ const updateSubscription = async (req, res) => {
       return ResponseUtil.notFoundError(res, 'Subscription not found');
     }
 
-    await subscription.update({
+    // Extract buffer fields from request
+    const {
+      buffer_days,
+      buffer_fee,
+      allow_buffer
+    } = req.body;
+
+    const updateData = {
       title,
       validityDays,
       price,
@@ -197,8 +214,15 @@ const updateSubscription = async (req, res) => {
       isMostPopular,
       isCheapest,
       updatedBy,
-      updateTimestamp: new Date()
-    });
+      updated_at: new Date() // Updated field name
+    };
+
+    // Add buffer fields if they are provided
+    if (buffer_days !== undefined) updateData.buffer_days = buffer_days;
+    if (buffer_fee !== undefined) updateData.buffer_fee = buffer_fee;
+    if (allow_buffer !== undefined) updateData.allow_buffer = allow_buffer;
+
+    await subscription.update(updateData);
 
     const updatedSubscription = await Subscription.findByPk(id, {
       include: [
@@ -210,7 +234,7 @@ const updateSubscription = async (req, res) => {
         {
           model: SubscriptionFeature,
           as: 'features',
-          where: { activeStatus: true },
+          where: { record_status: 1 }, // Updated field name
           required: false
         }
       ]
@@ -235,9 +259,9 @@ const deleteSubscription = async (req, res) => {
     }
 
     await subscription.update({
-      activeStatus: false,
+      record_status: 0, // Updated field name for soft delete
       updatedBy,
-      updateTimestamp: new Date()
+      updated_at: new Date() // Updated field name
     });
 
     return ResponseUtil.success(res, null, 'Subscription deleted successfully');

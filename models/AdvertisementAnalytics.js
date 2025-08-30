@@ -9,7 +9,7 @@ const AdvertisementAnalytics = sequelize.define('AdvertisementAnalytics', {
     defaultValue: () => `ANALYTICS${Date.now()}${Math.floor(Math.random() * 1000)}`,
   },
   advertisementId: {
-    type: DataTypes.STRING(50),
+    type: DataTypes.BIGINT,
     allowNull: false,
     field: 'advertisement_id',
     references: {
@@ -87,10 +87,43 @@ const AdvertisementAnalytics = sequelize.define('AdvertisementAnalytics', {
     defaultValue: DataTypes.NOW,
     allowNull: false,
     field: 'event_timestamp'
+  },
+  createdBy: {
+    type: DataTypes.BIGINT,
+    allowNull: true,
+    field: 'created_by',
+    comment: 'User ID who created this record'
+  },
+  updatedBy: {
+    type: DataTypes.BIGINT,
+    allowNull: true,
+    field: 'updated_by',
+    comment: 'User ID who last updated this record'
+  },
+  recordStatus: {
+    type: DataTypes.TINYINT(1),
+    allowNull: false,
+    defaultValue: 1,
+    field: 'record_status',
+    comment: '1=active, 0=inactive'
+  },
+  createdBy: {
+    type: DataTypes.BIGINT,
+    allowNull: true,
+    field: 'created_by',
+    comment: 'User ID who created this record'
+  },
+  updatedBy: {
+    type: DataTypes.BIGINT,
+    allowNull: true,
+    field: 'updated_by',
+    comment: 'User ID who last updated this record'
   }
 }, {
   tableName: 'advertisement_analytics',
-  timestamps: false,
+  timestamps: true,
+  createdAt: 'created_at',
+  updatedAt: 'updated_at',
   indexes: [
     {
       fields: ['advertisement_id']

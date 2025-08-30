@@ -16,6 +16,45 @@ class JWTUtils {
     return crypto.randomBytes(64).toString('hex');
   }
 
+  // Create refresh token in database
+  static async createRefreshToken(userId, deviceInfo = null, ipAddress = null, userAgent = null) {
+    const RefreshToken = require('../models/RefreshToken');
+    
+    // Clean up any existing expired tokens for this user
+    await RefreshToken.destroy({
+      where: {
+        userId,
+        expiresAt: {
+          [require('sequelize').Op.lt]: new Date()
+        }
+      }
+    });
+
+    // Optionally revoke existing valid tokens (for single session per user)
+    // Uncomment if you want only one active session per user:
+    // await RefreshToken.revokeAllUserTokens(userId);
+
+    const token = this.generateRefreshToken();
+    const expiresAt = this.getRefreshTokenExpiration();
+
+    const refreshToken = await RefreshToken.create({
+      token,
+      userId,
+      expiresAt,
+      deviceInfo: deviceInfo ? JSON.stringify(deviceInfo) : null,
+      ipAddress,
+      userAgent
+    });
+
+    return refreshToken.token;
+  }
+
+  // Validate refresh token
+  static async validateRefreshToken(token) {
+    const RefreshToken = require('../models/RefreshToken');
+    return await RefreshToken.findValidToken(token);
+  }
+
   // Verify access token
   static verifyAccessToken(token) {
     try {

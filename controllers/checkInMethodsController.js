@@ -14,7 +14,7 @@ const getGymCheckInMethods = async (req, res) => {
   try {
     const { gymId } = req.params;
     const userEmail = req.user.email;
-    const userType = req.user.type;
+    const userRole = req.user.role; // Updated to use role field
 
     // Verify gym exists and user has permission
     const gym = await Gym.findByPk(gymId);
@@ -22,8 +22,8 @@ const getGymCheckInMethods = async (req, res) => {
       return ResponseUtil.notFoundError(res, 'Gym not found');
     }
 
-    // Authorization check
-    if (userType !== '3' && gym.ownerId !== userEmail) {
+    // Authorization check - updated to use role and owner_id
+    if (userRole !== 4 && gym.owner_id !== req.user.id) { // Updated role value and owner_id field
       return ResponseUtil.forbiddenError(res, 'You are not authorized to view check-in methods for this gym');
     }
 
@@ -102,7 +102,7 @@ const updateGymCheckInMethods = async (req, res) => {
       notifications
     } = req.body;
     const userEmail = req.user.email;
-    const userType = req.user.type;
+    const userRole = req.user.role; // Updated to use role field
     const userId = req.user.id;
 
     // Verify gym exists and user has permission
@@ -112,8 +112,8 @@ const updateGymCheckInMethods = async (req, res) => {
       return ResponseUtil.notFoundError(res, 'Gym not found');
     }
 
-    // Authorization check
-    if (userType !== '3' && gym.ownerId !== userEmail) {
+    // Authorization check - updated to use role and owner_id
+    if (userRole !== 4 && gym.owner_id !== req.user.id) { // Updated role value and owner_id field
       await transaction.rollback();
       return ResponseUtil.forbiddenError(res, 'You are not authorized to update check-in methods for this gym');
     }
@@ -282,7 +282,7 @@ const resetGymCheckInMethods = async (req, res) => {
   try {
     const { gymId } = req.params;
     const userEmail = req.user.email;
-    const userType = req.user.type;
+    const userRole = req.user.role; // Updated to use role field
     const userId = req.user.id;
 
     // Verify gym exists and user has permission
@@ -292,8 +292,8 @@ const resetGymCheckInMethods = async (req, res) => {
       return ResponseUtil.notFoundError(res, 'Gym not found');
     }
 
-    // Authorization check
-    if (userType !== '3' && gym.ownerId !== userEmail) {
+    // Authorization check - updated to use role and owner_id
+    if (userRole !== 4 && gym.owner_id !== req.user.id) { // Updated role value and owner_id field
       await transaction.rollback();
       return ResponseUtil.forbiddenError(res, 'You are not authorized to reset check-in methods for this gym');
     }
@@ -364,7 +364,7 @@ const validateCheckInConfiguration = async (req, res) => {
   try {
     const { gymId } = req.params;
     const userEmail = req.user.email;
-    const userType = req.user.type;
+    const userRole = req.user.role; // Updated to use role field
 
     // Verify gym exists and user has permission
     const gym = await Gym.findByPk(gymId);
@@ -372,8 +372,8 @@ const validateCheckInConfiguration = async (req, res) => {
       return ResponseUtil.notFoundError(res, 'Gym not found');
     }
 
-    // Authorization check
-    if (userType !== '3' && gym.ownerId !== userEmail) {
+    // Authorization check - updated to use role and owner_id
+    if (userRole !== 4 && gym.owner_id !== req.user.id) { // Updated role value and owner_id field
       return ResponseUtil.forbiddenError(res, 'You are not authorized to validate check-in configuration for this gym');
     }
 

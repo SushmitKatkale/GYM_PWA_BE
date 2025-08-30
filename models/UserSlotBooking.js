@@ -3,140 +3,134 @@ const { sequelize } = require('../config/database');
 
 const UserSlotBooking = sequelize.define('UserSlotBooking', {
   id: {
-    type: DataTypes.INTEGER,
+    type: DataTypes.BIGINT,
     primaryKey: true,
     autoIncrement: true
   },
-  userEmail: {
-    type: DataTypes.STRING(255),
+  userId: {
+    type: DataTypes.BIGINT,
     allowNull: false,
-    validate: {
-      isEmail: true
-    },
-    field: 'user_email'
-  },
-  userSubscriptionId: {
-    type: DataTypes.INTEGER,
-    allowNull: false,
+    field: 'user_id',
     references: {
-      model: 'user_subscriptions',
+      model: 'users',
       key: 'id'
-    },
-    field: 'user_subscription_id'
+    }
   },
-  gymSlotId: {
-    type: DataTypes.INTEGER,
+  slotId: {
+    type: DataTypes.BIGINT,
     allowNull: false,
+    field: 'slot_id',
     references: {
       model: 'gym_slots',
       key: 'id'
-    },
-    field: 'gym_slot_id'
+    }
+  },
+  bookingStatus: {
+    type: DataTypes.TINYINT,
+    allowNull: false,
+    defaultValue: 1,
+    field: 'booking_status',
+    comment: '1=booked, 0=cancelled'
   },
   bookingDate: {
     type: DataTypes.DATEONLY,
     allowNull: false,
-    validate: {
-      isDate: true
-    },
     field: 'booking_date'
   },
-  bookingStatus: {
-    type: DataTypes.ENUM('active', 'cancelled', 'completed', 'no_show', 'checked_in'),
+  recordStatus: {
+    type: DataTypes.TINYINT(1),
     allowNull: false,
-    defaultValue: 'active',
-    field: 'booking_status'
-  },
-  bookingType: {
-    type: DataTypes.ENUM('regular', 'one_time_change', 'temporary'),
-    allowNull: false,
-    defaultValue: 'regular',
-    field: 'booking_type'
-  },
-  checkinTime: {
-    type: DataTypes.DATE,
-    allowNull: true,
-    field: 'checkin_time'
-  },
-  checkoutTime: {
-    type: DataTypes.DATE,
-    allowNull: true,
-    field: 'checkout_time'
-  },
-  bookingNotes: {
-    type: DataTypes.TEXT,
-    allowNull: true,
-    field: 'booking_notes'
-  },
-  cancelReason: {
-    type: DataTypes.TEXT,
-    allowNull: true,
-    field: 'cancel_reason'
-  },
-  cancelledAt: {
-    type: DataTypes.DATE,
-    allowNull: true,
-    field: 'cancelled_at'
-  },
-  activeStatus: {
-    type: DataTypes.BOOLEAN,
-    allowNull: false,
-    defaultValue: true,
-    field: 'active_status'
-  },
-  createTimestamp: {
-    type: DataTypes.DATE,
-    allowNull: false,
-    defaultValue: DataTypes.NOW,
-    field: 'create_timestamp'
+    defaultValue: 1,
+    field: 'record_status',
+    comment: '1=active, 0=inactive'
   },
   createdBy: {
-    type: DataTypes.STRING(100),
+    type: DataTypes.BIGINT,
     allowNull: true,
-    field: 'created_by'
-  },
-  updateTimestamp: {
-    type: DataTypes.DATE,
-    allowNull: false,
-    defaultValue: DataTypes.NOW,
-    field: 'update_timestamp'
+    field: 'created_by',
+    comment: 'User ID who created this record'
   },
   updatedBy: {
-    type: DataTypes.STRING(100),
+    type: DataTypes.BIGINT,
     allowNull: true,
-    field: 'updated_by'
+    field: 'updated_by',
+    comment: 'User ID who last updated this record'
   }
 }, {
   tableName: 'user_slot_bookings',
-  timestamps: false,
+  timestamps: true,
+  createdAt: 'created_at',
+  updatedAt: 'updated_at',
+  underscored: true,
   indexes: [
     {
-      fields: ['user_email']
-    },
-    {
-      fields: ['user_subscription_id']
-    },
-    {
-      fields: ['gym_slot_id']
-    },
-    {
-      fields: ['booking_date']
-    },
-    {
-      fields: ['booking_status']
-    },
-    {
-      fields: ['gym_slot_id', 'booking_date']
-    },
-    {
-      fields: ['user_email', 'booking_date']
+      unique: true,
+      fields: ['user_id', 'slot_id', 'booking_date'],
+      name: 'unique_user_slot_booking_date'
     }
-  ],
-  hooks: {
-    beforeUpdate: (userSlotBooking) => {
-      userSlotBooking.updateTimestamp = new Date();
-    }
-  }
+  ]
 });
+
+// Instance methods
+UserSlotBooking.prototype.isActive = function() {
+  return this.bookingStatus === 1 && this.recordStatus === 1;
+};
+
+UserSlotBooking.prototype.isCancelled = function() {
+  return this.bookingStatus === 0;
+};
+
+UserSlotBooking.prototype.cancel = function() {
+  this.bookingStatus = 0;
+  return this.save();
+};
+
+UserSlotBooking.prototype.reactivate = function() {
+  this.bookingStatus = 1;
+  return this.save();
+};
+
+// Static methods
+UserSlotBooking.getUserBookingsForDate = async function(userId, date) {
+  return await this.findAll({
+    where: {
+      userId: userId,
+      bookingDate: date,
+      recordStatus: 1
+    },
+    include: [
+      {
+        association: 'slot',
+        include: ['gym']
+      }
+    ],
+    order: [['slot', 'start_time', 'ASC']]
+  });
+};
+
+UserSlotBooking.getSlotBookingsCount = async function(slotId, date) {
+  return await this.count({
+    where: {
+      slotId: slotId,
+      bookingDate: date,
+      bookingStatus: 1,
+      recordStatus: 1
+    }
+  });
+};
+
+UserSlotBooking.isUserBookedForSlot = async function(userId, slotId, date) {
+  const booking = await this.findOne({
+    where: {
+      userId: userId,
+      slotId: slotId,
+      bookingDate: date,
+      bookingStatus: 1,
+      recordStatus: 1
+    }
+  });
+  
+  return booking !== null;
+};
 
 module.exports = UserSlotBooking;

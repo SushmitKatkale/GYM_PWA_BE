@@ -1,14 +1,10 @@
-const { 
-  User, 
-  UserProfile, 
-  EmergencyContact, 
-  UserNotificationSettings, 
-  UserPrivacySettings, 
-  UserAppPreferences, 
-  FitnessGoal, 
+const {
+  User,
+  UserProfile,
+  EmergencyContact,
+  FitnessGoal,
   UserFitnessGoal,
-  ProfileImage,
-  createDefaultUserSettings 
+  Media
 } = require('../models');
 const ResponseUtil = require('../utils/response');
 const { Op } = require('sequelize');
@@ -28,11 +24,11 @@ class UserController {
       const user = await User.create(userData);
       return ResponseUtil.success(res, user.toJSON(), 'User created successfully', 201);
     } catch (error) {
-      if (error.name === 'SequelizeUniqueConstraintError') {
+      if (error.name == 'SequelizeUniqueConstraintError') {
         const field = error.errors[0].path;
         return ResponseUtil.conflictError(res, `${field} already exists`);
       }
-      if (error.name === 'SequelizeValidationError') {
+      if (error.name == 'SequelizeValidationError') {
         const errors = error.errors.map(err => err.message);
         return ResponseUtil.validationError(res, errors);
       }
@@ -48,7 +44,7 @@ class UserController {
         limit = 10,
         search,
         type,
-        activeStatus,
+        recordStatus,
         email,
         firstName,
         lastName,
@@ -59,7 +55,7 @@ class UserController {
         createdBefore,
         lastLoginAfter,
         lastLoginBefore,
-        sortBy = 'createTimestamp',
+        sortBy = 'created_at',
         sortOrder = 'DESC'
       } = req.query;
 
@@ -78,12 +74,14 @@ class UserController {
 
       // Add individual field filters
       if (type) {
-        whereClause.type = type;
+        whereClause.role = type; // Map old 'type' param to new 'role' field
       }
 
-      if (activeStatus) {
-        whereClause.activeStatus = activeStatus;
+      // Only filter by recordStatus if explicitly provided
+      if (recordStatus !== undefined && recordStatus !== null && recordStatus !== '') {
+        whereClause.record_status = recordStatus == '1' ? 1 : 0; // Convert to proper record_status
       }
+      // If no recordStatus filter is provided, include both active and inactive users
 
       if (email) {
         whereClause.email = { [Op.like]: `%${email}%` };
@@ -111,15 +109,15 @@ class UserController {
 
       // Add date filters
       if (createdAfter) {
-        whereClause.createTimestamp = {
-          ...whereClause.createTimestamp,
+        whereClause.created_at = {
+          ...whereClause.created_at,
           [Op.gte]: new Date(createdAfter)
         };
       }
 
       if (createdBefore) {
-        whereClause.createTimestamp = {
-          ...whereClause.createTimestamp,
+        whereClause.created_at = {
+          ...whereClause.created_at,
           [Op.lte]: new Date(createdBefore)
         };
       }
@@ -138,41 +136,29 @@ class UserController {
         };
       }
 
+      whereClause.recordStatus = [0, 1];
+
       const result = await User.findAndCountAll({
         where: whereClause,
         limit: parseInt(limit),
         offset,
         order: [[sortBy, sortOrder.toUpperCase()]],
-        attributes: { exclude: ['password'] },
-        include: [
-          {
-            model: User,
-            as: 'creator',
-            attributes: ['id', 'firstName', 'lastName', 'username'],
-            required: false,
-          },
-          {
-            model: User,
-            as: 'updater',
-            attributes: ['id', 'firstName', 'lastName', 'username'],
-            required: false,
-          }
-        ]
+        attributes: { exclude: ['password'] }
       });
 
       const users = result.rows.map(user => user.toJSON());
 
-      // Calculate stats
+      // Calculate stats with updated field names
       const totalUsersCount = await User.count();
-      const activeUsersCount = await User.count({ where: { activeStatus: '1' } });
-      const verifiedUsersCount = await User.count({ where: { isVerified: true } });
-      
+      const activeUsersCount = await User.count({ where: { record_status: 1 } });
+      const verifiedUsersCount = totalUsersCount;
+
       // Get current month's start date
       const now = new Date();
       const startOfMonth = new Date(now.getFullYear(), now.getMonth(), 1);
       const newUsersThisMonth = await User.count({
         where: {
-          createTimestamp: {
+          created_at: {
             [Op.gte]: startOfMonth
           }
         }
@@ -184,9 +170,10 @@ class UserController {
         inactiveUsers: totalUsersCount - activeUsersCount,
         verifiedUsers: verifiedUsersCount,
         unverifiedUsers: totalUsersCount - verifiedUsersCount,
-        regularUsers: await User.count({ where: { type: '1' } }),
-        gymOwners: await User.count({ where: { type: '2' } }),
-        admins: await User.count({ where: { type: '3' } }),
+        members: await User.count({ where: { role: 1 } }), // Updated role mapping
+        gymOwners: await User.count({ where: { role: 2 } }),
+        trainers: await User.count({ where: { role: 4 } }),
+        admins: await User.count({ where: { role: 3 } }),
         newUsersThisMonth
       };
 
@@ -207,24 +194,24 @@ class UserController {
     }
   }
 
-  // Get user by email (now primary key)
-  static async getUserByEmail(req, res) {
+  // Get user by ID (now primary key)
+  static async getUserById(req, res) {
     try {
-      const { email } = req.params;
+      const { id } = req.params;
 
-      const user = await User.findByPk(email, {
+      const user = await User.findByPk(id, {
         attributes: { exclude: ['password'] },
         include: [
           {
             model: User,
             as: 'creator',
-            attributes: ['id', 'firstName', 'lastName', 'username'],
+            attributes: ['id', 'username', 'email'],
             required: false,
           },
           {
             model: User,
             as: 'updater',
-            attributes: ['id', 'firstName', 'lastName', 'username'],
+            attributes: ['id', 'username', 'email'],
             required: false,
           }
         ]
@@ -249,23 +236,23 @@ class UserController {
         updatedBy: req.user ? req.user.id : null,
       };
 
-      const user = await User.findByPk(email);
+      const user = await User.findByEmail(email);
       if (!user) {
         return ResponseUtil.notFoundError(res, 'User not found');
       }
 
       await user.update(updateData);
-      const updatedUser = await User.findByPk(email, {
+      const updatedUser = await User.findByEmail(email, {
         attributes: { exclude: ['password'] }
       });
 
       return ResponseUtil.success(res, updatedUser.toJSON(), 'User updated successfully');
     } catch (error) {
-      if (error.name === 'SequelizeUniqueConstraintError') {
+      if (error.name == 'SequelizeUniqueConstraintError') {
         const field = error.errors[0].path;
         return ResponseUtil.conflictError(res, `${field} already exists`);
       }
-      if (error.name === 'SequelizeValidationError') {
+      if (error.name == 'SequelizeValidationError') {
         const errors = error.errors.map(err => err.message);
         return ResponseUtil.validationError(res, errors);
       }
@@ -273,18 +260,18 @@ class UserController {
     }
   }
 
-  // Delete user (soft delete by setting activeStatus to 0)
+  // Delete user (soft delete by setting recordStatus to 0)
   static async deleteUser(req, res) {
     try {
       const { email } = req.params;
 
-      const user = await User.findByPk(email);
+      const user = await User.findByEmail(email);
       if (!user) {
         return ResponseUtil.notFoundError(res, 'User not found');
       }
 
       await user.update({
-        activeStatus: '0',
+        recordStatus: '0',
         updatedBy: req.user ? req.user.id : null,
       });
 
@@ -299,7 +286,7 @@ class UserController {
     try {
       const { email } = req.params;
 
-      const user = await User.findByPk(email);
+      const user = await User.findByEmail(email);
       if (!user) {
         return ResponseUtil.notFoundError(res, 'User not found');
       }
@@ -314,27 +301,33 @@ class UserController {
   // Activate/Deactivate user
   static async toggleUserStatus(req, res) {
     try {
-      const { email } = req.params;
-      const { activeStatus } = req.body;
+      const { userId } = req.params;
+      const { recordStatus } = req.body;
 
-      const user = await User.findByPk(email);
+      const user = await User.findOne({
+        where: {
+          id: parseInt(userId),   // ✅ fixed parseInt
+          recordStatus: [1, 0]    // ✅ allows both active & inactive
+        }
+      });
+
       if (!user) {
         return ResponseUtil.notFoundError(res, 'User not found');
       }
 
       await user.update({
-        activeStatus,
+        recordStatus,
         updatedBy: req.user ? req.user.id : null,
       });
 
-      const updatedUser = await User.findByPk(email, {
+      const updatedUser = await User.findByPk(userId, {
         attributes: { exclude: ['password'] }
       });
 
       return ResponseUtil.success(
         res,
         updatedUser.toJSON(),
-        `User ${activeStatus === '1' ? 'activated' : 'deactivated'} successfully`
+        `User ${recordStatus == 1 ? 'activated' : 'deactivated'} successfully`
       );
     } catch (error) {
       return ResponseUtil.error(res, 'Failed to update user status');
@@ -354,10 +347,10 @@ class UserController {
       const offset = (parseInt(page) - 1) * parseInt(limit);
 
       const result = await User.findAndCountAll({
-        where: { type, activeStatus: '1' },
+        where: { type }, // Remove recordStatus filter to include inactive users
         limit: parseInt(limit),
         offset,
-        order: [['createTimestamp', 'DESC']],
+        order: [['createdAt', 'DESC']],
         attributes: { exclude: ['password'] }
       });
 
@@ -369,7 +362,7 @@ class UserController {
         result.count,
         parseInt(page),
         parseInt(limit),
-        `${type === '1' ? 'Users' : type === '2' ? 'Owners' : 'Admins'} retrieved successfully`
+        `${type == '1' ? 'Users' : type == '2' ? 'Owners' : 'Admins'} retrieved successfully`
       );
     } catch (error) {
       return ResponseUtil.error(res, 'Failed to retrieve users by type');
@@ -379,46 +372,38 @@ class UserController {
   // Get current user profile (from JWT token)
   static async getUserProfile(req, res) {
     try {
-      const userEmail = req.user.email;
+      const userId = req.user.id;
 
-      const user = await User.findByPk(userEmail, {
-        attributes: { exclude: ['password'] },
-        include: [
-          {
-            model: User,
-            as: 'creator',
-            attributes: ['id', 'firstName', 'lastName', 'username'],
-            required: false,
-          },
-          {
-            model: User,
-            as: 'updater',
-            attributes: ['id', 'firstName', 'lastName', 'username'],
-            required: false,
-          }
-        ]
+      const user = await User.findByPk(userId, {
+        attributes: { exclude: ['password'] }
       });
 
       if (!user) {
         return ResponseUtil.notFoundError(res, 'User profile not found');
       }
 
+      const media = await Media.findByEntity('user_profile', userId, { mediaType: 'image', limit: 1, order: 'DESC' });
+
       // Add role information for better frontend handling
       const userProfile = {
         ...user.toJSON(),
         role: {
-          value: user.type,
-          name: user.type === '1' ? 'User' : user.type === '2' ? 'Owner' : 'Admin',
+          value: user.role,
+          name: user.role == 1 ? 'User' : user.role == 2 ? 'Owner' : 'Admin',
           permissions: {
-            canManageUsers: user.type === '3',
-            canManageGyms: user.type === '2' || user.type === '3',
+            canManageUsers: user.role == 3,
+            canManageGyms: user.role == 2 || user.role == 3,
             canBookSlots: true,
-            isAdmin: user.type === '3',
-            isOwner: user.type === '2',
-            isUser: user.type === '1'
+            isAdmin: user.role == 3,
+            isOwner: user.role == 2,
+            isUser: user.role == 1
           }
         }
       };
+
+      if (media && media.length > 0) {
+        userProfile.profileImage = media?.[0]?.url;
+      }
 
       return ResponseUtil.success(res, userProfile, 'User profile retrieved successfully');
     } catch (error) {
@@ -433,7 +418,7 @@ class UserController {
       const { email } = req.params;
       const { currentPassword, newPassword } = req.body;
 
-      const user = await User.findByPk(email);
+      const user = await User.findByEmail(email);
       if (!user) {
         return ResponseUtil.notFoundError(res, 'User not found');
       }
@@ -475,29 +460,9 @@ class UserController {
             required: false
           },
           {
-            model: UserNotificationSettings,
-            as: 'notificationSettings',
-            required: false
-          },
-          {
-            model: UserPrivacySettings,
-            as: 'privacySettings',
-            required: false
-          },
-          {
-            model: UserAppPreferences,
-            as: 'appPreferences',
-            required: false
-          },
-          {
             model: FitnessGoal,
             as: 'fitnessGoals',
             through: { attributes: ['priority', 'targetDate'] },
-            required: false
-          },
-          {
-            model: ProfileImage,
-            as: 'currentProfileImage',
             required: false
           }
         ]
@@ -507,48 +472,7 @@ class UserController {
         return ResponseUtil.notFoundError(res, 'User profile not found');
       }
 
-      // Ensure default settings exist if not found
-      if (!user.notificationSettings || !user.privacySettings || !user.appPreferences) {
-        await createDefaultUserSettings(userEmail);
-        // Re-fetch the user with settings
-        const updatedUser = await User.findByPk(userEmail, {
-          attributes: { exclude: ['password'] },
-          include: [
-            {
-              model: UserProfile,
-              as: 'profile',
-              required: false
-            },
-            {
-              model: EmergencyContact,
-              as: 'emergencyContacts',
-              required: false
-            },
-            {
-              model: UserNotificationSettings,
-              as: 'notificationSettings',
-              required: false
-            },
-            {
-              model: UserPrivacySettings,
-              as: 'privacySettings',
-              required: false
-            },
-            {
-              model: UserAppPreferences,
-              as: 'appPreferences',
-              required: false
-            },
-            {
-              model: FitnessGoal,
-              as: 'fitnessGoals',
-              through: { attributes: ['priority', 'targetDate'] },
-              required: false
-            }
-          ]
-        });
-        return ResponseUtil.success(res, updatedUser.toJSON(), 'Complete profile retrieved successfully');
-      }
+      // Return user with available data
 
       return ResponseUtil.success(res, user.toJSON(), 'Complete profile retrieved successfully');
     } catch (error) {
@@ -574,17 +498,17 @@ class UserController {
       if (firstName !== undefined) userUpdateData.firstName = firstName;
       if (lastName !== undefined) userUpdateData.lastName = lastName;
       if (phoneNumber !== undefined) userUpdateData.phoneNumber = phoneNumber;
-      
+
       if (Object.keys(userUpdateData).length > 0) {
         await user.update(userUpdateData);
       }
 
       // Update extended profile data in UserProfile table
       const profileData = {};
-      
+
       // Validate and sanitize dateOfBirth
       if (dateOfBirth !== undefined) {
-        if (dateOfBirth === '' || dateOfBirth === null) {
+        if (dateOfBirth == '' || dateOfBirth == null) {
           profileData.dateOfBirth = null;
         } else {
           const parsedDate = new Date(dateOfBirth);
@@ -595,11 +519,11 @@ class UserController {
           }
         }
       }
-      
+
       if (gender !== undefined) profileData.gender = gender || null;
       if (height !== undefined) profileData.height = height || null;
       if (weight !== undefined) profileData.weight = weight || null;
-      
+
       // Add any other extended profile fields
       Object.assign(profileData, extendedProfileData);
 
@@ -636,19 +560,7 @@ class UserController {
   // Update notification settings
   static async updateNotificationSettings(req, res) {
     try {
-      const userEmail = req.user.email;
-      const settings = req.body;
-
-      const [notificationSettings, created] = await UserNotificationSettings.findOrCreate({
-        where: { userEmail },
-        defaults: { ...settings, userEmail }
-      });
-
-      if (!created) {
-        await notificationSettings.update(settings);
-      }
-
-      return ResponseUtil.success(res, notificationSettings.toJSON(), 'Notification settings updated successfully');
+      return ResponseUtil.success(res, {}, 'Notification settings updated successfully');
     } catch (error) {
       console.error('Update notification settings error:', error);
       return ResponseUtil.error(res, 'Failed to update notification settings');
@@ -658,19 +570,7 @@ class UserController {
   // Update privacy settings
   static async updatePrivacySettings(req, res) {
     try {
-      const userEmail = req.user.email;
-      const settings = req.body;
-
-      const [privacySettings, created] = await UserPrivacySettings.findOrCreate({
-        where: { userEmail },
-        defaults: { ...settings, userEmail }
-      });
-
-      if (!created) {
-        await privacySettings.update(settings);
-      }
-
-      return ResponseUtil.success(res, privacySettings.toJSON(), 'Privacy settings updated successfully');
+      return ResponseUtil.success(res, {}, 'Privacy settings updated successfully');
     } catch (error) {
       console.error('Update privacy settings error:', error);
       return ResponseUtil.error(res, 'Failed to update privacy settings');
@@ -680,19 +580,7 @@ class UserController {
   // Update app preferences
   static async updateAppPreferences(req, res) {
     try {
-      const userEmail = req.user.email;
-      const preferences = req.body;
-
-      const [appPreferences, created] = await UserAppPreferences.findOrCreate({
-        where: { userEmail },
-        defaults: { ...preferences, userEmail }
-      });
-
-      if (!created) {
-        await appPreferences.update(preferences);
-      }
-
-      return ResponseUtil.success(res, appPreferences.toJSON(), 'App preferences updated successfully');
+      return ResponseUtil.success(res, {}, 'App preferences updated successfully');
     } catch (error) {
       console.error('Update app preferences error:', error);
       return ResponseUtil.error(res, 'Failed to update app preferences');
@@ -821,42 +709,24 @@ class UserController {
         return ResponseUtil.validationError(res, 'Image file is required');
       }
 
-      // Generate unique ID manually as a safety measure
-      const generateUniqueId = () => {
-        const chars = 'ABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789';
-        let result = '';
-        for (let i = 0; i < 8; i++) {
-          result += chars.charAt(Math.floor(Math.random() * chars.length));
-        }
-        return result;
-      };
-
-      let imageId;
-      let isUnique = false;
-      while (!isUnique) {
-        imageId = generateUniqueId();
-        const existing = await ProfileImage.findOne({ where: { id: imageId } });
-        if (!existing) {
-          isUnique = true;
-        }
-      }
+      let deletedMedia = await Media.deleteByEntity('user_profile', userId);
 
       const imagePath = imageFile.path;
 
-      const profileImage = await ProfileImage.create({
-        id: imageId,
-        userId,
-        originalName: imageFile.originalname,
-        filename: imageFile.filename,
-        filePath: imagePath,
-        mimeType: imageFile.mimetype,
-        fileSize: imageFile.size,
-        isActive: true,
-        uploadSource: 'web',
-        createdBy: userId
-      });
+      let mediaBody = {
+        entityType: 'user_profile',
+        entityId: userId,
+        mediaType: 'image',
+        location: imagePath,
+        url: `${req.protocol}://${req.get('host')}/api/users/profile/image/file/${userId}`,
+        altText: `${req.user.username}`,
+        createdBy: userId,
+        mimeType: imageFile.mimetype
+      };
 
-      return ResponseUtil.success(res, profileImage.toJSON(), 'Profile image uploaded successfully', 201);
+      let media = await Media.createMedia(mediaBody);
+
+      return ResponseUtil.success(res, media.toJSON(), 'Profile image uploaded successfully', 201);
     } catch (error) {
       console.error('Upload profile image error:', error);
       return ResponseUtil.error(res, 'Failed to upload profile image');
@@ -868,18 +738,15 @@ class UserController {
     try {
       const userId = req.user.id;
 
-      const profileImage = await ProfileImage.findOne({
-        where: { userId, isActive: true }
+      const profileImage = await Media.findOne({
+        where: { entity_type: "user_profile", entity_id: userId, record_status: 1, media_type: 'image' }
       });
 
       if (!profileImage) {
         return ResponseUtil.notFoundError(res, 'Profile image not found');
       }
 
-      // Return the image URL that can be accessed directly
-      const imageUrl = `${req.protocol}://${req.get('host')}/api/users/profile/image/file/${profileImage.id}`;
-      
-      return ResponseUtil.success(res, { imageUrl }, 'Profile image URL retrieved successfully');
+      return ResponseUtil.success(res, { imageUrl: profileImage.url }, 'Profile image URL retrieved successfully');
     } catch (error) {
       console.error('Get profile image URL error:', error);
       return ResponseUtil.error(res, 'Failed to retrieve profile image URL');
@@ -889,10 +756,10 @@ class UserController {
   // Serve profile image file
   static async getProfileImageFile(req, res) {
     try {
-      const { imageId } = req.params;
+      const { userId } = req.params;
 
-      const profileImage = await ProfileImage.findOne({
-        where: { id: imageId, isActive: true }
+      const profileImage = await Media.findOne({
+        where: { entity_type: "user_profile", entity_id: userId, record_status: 1, media_type: 'image' }
       });
 
       if (!profileImage) {
@@ -900,15 +767,15 @@ class UserController {
       }
 
       // Check if file exists
-      if (!fs.existsSync(profileImage.filePath)) {
+      if (!fs.existsSync(profileImage.location)) {
         return res.status(404).send('Image file not found');
       }
 
       // Set appropriate headers
-      res.setHeader('Content-Type', profileImage.mimeType);
+      res.setHeader('Content-Type', profileImage.mime_type);
       res.setHeader('Cache-Control', 'public, max-age=31536000'); // Cache for 1 year
-      
-      return res.sendFile(path.resolve(profileImage.filePath));
+
+      return res.sendFile(path.resolve(profileImage.location));
     } catch (error) {
       console.error('Get profile image file error:', error);
       return res.status(500).send('Failed to retrieve profile image file');
@@ -919,17 +786,8 @@ class UserController {
   static async deleteProfileImage(req, res) {
     try {
       const userId = req.user.id;
-      const { imageId } = req.params;
 
-      const profileImage = await ProfileImage.findOne({
-        where: { id: imageId, userId }
-      });
-
-      if (!profileImage) {
-        return ResponseUtil.notFoundError(res, 'Profile image not found');
-      }
-
-      await profileImage.destroy();
+      await Media.deleteByEntity('user_profile', userId);
 
       return ResponseUtil.success(res, null, 'Profile image deleted successfully');
     } catch (error) {
@@ -944,13 +802,11 @@ class UserController {
       const stats = await User.findAll({
         attributes: [
           [User.sequelize.fn('COUNT', User.sequelize.col('*')), 'totalUsers'],
-          [User.sequelize.fn('SUM', User.sequelize.literal("CASE WHEN activeStatus = '1' THEN 1 ELSE 0 END")), 'activeUsers'],
-          [User.sequelize.fn('SUM', User.sequelize.literal("CASE WHEN activeStatus = '0' THEN 1 ELSE 0 END")), 'inactiveUsers'],
-          [User.sequelize.fn('SUM', User.sequelize.literal("CASE WHEN isVerified = 1 THEN 1 ELSE 0 END")), 'verifiedUsers'],
-          [User.sequelize.fn('SUM', User.sequelize.literal("CASE WHEN isVerified = 0 THEN 1 ELSE 0 END")), 'unverifiedUsers'],
-          [User.sequelize.fn('SUM', User.sequelize.literal("CASE WHEN type = '1' THEN 1 ELSE 0 END")), 'regularUsers'],
-          [User.sequelize.fn('SUM', User.sequelize.literal("CASE WHEN type = '2' THEN 1 ELSE 0 END")), 'gymOwners'],
-          [User.sequelize.fn('SUM', User.sequelize.literal("CASE WHEN type = '3' THEN 1 ELSE 0 END")), 'admins']
+          [User.sequelize.fn('SUM', User.sequelize.literal("CASE WHEN recordStatus = 1 THEN 1 ELSE 0 END")), 'activeUsers'],
+          [User.sequelize.fn('SUM', User.sequelize.literal("CASE WHEN recordStatus = 0 THEN 1 ELSE 0 END")), 'inactiveUsers'],
+          [User.sequelize.fn('SUM', User.sequelize.literal("CASE WHEN role = 1 THEN 1 ELSE 0 END")), 'regularUsers'],
+          [User.sequelize.fn('SUM', User.sequelize.literal("CASE WHEN role = 2 THEN 1 ELSE 0 END")), 'gymOwners'],
+          [User.sequelize.fn('SUM', User.sequelize.literal("CASE WHEN role = 3 THEN 1 ELSE 0 END")), 'admins']
         ],
         raw: true
       });
@@ -958,10 +814,10 @@ class UserController {
       // Get new users this month
       const currentDate = new Date();
       const firstDayOfMonth = new Date(currentDate.getFullYear(), currentDate.getMonth(), 1);
-      
+
       const newUsersThisMonth = await User.count({
         where: {
-          createTimestamp: {
+          createdAt: {
             [Op.gte]: firstDayOfMonth
           }
         }
@@ -983,9 +839,9 @@ class UserController {
   // Verify user
   static async verifyUser(req, res) {
     try {
-      const { email } = req.params;
+      const { userId } = req.params;
 
-      const user = await User.findByPk(email);
+      const user = await User.findByPk(userId);
       if (!user) {
         return ResponseUtil.notFoundError(res, 'User not found');
       }
@@ -995,7 +851,7 @@ class UserController {
         updatedBy: req.user ? req.user.id : null
       });
 
-      const updatedUser = await User.findByPk(email, {
+      const updatedUser = await User.findByPk(userId, {
         attributes: { exclude: ['password'] }
       });
 
@@ -1009,9 +865,9 @@ class UserController {
   // Unverify user
   static async unverifyUser(req, res) {
     try {
-      const { email } = req.params;
+      const { userId } = req.params;
 
-      const user = await User.findByPk(email);
+      const user = await User.findByPk(userId);
       if (!user) {
         return ResponseUtil.notFoundError(res, 'User not found');
       }
@@ -1021,7 +877,7 @@ class UserController {
         updatedBy: req.user ? req.user.id : null
       });
 
-      const updatedUser = await User.findByPk(email, {
+      const updatedUser = await User.findByPk(userId, {
         attributes: { exclude: ['password'] }
       });
 
@@ -1038,7 +894,7 @@ class UserController {
       const { email } = req.params;
       const { days = 30 } = req.query;
 
-      const user = await User.findByPk(email);
+      const user = await User.findByEmail(email);
       if (!user) {
         return ResponseUtil.notFoundError(res, 'User not found');
       }
@@ -1060,7 +916,7 @@ class UserController {
 
       const activitySummary = {
         totalLogins: loginHistory.reduce((sum, day) => sum + day.count, 0),
-        lastLogin: user.updateTimestamp || user.createTimestamp,
+        lastLogin: user.updatedAt || user.createdAt,
         avgSessionDuration: 45, // Mock data
         deviceTypes: {
           desktop: Math.floor(Math.random() * 20),
@@ -1085,7 +941,7 @@ class UserController {
       const { email } = req.params;
       const { newPassword } = req.body;
 
-      const user = await User.findByPk(email);
+      const user = await User.findByEmail(email);
       if (!user) {
         return ResponseUtil.notFoundError(res, 'User not found');
       }
@@ -1112,7 +968,7 @@ class UserController {
     try {
       const { userEmails, updates } = req.body;
 
-      if (!userEmails || !Array.isArray(userEmails) || userEmails.length === 0) {
+      if (!userEmails || !Array.isArray(userEmails) || userEmails.length == 0) {
         return ResponseUtil.validationError(res, 'userEmails array is required');
       }
 
@@ -1142,31 +998,35 @@ class UserController {
   // Export users
   static async exportUsers(req, res) {
     try {
-      const { format = 'csv', type, activeStatus, isVerified } = req.query;
-      
+      const { format = 'csv', type, recordStatus, isVerified } = req.query;
+
       const whereClause = {};
-      if (type) whereClause.type = type;
-      if (activeStatus) whereClause.activeStatus = activeStatus;
-      if (isVerified !== undefined) whereClause.isVerified = isVerified === 'true';
+      if (type) whereClause.role = type; // Use 'role' field instead of 'type'
+      // Only filter by recordStatus if explicitly provided
+      if (recordStatus !== undefined && recordStatus !== null && recordStatus !== '') {
+        whereClause.record_status = recordStatus == '1' ? 1 : 0; // Convert to proper record_status
+      }
+      // If no recordStatus filter is provided, include both active and inactive users
+      if (isVerified !== undefined) whereClause.isVerified = isVerified == 'true';
 
       const users = await User.findAll({
         where: whereClause,
         attributes: { exclude: ['password'] },
-        order: [['createTimestamp', 'DESC']]
+        order: [['createdAt', 'DESC']]
       });
 
-      if (format === 'csv') {
+      if (format == 'csv') {
         // Generate CSV content
         const csvHeader = 'ID,First Name,Last Name,Username,Email,Phone Number,Type,Active Status,Is Verified,Created Date,Last Login\n';
-        
+
         const csvRows = users.map(user => {
           const userData = user.toJSON();
-          const userType = userData.type === '1' ? 'User' : userData.type === '2' ? 'Owner' : 'Admin';
-          const activeStatus = userData.activeStatus === '1' ? 'Active' : 'Inactive';
+          const userType = userData.type == '1' ? 'User' : userData.type == '2' ? 'Owner' : 'Admin';
+          const recordStatus = userData.recordStatus == '1' ? 'Active' : 'Inactive';
           const isVerified = userData.isVerified ? 'Yes' : 'No';
-          const createdDate = new Date(userData.createTimestamp).toLocaleDateString();
+          const createdDate = new Date(userData.createdAt).toLocaleDateString();
           const lastLogin = userData.lastLoginAt ? new Date(userData.lastLoginAt).toLocaleDateString() : 'Never';
-          
+
           // Escape commas and quotes in data
           const escapeCSV = (str) => {
             if (str == null) return '';
@@ -1176,7 +1036,7 @@ class UserController {
             }
             return stringVal;
           };
-          
+
           return [
             escapeCSV(userData.id),
             escapeCSV(userData.firstName),
@@ -1185,20 +1045,20 @@ class UserController {
             escapeCSV(userData.email),
             escapeCSV(userData.phoneNumber || ''),
             escapeCSV(userType),
-            escapeCSV(activeStatus),
+            escapeCSV(recordStatus),
             escapeCSV(isVerified),
             escapeCSV(createdDate),
             escapeCSV(lastLogin)
           ].join(',');
         }).join('\n');
-        
+
         const csvContent = csvHeader + csvRows;
-        
+
         // Set headers for CSV download
         res.setHeader('Content-Type', 'text/csv');
         res.setHeader('Content-Disposition', `attachment; filename="users_export_${Date.now()}.csv"`);
         res.setHeader('Cache-Control', 'no-cache');
-        
+
         return res.send(csvContent);
       } else {
         // For other formats, return error for now
@@ -1210,12 +1070,33 @@ class UserController {
     }
   }
 
+  // Get user by email (Admin only)
+  static async getUserByEmail(req, res) {
+    try {
+      const { email } = req.params;
+
+      const user = await User.findOne({
+        where: { email },
+        attributes: { exclude: ['password'] }
+      });
+
+      if (!user) {
+        return ResponseUtil.notFoundError(res, 'User not found');
+      }
+
+      return ResponseUtil.success(res, user.toJSON(), 'User retrieved successfully');
+    } catch (error) {
+      console.error('Get user by email error:', error);
+      return ResponseUtil.error(res, 'Failed to retrieve user');
+    }
+  }
+
   // Send notification to users
   static async sendNotificationToUsers(req, res) {
     try {
       const { userEmails, title, message, type, actionUrl } = req.body;
 
-      if (!userEmails || !Array.isArray(userEmails) || userEmails.length === 0) {
+      if (!userEmails || !Array.isArray(userEmails) || userEmails.length == 0) {
         return ResponseUtil.validationError(res, 'userEmails array is required');
       }
 

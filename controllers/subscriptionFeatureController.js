@@ -1,5 +1,5 @@
 const { SubscriptionFeature, Subscription, Gym } = require('../models');
-const { successResponse, errorResponse } = require('../utils/response');
+const ResponseUtil = require('../utils/response');
 const { Op } = require('sequelize');
 
 // Create a new subscription feature
@@ -15,7 +15,7 @@ const createSubscriptionFeature = async (req, res) => {
     // Check if subscription exists
     const subscription = await Subscription.findByPk(subscriptionId);
     if (!subscription) {
-      return errorResponse(res, 'Subscription not found', 404);
+      return ResponseUtil.error(res, 'Subscription not found', 404);
     }
 
     const feature = await SubscriptionFeature.create({
@@ -23,13 +23,13 @@ const createSubscriptionFeature = async (req, res) => {
       subscriptionId,
       isHighlighted: isHighlighted || false,
       createdBy,
-      activeStatus: true
+      recordStatus: true
     });
 
-    return successResponse(res, 'Subscription feature created successfully', feature, 201);
+    return ResponseUtil.success(res, 'Subscription feature created successfully', feature, 201);
   } catch (error) {
     console.error('Error creating subscription feature:', error);
-    return errorResponse(res, 'Failed to create subscription feature', 500);
+    return ResponseUtil.error(res, 'Failed to create subscription feature', 500);
   }
 };
 
@@ -48,7 +48,7 @@ const getAllSubscriptionFeatures = async (req, res) => {
     const whereClause = {};
 
     if (activeOnly === 'true') {
-      whereClause.activeStatus = true;
+      whereClause.recordStatus = true;
     }
 
     if (subscriptionId) {
@@ -77,10 +77,10 @@ const getAllSubscriptionFeatures = async (req, res) => {
       ],
       limit: parseInt(limit),
       offset: parseInt(offset),
-      order: [['createTimestamp', 'DESC']]
+      order: [['createdAt', 'DESC']]
     });
 
-    return successResponse(res, 'Subscription features retrieved successfully', {
+    return ResponseUtil.success(res, 'Subscription features retrieved successfully', {
       features: rows,
       pagination: {
         currentPage: parseInt(page),
@@ -91,7 +91,7 @@ const getAllSubscriptionFeatures = async (req, res) => {
     });
   } catch (error) {
     console.error('Error fetching subscription features:', error);
-    return errorResponse(res, 'Failed to fetch subscription features', 500);
+    return ResponseUtil.error(res, 'Failed to fetch subscription features', 500);
   }
 };
 
@@ -103,7 +103,7 @@ const getFeaturesBySubscription = async (req, res) => {
 
     const whereClause = { subscriptionId };
     if (activeOnly === 'true') {
-      whereClause.activeStatus = true;
+      whereClause.recordStatus = true;
     }
 
     const features = await SubscriptionFeature.findAll({
@@ -122,13 +122,13 @@ const getFeaturesBySubscription = async (req, res) => {
           ]
         }
       ],
-      order: [['createTimestamp', 'DESC']]
+      order: [['createdAt', 'DESC']]
     });
 
-    return successResponse(res, 'Subscription features retrieved successfully', features);
+    return ResponseUtil.success(res, 'Subscription features retrieved successfully', features);
   } catch (error) {
     console.error('Error fetching subscription features:', error);
-    return errorResponse(res, 'Failed to fetch subscription features', 500);
+    return ResponseUtil.error(res, 'Failed to fetch subscription features', 500);
   }
 };
 
@@ -155,13 +155,13 @@ const getSubscriptionFeatureById = async (req, res) => {
     });
 
     if (!feature) {
-      return errorResponse(res, 'Subscription feature not found', 404);
+      return ResponseUtil.error(res, 'Subscription feature not found', 404);
     }
 
-    return successResponse(res, 'Subscription feature retrieved successfully', feature);
+    return ResponseUtil.success(res, 'Subscription feature retrieved successfully', feature);
   } catch (error) {
     console.error('Error fetching subscription feature:', error);
-    return errorResponse(res, 'Failed to fetch subscription feature', 500);
+    return ResponseUtil.error(res, 'Failed to fetch subscription feature', 500);
   }
 };
 
@@ -177,14 +177,14 @@ const updateSubscriptionFeature = async (req, res) => {
 
     const feature = await SubscriptionFeature.findByPk(id);
     if (!feature) {
-      return errorResponse(res, 'Subscription feature not found', 404);
+      return ResponseUtil.error(res, 'Subscription feature not found', 404);
     }
 
     await feature.update({
       title,
       isHighlighted,
       updatedBy,
-      updateTimestamp: new Date()
+      updatedAt: new Date()
     });
 
     const updatedFeature = await SubscriptionFeature.findByPk(id, {
@@ -204,10 +204,10 @@ const updateSubscriptionFeature = async (req, res) => {
       ]
     });
 
-    return successResponse(res, 'Subscription feature updated successfully', updatedFeature);
+    return ResponseUtil.success(res, 'Subscription feature updated successfully', updatedFeature);
   } catch (error) {
     console.error('Error updating subscription feature:', error);
-    return errorResponse(res, 'Failed to update subscription feature', 500);
+    return ResponseUtil.error(res, 'Failed to update subscription feature', 500);
   }
 };
 
@@ -219,19 +219,19 @@ const deleteSubscriptionFeature = async (req, res) => {
 
     const feature = await SubscriptionFeature.findByPk(id);
     if (!feature) {
-      return errorResponse(res, 'Subscription feature not found', 404);
+      return ResponseUtil.error(res, 'Subscription feature not found', 404);
     }
 
     await feature.update({
-      activeStatus: false,
+      recordStatus: false,
       updatedBy,
-      updateTimestamp: new Date()
+      updatedAt: new Date()
     });
 
-    return successResponse(res, 'Subscription feature deleted successfully');
+    return ResponseUtil.success(res, 'Subscription feature deleted successfully');
   } catch (error) {
     console.error('Error deleting subscription feature:', error);
-    return errorResponse(res, 'Failed to delete subscription feature', 500);
+    return ResponseUtil.error(res, 'Failed to delete subscription feature', 500);
   }
 };
 

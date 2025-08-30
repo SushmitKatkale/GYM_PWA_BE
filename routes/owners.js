@@ -4,7 +4,7 @@ const { authenticate, authorize } = require('../middleware/auth');
 
 const router = Router();
 
-// Admin only routes (type='3')
+// Admin only routes (role=3)
 router.get('/', authenticate, authorize('3'), getOwners);
 router.get('/search', authenticate, authorize('3'), searchOwners);
 router.post('/', authenticate, authorize('3'), createOwner);

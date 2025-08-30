@@ -4,7 +4,7 @@ const ResponseUtil = require('../utils/response');
 class OwnerDashboardController {
   static async getDashboardData(req, res) {
     try {
-      const ownerId = req.user.email; // Owner ID is their email
+      const ownerId = req.user.id; // Updated to use user ID
       const result = await DashboardService.getOwnerDashboardData(ownerId);
       
       if (result.success) {
@@ -21,7 +21,7 @@ class OwnerDashboardController {
   static async getGymAnalytics(req, res) {
     try {
       const { gymId } = req.params;
-      const ownerId = req.user.email;
+      const ownerId = req.user.id; // Updated to use user ID
 
       // TODO: Add specific gym analytics
       // For now, return basic gym info
@@ -30,7 +30,7 @@ class OwnerDashboardController {
       const gym = await Gym.findOne({
         where: { 
           id: gymId,
-          ownerId: ownerId // Ensure owner can only access their gym
+          owner_id: ownerId // Updated field name and ensure owner can only access their gym
         }
       });
 
@@ -38,7 +38,7 @@ class OwnerDashboardController {
       const activeSubscriptions = UserSubscription ? await UserSubscription.count({
         where: {
           subscriptionId: gymId, // Assuming subscriptionId relates to gym
-          activeStatus: true,
+          record_status: 1, // Updated field name
           validTo: { [require('sequelize').Op.gte]: new Date() }
         }
       }) : 0;

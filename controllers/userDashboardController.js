@@ -4,8 +4,9 @@ const ResponseUtil = require('../utils/response');
 class UserDashboardController {
   static async getDashboardData(req, res) {
     try {
-      const userEmail = req.user.email; // Use email for UserSubscription lookup
-      const result = await DashboardService.getUserDashboardData(userEmail);
+      const userId = req.user.id; // Use user ID as primary identifier
+      const userEmail = req.user.email; // Keep email for backward compatibility
+      const result = await DashboardService.getUserDashboardData(userId, userEmail);
       
       if (result.success) {
         return ResponseUtil.success(res, result.data, 'User dashboard data retrieved successfully');

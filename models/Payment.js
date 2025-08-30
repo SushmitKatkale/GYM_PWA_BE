@@ -3,9 +3,44 @@ const { sequelize } = require('../config/database');
 
 const Payment = sequelize.define('Payment', {
   id: {
-    type: DataTypes.INTEGER,
+    type: DataTypes.BIGINT,
     primaryKey: true,
     autoIncrement: true
+  },
+  userId: {
+    type: DataTypes.BIGINT,
+    allowNull: false,
+    field: 'user_id',
+    references: {
+      model: 'users',
+      key: 'id'
+    }
+  },
+  gymId: {
+    type: DataTypes.BIGINT,
+    allowNull: false,
+    field: 'gym_id',
+    references: {
+      model: 'gyms',
+      key: 'id'
+    }
+  },
+  amount: {
+    type: DataTypes.DECIMAL(10, 2),
+    allowNull: false,
+    validate: {
+      min: 0
+    }
+  },
+  status: {
+    type: DataTypes.TINYINT,
+    allowNull: false,
+    defaultValue: 0,
+    comment: '0=pending,1=success,2=failed'
+  },
+  gateway: {
+    type: DataTypes.ENUM('razorpay', 'phonepe', 'stripe'),
+    allowNull: false
   },
   paymentRefNo: {
     type: DataTypes.STRING(100),
@@ -13,217 +48,55 @@ const Payment = sequelize.define('Payment', {
     unique: true,
     field: 'payment_ref_no'
   },
-  bankRefNo: {
-    type: DataTypes.STRING(100),
+  commissionPercent: {
+    type: DataTypes.DECIMAL(5, 2),
     allowNull: true,
-    field: 'bank_ref_no'
+    defaultValue: 0,
+    field: 'commission_percent'
   },
-  paidVia: {
-    type: DataTypes.ENUM('credit_card', 'debit_card', 'upi', 'net_banking', 'wallet', 'cash', 'bank_transfer'),
+  gstPercent: {
+    type: DataTypes.DECIMAL(5, 2),
     allowNull: true,
-    field: 'paid_via'
-  },
-  paymentCcy: {
-    type: DataTypes.STRING(3),
-    allowNull: false,
-    defaultValue: 'INR',
-    validate: {
-      len: [3, 3]
-    },
-    field: 'payment_ccy'
-  },
-  paymentAmount: {
-    type: DataTypes.DECIMAL(10, 2),
-    allowNull: false,
-    validate: {
-      min: 0
-    },
-    field: 'payment_amount'
-  },
-  paymentStatus: {
-    type: DataTypes.ENUM('pending', 'processing', 'completed', 'failed', 'cancelled', 'refunded'),
-    allowNull: false,
-    defaultValue: 'pending',
-    field: 'payment_status'
-  },
-  transactionId: {
-    type: DataTypes.STRING(100),
-    allowNull: true,
-    field: 'transaction_id'
-  },
-  gatewayResponse: {
-    type: DataTypes.TEXT,
-    allowNull: true,
-    field: 'gateway_response'
-  },
-  activeStatus: {
-    type: DataTypes.BOOLEAN,
-    allowNull: false,
-    defaultValue: true,
-    field: 'active_status'
-  },
-  createTimestamp: {
-    type: DataTypes.DATE,
-    allowNull: false,
-    defaultValue: DataTypes.NOW,
-    field: 'create_timestamp'
+    defaultValue: 0,
+    field: 'gst_percent'
   },
   createdBy: {
-    type: DataTypes.STRING(100),
+    type: DataTypes.BIGINT,
     allowNull: true,
-    field: 'created_by'
-  },
-  updateTimestamp: {
-    type: DataTypes.DATE,
-    allowNull: false,
-    defaultValue: DataTypes.NOW,
-    field: 'update_timestamp'
+    field: 'created_by',
+    comment: 'User ID who created this record'
   },
   updatedBy: {
-    type: DataTypes.STRING(100),
+    type: DataTypes.BIGINT,
     allowNull: true,
-    field: 'updated_by'
+    field: 'updated_by',
+    comment: 'User ID who last updated this record'
   },
-  // Razorpay specific fields
-  razorpayOrderId: {
-    type: DataTypes.STRING(255),
-    allowNull: true,
-    field: 'razorpay_order_id'
-  },
-  razorpayPaymentId: {
-    type: DataTypes.STRING(255),
-    allowNull: true,
-    field: 'razorpay_payment_id'
-  },
-  transferId: {
-    type: DataTypes.STRING(255),
-    allowNull: true,
-    field: 'transfer_id'
-  },
-  vendorConfigId: {
-    type: DataTypes.INTEGER,
-    allowNull: true,
-    references: {
-      model: 'vendor_payment_configs',
-      key: 'id'
-    },
-    field: 'vendor_config_id'
-  },
-  // Commission calculation fields
-  commission: {
-    type: DataTypes.DECIMAL(10, 2),
-    allowNull: true,
-    validate: {
-      min: 0
-    }
-  },
-  gstOnCommission: {
-    type: DataTypes.DECIMAL(10, 2),
-    allowNull: true,
-    validate: {
-      min: 0
-    },
-    field: 'gst_on_commission'
-  },
-  totalDeduction: {
-    type: DataTypes.DECIMAL(10, 2),
-    allowNull: true,
-    validate: {
-      min: 0
-    },
-    field: 'total_deduction'
-  },
-  vendorAmount: {
-    type: DataTypes.DECIMAL(10, 2),
-    allowNull: true,
-    validate: {
-      min: 0
-    },
-    field: 'vendor_amount'
-  },
-  cutCalculationDetails: {
-    type: DataTypes.JSON,
-    allowNull: true,
-    field: 'cut_calculation_details'
-  },
-  // Gateway information
-  gateway: {
-    type: DataTypes.ENUM('razorpay', 'phonepe'),
-    allowNull: true,
-    defaultValue: 'razorpay'
-  },
-  // PhonePe specific fields
-  phonepeTransactionId: {
-    type: DataTypes.STRING(255),
-    allowNull: true,
-    field: 'phonepe_transaction_id'
-  },
-  phonepePaymentId: {
-    type: DataTypes.STRING(255),
-    allowNull: true,
-    field: 'phonepe_payment_id'
-  },
-  // Additional fields for better tracking
-  userEmail: {
-    type: DataTypes.STRING(255),
+  recordStatus: {
+    type: DataTypes.TINYINT(1),
     allowNull: false,
-    validate: {
-      isEmail: true
-    },
-    references: {
-      model: 'users',
-      key: 'email'
-    },
-    field: 'user_email'
+    defaultValue: 1,
+    field: 'record_status',
+    comment: '1=active, 0=inactive'
   },
-  subscriptionId: {
-    type: DataTypes.INTEGER,
+  createdBy: {
+    type: DataTypes.BIGINT,
     allowNull: true,
-    references: {
-      model: 'subscriptions',
-      key: 'id'
-    },
-    field: 'subscription_id'
+    field: 'created_by',
+    comment: 'User ID who created this record'
   },
-  status: {
-    type: DataTypes.ENUM('pending', 'completed', 'failed', 'cancelled'),
-    allowNull: false,
-    defaultValue: 'pending'
-  },
-  completedAt: {
-    type: DataTypes.DATE,
+  updatedBy: {
+    type: DataTypes.BIGINT,
     allowNull: true,
-    field: 'completed_at'
+    field: 'updated_by',
+    comment: 'User ID who last updated this record'
   }
 }, {
   tableName: 'payments',
-  timestamps: false,
-  indexes: [
-    {
-      fields: ['payment_ref_no'],
-      unique: true
-    },
-    {
-      fields: ['bank_ref_no']
-    },
-    {
-      fields: ['user_email']
-    },
-    {
-      fields: ['payment_status']
-    },
-    {
-      fields: ['transaction_id']
-    },
-    {
-      fields: ['create_timestamp']
-    }
-  ],
-  hooks: {
-    beforeUpdate: (payment) => {
-      payment.updateTimestamp = new Date();
-    }
-  }
+  timestamps: true,
+  createdAt: 'created_at',
+  updatedAt: 'updated_at',
+  underscored: true
 });
 
 module.exports = Payment;

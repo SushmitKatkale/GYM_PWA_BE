@@ -32,12 +32,12 @@ class DashboardService {
         // Total counts
         Promise.all([
           User.count(),
-          User.count({ where: { activeStatus: '1' } }),
+          User.count({ where: { record_status: 1 } }), // Updated field name
           Gym.count(),
-          Gym.count({ where: { activeStatus: true } }),
+          Gym.count({ where: { record_status: 1 } }), // Updated field name
           UserSubscription ? UserSubscription.count({ 
             where: { 
-              activeStatus: true,
+              record_status: 1, // Updated field name
               validTo: { [Op.gte]: new Date() } 
             } 
           }) : 0
@@ -45,12 +45,12 @@ class DashboardService {
         
         // This month stats
         Promise.all([
-          User.count({ where: { createTimestamp: { [Op.gte]: firstDayOfMonth } } }),
-          Gym.count({ where: { createTimestamp: { [Op.gte]: firstDayOfMonth } } }),
+          User.count({ where: { created_at: { [Op.gte]: firstDayOfMonth } } }), // Updated field name
+          Gym.count({ where: { created_at: { [Op.gte]: firstDayOfMonth } } }), // Updated field name
           UserSubscription ? UserSubscription.count({ 
             where: { 
-              createTimestamp: { [Op.gte]: firstDayOfMonth },
-              activeStatus: true,
+              created_at: { [Op.gte]: firstDayOfMonth }, // Updated field name
+              record_status: 1, // Updated field name
               validTo: { [Op.gte]: new Date() }
             } 
           }) : 0
@@ -60,7 +60,7 @@ class DashboardService {
         Promise.all([
           User.count({ 
             where: { 
-              createTimestamp: { 
+              created_at: { // Updated field name
                 [Op.gte]: firstDayOfLastMonth,
                 [Op.lte]: lastDayOfLastMonth
               } 
@@ -68,7 +68,7 @@ class DashboardService {
           }),
           Gym.count({ 
             where: { 
-              createTimestamp: { 
+              created_at: { // Updated field name
                 [Op.gte]: firstDayOfLastMonth,
                 [Op.lte]: lastDayOfLastMonth
               } 
@@ -78,8 +78,8 @@ class DashboardService {
         
         // Yearly growth
         Promise.all([
-          User.count({ where: { createTimestamp: { [Op.gte]: firstDayOfYear } } }),
-          Gym.count({ where: { createTimestamp: { [Op.gte]: firstDayOfYear } } })
+          User.count({ where: { created_at: { [Op.gte]: firstDayOfYear } } }), // Updated field name
+          Gym.count({ where: { created_at: { [Op.gte]: firstDayOfYear } } }) // Updated field name
         ]),
         
         // Recent activities (last 7 days)
@@ -143,12 +143,12 @@ class DashboardService {
       const [userTrends, gymTrends, revenueTrends, userTypeBreakdown] = await Promise.all([
         // User registration trends
         sequelize.query(`
-          SELECT DATE(create_timestamp) as date,
+          SELECT DATE(created_at) as date,
                  COUNT(*) as count
           FROM users 
-          WHERE create_timestamp >= :startDate 
-            AND create_timestamp <= :endDate
-          GROUP BY DATE(create_timestamp)
+          WHERE created_at >= :startDate 
+            AND created_at <= :endDate
+          GROUP BY DATE(created_at)
           ORDER BY date ASC
         `, {
           replacements: { startDate, endDate },
@@ -157,12 +157,12 @@ class DashboardService {
         
         // Gym registration trends  
         sequelize.query(`
-          SELECT DATE(create_timestamp) as date,
+          SELECT DATE(created_at) as date,
                  COUNT(*) as count
           FROM gyms 
-          WHERE create_timestamp >= :startDate 
-            AND create_timestamp <= :endDate
-          GROUP BY DATE(create_timestamp)
+          WHERE created_at >= :startDate 
+            AND created_at <= :endDate
+          GROUP BY DATE(created_at)
           ORDER BY date ASC
         `, {
           replacements: { startDate, endDate },
@@ -172,13 +172,13 @@ class DashboardService {
         // Revenue trends (mock for now - would need payments table)
         this.getMockRevenueTrends(startDate, endDate),
         
-        // User type breakdown
+        // User role breakdown - updated to use role field
         User.findAll({
           attributes: [
-            'type',
-            [sequelize.fn('COUNT', sequelize.col('type')), 'count']
+            'role', // Updated field name
+            [sequelize.fn('COUNT', sequelize.col('role')), 'count']
           ],
-          group: ['type'],
+          group: ['role'],
           raw: true
         })
       ]);
@@ -195,10 +195,10 @@ class DashboardService {
             gyms: parseInt(item.count)
           })),
           revenueTrends,
-          userTypeBreakdown: {
-            users: userTypeBreakdown.find(u => u.type === '1')?.count || 0,
-            owners: userTypeBreakdown.find(u => u.type === '2')?.count || 0,
-            admins: userTypeBreakdown.find(u => u.type === '3')?.count || 0
+          userRoleBreakdown: { // Updated to reflect role field
+            users: userTypeBreakdown.find(u => u.role === 1)?.count || 0, // Updated role values
+            owners: userTypeBreakdown.find(u => u.role === 2)?.count || 0,
+            admins: userTypeBreakdown.find(u => u.role === 4)?.count || 0 // Admin role is 4
           }
         }
       };
@@ -219,9 +219,15 @@ class DashboardService {
       const yesterday = new Date();
       yesterday.setDate(yesterday.getDate() - 1);
 
-      // Get owner's gyms (ownerId field stores email address)
+      // Get owner's gyms (owner_id field stores user ID, fallback to ownerId with email)
       const ownerGyms = await Gym.findAll({
-        where: { ownerId: ownerEmail, activeStatus: true }
+        where: { 
+          [Op.or]: [
+            { owner_id: ownerEmail }, // If ownerEmail is actually user ID
+            { ownerId: ownerEmail }    // Fallback for old schema
+          ],
+          record_status: 1 // Updated field name
+        }
       });
 
       const gymIds = ownerGyms.map(gym => gym.id);
@@ -250,11 +256,11 @@ class DashboardService {
       ] = await Promise.all([
         // Active members across owner's gyms (join through subscription->gym relationship)
         UserSubscription && gymIds.length > 0 ? sequelize.query(`
-          SELECT COUNT(DISTINCT us.user_email) as count
+          SELECT COUNT(DISTINCT COALESCE(us.user_id, us.user_email)) as count
           FROM user_subscriptions us
           JOIN subscriptions s ON us.subscription_id = s.id
           WHERE s.gym_id IN (:gymIds)
-            AND us.active_status = true
+            AND us.record_status = 1
             AND us.valid_to >= NOW()
         `, {
           replacements: { gymIds },
@@ -308,7 +314,7 @@ class DashboardService {
   }
 
   // User Dashboard Analytics
-  static async getUserDashboardData(userId) {
+  static async getUserDashboardData(userId, userEmail) { // Accept both parameters
     try {
       const currentDate = new Date();
       const weekAgo = new Date();
@@ -324,11 +330,14 @@ class DashboardService {
         upcomingBookings,
         recentActivity
       ] = await Promise.all([
-        // Active subscriptions - use userEmail to match user
+        // Active subscriptions - support both user_id and userEmail
         UserSubscription ? UserSubscription.findAll({
           where: { 
-            userEmail: userId, // Assuming userId is actually email
-            activeStatus: true,
+            [Op.or]: [
+              { user_id: userId },
+              { userEmail: userEmail }
+            ],
+            record_status: 1, // Updated field name
             validTo: { [Op.gte]: new Date() }
           }
         }) : [],
@@ -388,16 +397,16 @@ class DashboardService {
 
       const [recentUsers, recentGyms] = await Promise.all([
         User.findAll({
-          where: { createTimestamp: { [Op.gte]: weekAgo } },
-          attributes: ['firstName', 'lastName', 'email', 'createTimestamp', 'type'],
-          order: [['createTimestamp', 'DESC']],
+          where: { created_at: { [Op.gte]: weekAgo } }, // Updated field name
+          attributes: ['firstName', 'lastName', 'email', 'created_at', 'role'], // Updated field names
+          order: [['created_at', 'DESC']],
           limit: 5
         }),
         
         Gym.findAll({
-          where: { createTimestamp: { [Op.gte]: weekAgo } },
-          attributes: ['name', 'createTimestamp', 'ownerId'],
-          order: [['createTimestamp', 'DESC']],
+          where: { created_at: { [Op.gte]: weekAgo } }, // Updated field name
+          attributes: ['name', 'created_at', 'owner_id', 'ownerId'], // Include both fields
+          order: [['created_at', 'DESC']],
           limit: 5
         })
       ]);
@@ -407,8 +416,8 @@ class DashboardService {
       recentUsers.forEach(user => {
         activities.push({
           type: 'user_registered',
-          message: `New ${user.type === '2' ? 'owner' : user.type === '3' ? 'admin' : 'user'} registered: ${user.firstName} ${user.lastName}`,
-          timestamp: user.createTimestamp,
+          message: `New ${user.role === 2 ? 'owner' : user.role === 4 ? 'admin' : 'user'} registered: ${user.firstName} ${user.lastName}`, // Updated role values
+          timestamp: user.created_at, // Updated field name
           metadata: { email: user.email }
         });
       });
@@ -417,9 +426,9 @@ class DashboardService {
         activities.push({
           type: 'gym_registered',
           message: `New gym registered: ${gym.name}`,
-          timestamp: gym.createTimestamp,
+          timestamp: gym.created_at, // Updated field name
           metadata: { 
-            ownerId: gym.ownerId || 'Unknown'
+            ownerId: gym.owner_id || gym.ownerId || 'Unknown' // Support both fields
           }
         });
       });

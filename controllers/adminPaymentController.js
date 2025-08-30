@@ -35,8 +35,8 @@ async function searchOwners(req, res) {
 
     const owners = await User.findAll({
       where: {
-        type: '2', // Owner type
-        activeStatus: '1',
+        role: 2, // Updated to use role field
+        record_status: 1, // Updated field name
         [Op.or]: [
           { email: { [Op.like]: `%${q}%` } },
           { firstName: { [Op.like]: `%${q}%` } },
@@ -73,7 +73,7 @@ async function searchGyms(req, res) {
 
     const gyms = await Gym.findAll({
       where: {
-        activeStatus: true,
+        record_status: 1, // Updated field name
         [Op.or]: [
           { name: { [Op.like]: `%${q}%` } },
           { address: { [Op.like]: `%${q}%` } },
@@ -83,7 +83,7 @@ async function searchGyms(req, res) {
       include: [{
         model: User,
         as: 'owner',
-        attributes: ['email']
+        attributes: ['id', 'email'] // Include ID for new schema
       }],
       limit: 10,
       attributes: ['id', 'name', 'address', 'city']
@@ -116,7 +116,7 @@ async function searchSubscriptions(req, res) {
 
     const subscriptions = await Subscription.findAll({
       where: {
-        activeStatus: true,
+        record_status: 1, // Updated field name
         title: { [Op.like]: `%${q}%` }
       },
       include: [{
@@ -169,9 +169,9 @@ async function getAllPayments(req, res) {
     
     // Date range filtering
     if (dateFrom || dateTo) {
-      whereConditions.createTimestamp = {};
-      if (dateFrom) whereConditions.createTimestamp[Op.gte] = new Date(dateFrom);
-      if (dateTo) whereConditions.createTimestamp[Op.lte] = new Date(dateTo + 'T23:59:59.999Z');
+      whereConditions.created_at = {}; // Updated field name
+      if (dateFrom) whereConditions.created_at[Op.gte] = new Date(dateFrom);
+      if (dateTo) whereConditions.created_at[Op.lte] = new Date(dateTo + 'T23:59:59.999Z');
     }
 
     // Include conditions for gym filtering
@@ -194,7 +194,7 @@ async function getAllPayments(req, res) {
       include: includeConditions,
       limit: parseInt(limit),
       offset,
-      order: [['createTimestamp', 'DESC']],
+      order: [['created_at', 'DESC']], // Updated field name
       distinct: true
     });
 
@@ -269,7 +269,7 @@ async function getPaymentStats(req, res) {
 
     const todaysStats = await Payment.findAll({
       where: {
-        createTimestamp: {
+        created_at: { // Updated field name
           [Op.gte]: new Date(new Date().setHours(0, 0, 0, 0))
         }
       },
@@ -310,7 +310,7 @@ async function getAllUserSubscriptions(req, res) {
     const offset = (parseInt(page) - 1) * parseInt(limit);
     
     // Build where conditions
-    const whereConditions = { activeStatus: true };
+    const whereConditions = { record_status: 1 }; // Updated field name
     if (userEmail) whereConditions.userEmail = { [Op.like]: `%${userEmail}%` };
     
     // Status filtering (active, expired, expiring)
@@ -350,7 +350,7 @@ async function getAllUserSubscriptions(req, res) {
       include: includeConditions,
       limit: parseInt(limit),
       offset,
-      order: [['createTimestamp', 'DESC']],
+      order: [['created_at', 'DESC']], // Updated field name
       distinct: true
     });
 
@@ -378,8 +378,8 @@ async function getAllUserSubscriptions(req, res) {
         paymentGateway: sub.payment?.gateway || 'unknown',
         transactionId: sub.payment?.transactionId || null,
         gym: sub.subscription?.gym || null,
-        createdAt: sub.createTimestamp,
-        updatedAt: sub.updateTimestamp
+        createdAt: sub.created_at || sub.createdAt, // Support both field names
+        updatedAt: sub.updated_at || sub.updatedAt
       };
     });
 
@@ -447,7 +447,7 @@ async function getUserSubscriptionStats(req, res) {
     const sevenDaysFromNow = new Date(now.getTime() + 7 * 24 * 60 * 60 * 1000);
     
     const stats = await UserSubscription.findAll({
-      where: { activeStatus: true },
+      where: { record_status: 1 }, // Updated field name
       attributes: [
         [fn('COUNT', col('id')), 'totalSubscriptions'],
         [fn('COUNT', literal('CASE WHEN validTo > NOW() THEN 1 END')), 'activeSubscriptions'],
@@ -459,8 +459,8 @@ async function getUserSubscriptionStats(req, res) {
 
     const todaysStats = await UserSubscription.findAll({
       where: {
-        activeStatus: true,
-        createTimestamp: {
+        record_status: 1, // Updated field name
+        created_at: { // Updated field name
           [Op.gte]: new Date(new Date().setHours(0, 0, 0, 0))
         }
       },
@@ -533,7 +533,7 @@ async function checkPaymentRefundable(req, res) {
     }
 
     // Check if payment is too old (6 months)
-    const paymentDate = new Date(payment.createTimestamp);
+    const paymentDate = new Date(payment.created_at || payment.createdAt); // Support both field names
     const sixMonthsAgo = new Date();
     sixMonthsAgo.setMonth(sixMonthsAgo.getMonth() - 6);
 
@@ -578,16 +578,16 @@ async function getAllRefunds(req, res) {
     const offset = (parseInt(page) - 1) * parseInt(limit);
     
     // Build where conditions
-    const whereConditions = { activeStatus: true };
+    const whereConditions = { record_status: 1 }; // Updated field name
     if (status) whereConditions.status = status;
     if (userEmail) whereConditions.userEmail = { [Op.like]: `%${userEmail}%` };
     if (refundType) whereConditions.refundType = refundType;
     
     // Date range filtering
     if (dateFrom || dateTo) {
-      whereConditions.createTimestamp = {};
-      if (dateFrom) whereConditions.createTimestamp[Op.gte] = new Date(dateFrom);
-      if (dateTo) whereConditions.createTimestamp[Op.lte] = new Date(dateTo + 'T23:59:59.999Z');
+      whereConditions.created_at = {}; // Updated field name
+      if (dateFrom) whereConditions.created_at[Op.gte] = new Date(dateFrom);
+      if (dateTo) whereConditions.created_at[Op.lte] = new Date(dateTo + 'T23:59:59.999Z');
     }
 
     const { count, rows: refunds } = await Refund.findAndCountAll({
@@ -621,7 +621,7 @@ async function getAllRefunds(req, res) {
       ],
       limit: parseInt(limit),
       offset,
-      order: [['createTimestamp', 'DESC']],
+      order: [['created_at', 'DESC']], // Updated field name
       distinct: true
     });
 
@@ -630,8 +630,8 @@ async function getAllRefunds(req, res) {
       const ref = refund.toJSON();
       return {
         ...ref,
-        createdAt: ref.createTimestamp,
-        updatedAt: ref.updateTimestamp
+        createdAt: ref.created_at || ref.createdAt, // Support both field names
+        updatedAt: ref.updated_at || ref.updatedAt
       };
     });
 
@@ -780,7 +780,7 @@ async function createRefund(req, res) {
     // If this is a subscription refund, deactivate the subscription
     if (subscriptionId) {
       await UserSubscription.update(
-        { activeStatus: false, updatedBy: req.user?.email || 'system' },
+        { record_status: 0, updatedBy: req.user?.email || 'system' }, // Updated field name
         { where: { id: subscriptionId } }
       );
     }
@@ -893,7 +893,7 @@ async function updateRefundStatus(req, res) {
 async function getRefundStats(req, res) {
   try {
     const stats = await Refund.findAll({
-      where: { activeStatus: true },
+      where: { record_status: 1 }, // Updated field name
       attributes: [
         [fn('COUNT', col('id')), 'totalRefunds'],
         [fn('SUM', col('refundAmount')), 'totalRefundAmount'],
@@ -906,8 +906,8 @@ async function getRefundStats(req, res) {
 
     const todaysStats = await Refund.findAll({
       where: {
-        activeStatus: true,
-        createTimestamp: {
+        record_status: 1, // Updated field name
+        created_at: { // Updated field name
           [Op.gte]: new Date(new Date().setHours(0, 0, 0, 0))
         }
       },
@@ -1055,7 +1055,7 @@ async function initiateRefundWithGateway(req, res) {
     if (subscriptionId) {
       const { UserSubscription } = require('../models');
       await UserSubscription.update(
-        { activeStatus: false, updatedBy: req.user?.email || 'system' },
+        { record_status: 0, updatedBy: req.user?.email || 'system' }, // Updated field name
         { where: { id: subscriptionId } }
       );
     }

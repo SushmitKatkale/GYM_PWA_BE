@@ -18,7 +18,7 @@ const generateQRCode = async (req, res) => {
   try {
     const { gymId, purpose, expiresInHours, maxUsage } = req.body;
     const userEmail = req.user.email;
-    const userType = req.user.type;
+    const userRole = req.user.role; // Updated to use role field
     const userId = req.user.id;
 
     // Validate required fields
@@ -37,7 +37,7 @@ const generateQRCode = async (req, res) => {
     }
 
     // Authorization check - only gym owner or admin can generate QR codes
-    if (userType !== '3' && gym.ownerId !== userEmail) {
+    if (userRole !== 4 && gym.owner_id !== req.user.id) { // Updated role value and owner_id field
       await transaction.rollback();
       return ResponseUtil.forbiddenError(res, 'You are not authorized to generate QR codes for this gym');
     }
@@ -96,7 +96,7 @@ const getGymQRCodes = async (req, res) => {
     const { gymId } = req.params;
     const { page = 1, limit = 10, activeOnly = 'true' } = req.query;
     const userEmail = req.user.email;
-    const userType = req.user.type;
+    const userRole = req.user.role; // Updated to use role field
 
     // Verify gym exists and user has permission
     const gym = await Gym.findByPk(gymId);
@@ -105,7 +105,7 @@ const getGymQRCodes = async (req, res) => {
     }
 
     // Authorization check
-    if (userType !== '3' && gym.ownerId !== userEmail) {
+    if (userRole !== 4 && gym.owner_id !== req.user.id) { // Updated role value and owner_id field
       return ResponseUtil.forbiddenError(res, 'You are not authorized to view QR codes for this gym');
     }
 
@@ -197,7 +197,7 @@ const updateQRCode = async (req, res) => {
     const { qrCodeId } = req.params;
     const { purpose, expiresInHours, maxUsage, isActive } = req.body;
     const userEmail = req.user.email;
-    const userType = req.user.type;
+    const userRole = req.user.role; // Updated to use role field
     const userId = req.user.id;
 
     // Find QR code
@@ -214,7 +214,7 @@ const updateQRCode = async (req, res) => {
     }
 
     // Authorization check
-    if (userType !== '3' && gymQRCode.gym.ownerId !== userEmail) {
+    if (userRole !== 4 && gymQRCode.gym.owner_id !== req.user.id) { // Updated role value and owner_id field
       await transaction.rollback();
       return ResponseUtil.forbiddenError(res, 'You are not authorized to update this QR code');
     }
@@ -276,7 +276,7 @@ const deleteQRCode = async (req, res) => {
   try {
     const { qrCodeId } = req.params;
     const userEmail = req.user.email;
-    const userType = req.user.type;
+    const userRole = req.user.role; // Updated to use role field
 
     // Find QR code
     const gymQRCode = await GymQRCodes.findByPk(qrCodeId, {
@@ -292,7 +292,7 @@ const deleteQRCode = async (req, res) => {
     }
 
     // Authorization check
-    if (userType !== '3' && gymQRCode.gym.ownerId !== userEmail) {
+    if (userRole !== 4 && gymQRCode.gym.owner_id !== req.user.id) { // Updated role value and owner_id field
       await transaction.rollback();
       return ResponseUtil.forbiddenError(res, 'You are not authorized to delete this QR code');
     }
@@ -324,7 +324,7 @@ const getQRCodeStats = async (req, res) => {
   try {
     const { gymId } = req.params;
     const userEmail = req.user.email;
-    const userType = req.user.type;
+    const userRole = req.user.role; // Updated to use role field
 
     // Verify gym exists and user has permission
     const gym = await Gym.findByPk(gymId);
@@ -333,7 +333,7 @@ const getQRCodeStats = async (req, res) => {
     }
 
     // Authorization check
-    if (userType !== '3' && gym.ownerId !== userEmail) {
+    if (userRole !== 4 && gym.owner_id !== req.user.id) { // Updated role value and owner_id field
       return ResponseUtil.forbiddenError(res, 'You are not authorized to view QR code statistics for this gym');
     }
 

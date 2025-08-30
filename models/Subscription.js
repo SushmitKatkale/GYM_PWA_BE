@@ -3,22 +3,26 @@ const { sequelize } = require('../config/database');
 
 const Subscription = sequelize.define('Subscription', {
   id: {
-    type: DataTypes.INTEGER,
+    type: DataTypes.BIGINT,
     autoIncrement: true,
     primaryKey: true
   },
-  title: {
-    type: DataTypes.STRING,
+  gymId: {
+    type: DataTypes.BIGINT,
+    allowNull: false,
+    field: 'gym_id',
+    references: {
+      model: 'gyms',
+      key: 'id'
+    },
+    onUpdate: 'CASCADE',
+    onDelete: 'CASCADE'
+  },
+  name: {
+    type: DataTypes.STRING(100),
     allowNull: false,
     validate: {
       notEmpty: true
-    }
-  },
-  validityDays: {
-    type: DataTypes.INTEGER,
-    allowNull: false,
-    validate: {
-      min: 1
     }
   },
   price: {
@@ -28,63 +32,59 @@ const Subscription = sequelize.define('Subscription', {
       min: 0
     }
   },
-  discountedPrice: {
-    type: DataTypes.DECIMAL(10, 2),
-    allowNull: true,
-    validate: {
-      min: 0
-    }
-  },
-  gymId: {
+  validityDays: {
     type: DataTypes.INTEGER,
     allowNull: false,
-    references: {
-      model: 'gyms',
-      key: 'id'
-    },
-    onUpdate: 'CASCADE',
-    onDelete: 'CASCADE'
+    field: 'validity_days',
+    validate: {
+      min: 1
+    }
   },
-  isMostPopular: {
-    type: DataTypes.BOOLEAN,
-    defaultValue: false,
-    allowNull: false
+  discountPercent: {
+    type: DataTypes.DECIMAL(5, 2),
+    allowNull: true,
+    defaultValue: 0,
+    field: 'discount_percent'
   },
-  isCheapest: {
-    type: DataTypes.BOOLEAN,
-    defaultValue: false,
-    allowNull: false
+  bufferDays: {
+    type: DataTypes.INTEGER,
+    allowNull: true,
+    defaultValue: 0,
+    field: 'buffer_days',
+    comment: 'Extra days allowed after expiry'
   },
-  activeStatus: {
-    type: DataTypes.BOOLEAN,
-    defaultValue: true,
-    allowNull: false
-  },
-  createTimestamp: {
-    type: DataTypes.DATE,
-    defaultValue: DataTypes.NOW,
-    allowNull: false
+  bufferFee: {
+    type: DataTypes.DECIMAL(10, 2),
+    allowNull: true,
+    defaultValue: 0.00,
+    field: 'buffer_fee',
+    comment: 'Fee for buffer days'
   },
   createdBy: {
-    type: DataTypes.STRING,
-    allowNull: true
-  },
-  updateTimestamp: {
-    type: DataTypes.DATE,
-    allowNull: true
+    type: DataTypes.BIGINT,
+    allowNull: true,
+    field: 'created_by',
+    comment: 'User ID who created this record'
   },
   updatedBy: {
-    type: DataTypes.STRING,
-    allowNull: true
+    type: DataTypes.BIGINT,
+    allowNull: true,
+    field: 'updated_by',
+    comment: 'User ID who last updated this record'
+  },
+  recordStatus: {
+    type: DataTypes.TINYINT(1),
+    allowNull: false,
+    defaultValue: 1,
+    field: 'record_status',
+    comment: '1=active, 0=inactive'
   }
 }, {
   tableName: 'subscriptions',
-  timestamps: false, // We're using custom timestamp fields
-  hooks: {
-    beforeUpdate: (subscription) => {
-      subscription.updateTimestamp = new Date();
-    }
-  }
+  timestamps: true,
+  createdAt: 'created_at',
+  updatedAt: 'updated_at',
+  underscored: true
 });
 
 module.exports = Subscription;

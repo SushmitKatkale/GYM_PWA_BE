@@ -4,7 +4,7 @@ const ResponseUtil = require('../utils/response');
 
 /**
  * Admin authentication middleware
- * Ensures user is authenticated and has admin privileges (type = '3')
+ * Ensures user is authenticated and has admin privileges (role = 4)
  */
 const adminAuth = async (req, res, next) => {
   try {
@@ -24,11 +24,10 @@ const adminAuth = async (req, res, next) => {
     const decoded = jwt.verify(token, process.env.JWT_SECRET);
     
     // Get user from database
-    const user = await User.findOne({
+    const user = await User.findByPk(decoded.userId, {
       where: { 
-        email: decoded.userEmail,
-        activeStatus: '1',
-        type: '3' // Admin only
+        record_status: 1,
+        role: 4 // Admin only (1=member, 2=owner, 3=trainer, 4=admin)
       }
     });
 

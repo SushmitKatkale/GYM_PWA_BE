@@ -3,167 +3,259 @@ const { sequelize } = require('../config/database');
 
 const Invoice = sequelize.define('Invoice', {
   id: {
-    type: DataTypes.INTEGER,
+    type: DataTypes.BIGINT,
     primaryKey: true,
     autoIncrement: true
   },
-  invoiceNumber: {
-    type: DataTypes.STRING(50),
-    allowNull: false,
-    unique: true,
-    field: 'invoice_number'
-  },
-  paymentId: {
-    type: DataTypes.INTEGER,
+  user_id: {
+    type: DataTypes.BIGINT,
     allowNull: false,
     references: {
-      model: 'payments',
+      model: 'users',
       key: 'id'
-    },
-    field: 'payment_id'
-  },
-  path: {
-    type: DataTypes.STRING(500),
-    allowNull: false,
-    validate: {
-      notEmpty: true
     }
   },
-  fileName: {
-    type: DataTypes.STRING(255),
+  gym_id: {
+    type: DataTypes.BIGINT,
     allowNull: false,
-    field: 'file_name'
-  },
-  fileSize: {
-    type: DataTypes.INTEGER,
-    allowNull: true,
-    field: 'file_size'
-  },
-  mimeType: {
-    type: DataTypes.STRING(100),
-    allowNull: true,
-    field: 'mime_type'
-  },
-  invoiceDate: {
-    type: DataTypes.DATE,
-    allowNull: false,
-    defaultValue: DataTypes.NOW,
-    field: 'invoice_date'
-  },
-  dueDate: {
-    type: DataTypes.DATE,
-    allowNull: true,
-    field: 'due_date'
-  },
-  totalAmount: {
-    type: DataTypes.DECIMAL(10, 2),
-    allowNull: false,
-    validate: {
-      min: 0
-    },
-    field: 'total_amount'
-  },
-  currency: {
-    type: DataTypes.STRING(3),
-    allowNull: false,
-    defaultValue: 'INR',
-    validate: {
-      len: [3, 3]
+    references: {
+      model: 'gyms',
+      key: 'id'
     }
   },
-  // Commission breakdown fields
-  commission: {
-    type: DataTypes.DECIMAL(10, 2),
-    allowNull: true,
-    validate: {
-      min: 0
-    }
+  invoice_number: {
+    type: DataTypes.STRING(50),
+    allowNull: false,
+    unique: true
   },
-  gstOnCommission: {
+  amount: {
     type: DataTypes.DECIMAL(10, 2),
-    allowNull: true,
-    validate: {
-      min: 0
-    },
-    field: 'gst_on_commission'
+    allowNull: false
   },
-  vendorAmount: {
-    type: DataTypes.DECIMAL(10, 2),
-    allowNull: true,
-    validate: {
-      min: 0
-    },
-    field: 'vendor_amount'
+  issued_date: {
+    type: DataTypes.DATEONLY,
+    allowNull: false
   },
-  gymName: {
+  file_path: {
     type: DataTypes.STRING(255),
-    allowNull: true,
-    field: 'gym_name'
+    allowNull: true
   },
-  subscriptionTitle: {
-    type: DataTypes.STRING(255),
-    allowNull: true,
-    field: 'subscription_title'
-  },
-  status: {
-    type: DataTypes.ENUM('draft', 'sent', 'paid', 'overdue', 'cancelled'),
-    allowNull: false,
-    defaultValue: 'paid'
-  },
-  activeStatus: {
-    type: DataTypes.BOOLEAN,
-    allowNull: false,
-    defaultValue: true,
-    field: 'active_status'
-  },
-  createTimestamp: {
-    type: DataTypes.DATE,
-    allowNull: false,
-    defaultValue: DataTypes.NOW,
-    field: 'create_timestamp'
+  record_status: {
+    type: DataTypes.TINYINT,
+    defaultValue: 1
   },
   createdBy: {
-    type: DataTypes.STRING(100),
+    type: DataTypes.BIGINT,
     allowNull: true,
-    field: 'created_by'
-  },
-  updateTimestamp: {
-    type: DataTypes.DATE,
-    allowNull: false,
-    defaultValue: DataTypes.NOW,
-    field: 'update_timestamp'
+    field: 'created_by',
+    comment: 'User ID who created this record'
   },
   updatedBy: {
-    type: DataTypes.STRING(100),
+    type: DataTypes.BIGINT,
     allowNull: true,
-    field: 'updated_by'
+    field: 'updated_by',
+    comment: 'User ID who last updated this record'
   }
 }, {
   tableName: 'invoices',
-  timestamps: false,
+    timestamps: true,
+  createdAt: 'created_at',
+  updatedAt: 'updated_at',
   indexes: [
+    {
+      fields: ['user_id']
+    },
+    {
+      fields: ['gym_id']
+    },
     {
       fields: ['invoice_number'],
       unique: true
     },
     {
-      fields: ['payment_id']
-    },
-    {
-      fields: ['invoice_date']
-    },
-    {
-      fields: ['status']
-    },
-    {
-      fields: ['active_status']
+      fields: ['issued_date']
     }
-  ],
-  hooks: {
-    beforeUpdate: (invoice) => {
-      invoice.updateTimestamp = new Date();
-    }
-  }
+  ]
 });
+
+// Instance methods
+Invoice.prototype.isActive = function() {
+  return this.record_status === 1;
+};
+
+Invoice.prototype.getItems = async function() {
+  const InvoiceItem = require('./InvoiceItem');
+  return await InvoiceItem.findAll({
+    where: {
+      invoice_id: this.id
+    },
+    order: [['created_at', 'ASC']]
+  });
+};
+
+Invoice.prototype.getTotalAmount = async function() {
+  const items = await this.getItems();
+  return items.reduce((total, item) => total + parseFloat(item.amount), 0);
+};
+
+Invoice.prototype.generateInvoiceNumber = function(gymId) {
+  const date = new Date();
+  const year = date.getFullYear();
+  const month = String(date.getMonth() + 1).padStart(2, '0');
+  const day = String(date.getDate()).padStart(2, '0');
+  const timestamp = Date.now().toString().slice(-6); // Last 6 digits of timestamp
+  
+  return `INV-${gymId}-${year}${month}${day}-${timestamp}`;
+};
+
+Invoice.prototype.getUserDetails = async function() {
+  const User = require('./User');
+  return await User.findByPk(this.user_id, {
+    attributes: ['id', 'email', 'username', 'phone'],
+    include: [{
+      model: require('./UserProfile'),
+      as: 'profile',
+      attributes: ['dob', 'gender']
+    }]
+  });
+};
+
+Invoice.prototype.getGymDetails = async function() {
+  const Gym = require('./Gym');
+  return await Gym.findByPk(this.gym_id, {
+    attributes: ['id', 'name', 'address']
+  });
+};
+
+// Static methods
+Invoice.findByUser = async function(userId, options = {}) {
+  const where = {
+    user_id: userId,
+    record_status: 1
+  };
+
+  if (options.startDate && options.endDate) {
+    where.issued_date = {
+      [sequelize.Sequelize.Op.between]: [options.startDate, options.endDate]
+    };
+  }
+
+  return await this.findAll({
+    where,
+    order: [['issued_date', 'DESC']],
+    include: options.include || []
+  });
+};
+
+Invoice.findByGym = async function(gymId, options = {}) {
+  const where = {
+    gym_id: gymId,
+    record_status: 1
+  };
+
+  if (options.startDate && options.endDate) {
+    where.issued_date = {
+      [sequelize.Sequelize.Op.between]: [options.startDate, options.endDate]
+    };
+  }
+
+  return await this.findAll({
+    where,
+    order: [['issued_date', 'DESC']],
+    include: options.include || []
+  });
+};
+
+Invoice.createInvoice = async function(invoiceData, items) {
+  const transaction = await sequelize.transaction();
+  
+  try {
+    // Generate invoice number
+    const invoiceNumber = this.prototype.generateInvoiceNumber(invoiceData.gym_id);
+    
+    // Calculate total amount from items
+    const totalAmount = items.reduce((sum, item) => sum + parseFloat(item.amount), 0);
+    
+    // Create invoice
+    const invoice = await this.create({
+      user_id: invoiceData.user_id,
+      gym_id: invoiceData.gym_id,
+      invoice_number: invoiceNumber,
+      amount: totalAmount,
+      issued_date: invoiceData.issued_date || new Date(),
+      file_path: invoiceData.file_path
+    }, { transaction });
+
+    // Create invoice items
+    const InvoiceItem = require('./InvoiceItem');
+    const invoiceItems = [];
+    
+    for (const item of items) {
+      const invoiceItem = await InvoiceItem.create({
+        invoice_id: invoice.id,
+        description: item.description,
+        amount: item.amount,
+        item_type: item.item_type || 'subscription'
+      }, { transaction });
+      
+      invoiceItems.push(invoiceItem);
+    }
+
+    await transaction.commit();
+    
+    // Return invoice with items
+    invoice.dataValues.items = invoiceItems;
+    return invoice;
+    
+  } catch (error) {
+    await transaction.rollback();
+    throw error;
+  }
+};
+
+Invoice.getMonthlyStats = async function(gymId, year, month) {
+  const startDate = new Date(year, month - 1, 1);
+  const endDate = new Date(year, month, 0);
+  
+  const stats = await this.findAll({
+    attributes: [
+      [sequelize.fn('COUNT', sequelize.col('id')), 'total_invoices'],
+      [sequelize.fn('SUM', sequelize.col('amount')), 'total_amount'],
+      [sequelize.fn('AVG', sequelize.col('amount')), 'average_amount']
+    ],
+    where: {
+      gym_id: gymId,
+      issued_date: {
+        [sequelize.Sequelize.Op.between]: [startDate, endDate]
+      },
+      record_status: 1
+    },
+    raw: true
+  });
+
+  return stats[0];
+};
+
+Invoice.getDailyStats = async function(gymId, startDate, endDate) {
+  const stats = await this.findAll({
+    attributes: [
+      [sequelize.fn('DATE', sequelize.col('issued_date')), 'date'],
+      [sequelize.fn('COUNT', sequelize.col('id')), 'total_invoices'],
+      [sequelize.fn('SUM', sequelize.col('amount')), 'total_amount']
+    ],
+    where: {
+      gym_id: gymId,
+      issued_date: {
+        [sequelize.Sequelize.Op.between]: [startDate, endDate]
+      },
+      record_status: 1
+    },
+    group: [sequelize.fn('DATE', sequelize.col('issued_date'))],
+    order: [[sequelize.fn('DATE', sequelize.col('issued_date')), 'ASC']],
+    raw: true
+  });
+
+  return stats;
+};
 
 module.exports = Invoice;

@@ -3,71 +3,65 @@ const { sequelize } = require('../config/database');
 
 const EmergencyContact = sequelize.define('EmergencyContact', {
   id: {
-    type: DataTypes.INTEGER,
+    type: DataTypes.BIGINT,
     primaryKey: true,
     autoIncrement: true
   },
-  userEmail: {
-    type: DataTypes.STRING(100),
+  userId: {
+    type: DataTypes.BIGINT,
     allowNull: false,
-    field: 'user_email',
+    field: 'user_id',
     references: {
       model: 'users',
-      key: 'email'
+      key: 'id'
     }
   },
-  contactName: {
+  name: {
     type: DataTypes.STRING(100),
-    allowNull: false,
-    field: 'contact_name',
+    allowNull: true,
     validate: {
-      len: [2, 100],
-      notEmpty: true
+      len: [2, 100]
     }
   },
-  contactPhone: {
+  phone: {
     type: DataTypes.STRING(20),
-    allowNull: false,
-    field: 'contact_phone',
+    allowNull: true,
     validate: {
       is: /^[+]?[0-9\s\-\(\)]+$/
     }
   },
-  relationship: {
+  relation: {
     type: DataTypes.STRING(50),
-    allowNull: false,
+    allowNull: true,
     validate: {
-      len: [2, 50],
-      notEmpty: true
+      len: [2, 50]
     }
   },
-  isPrimary: {
-    type: DataTypes.BOOLEAN,
+  recordStatus: {
+    type: DataTypes.TINYINT(1),
     allowNull: false,
-    defaultValue: true,
-    field: 'is_primary'
+    defaultValue: 1,
+    field: 'record_status',
+    comment: '1=active, 0=inactive'
   },
-  createTimestamp: {
-    type: DataTypes.DATE,
-    allowNull: false,
-    defaultValue: DataTypes.NOW,
-    field: 'create_timestamp'
+  createdBy: {
+    type: DataTypes.BIGINT,
+    allowNull: true,
+    field: 'created_by',
+    comment: 'User ID who created this record'
   },
-  updateTimestamp: {
-    type: DataTypes.DATE,
-    allowNull: false,
-    defaultValue: DataTypes.NOW,
-    field: 'update_timestamp'
+  updatedBy: {
+    type: DataTypes.BIGINT,
+    allowNull: true,
+    field: 'updated_by',
+    comment: 'User ID who last updated this record'
   }
 }, {
   tableName: 'emergency_contacts',
-  timestamps: false,
-  underscored: true,
-  hooks: {
-    beforeUpdate: (emergencyContact) => {
-      emergencyContact.updateTimestamp = new Date();
-    }
-  }
+  timestamps: true,
+  createdAt: 'created_at',
+  updatedAt: 'updated_at',
+  underscored: true
 });
 
 // Instance methods
@@ -79,8 +73,7 @@ EmergencyContact.prototype.toJSON = function() {
 // Associations
 EmergencyContact.associate = function(models) {
   EmergencyContact.belongsTo(models.User, {
-    foreignKey: 'userEmail',
-    targetKey: 'email',
+    foreignKey: 'userId',
     as: 'user'
   });
 };

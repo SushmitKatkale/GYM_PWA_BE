@@ -3,232 +3,75 @@ const { sequelize } = require('../config/database');
 
 const Notification = sequelize.define('Notification', {
   id: {
-    type: DataTypes.STRING(200), // Keep as string for now to match existing table
+    type: DataTypes.BIGINT,
     primaryKey: true,
+    autoIncrement: true
+  },
+  userId: {
+    type: DataTypes.BIGINT,
     allowNull: false,
-    field: 'id',
-  },
-  title: {
-    type: DataTypes.STRING(255),
-    allowNull: false,
-    field: 'title'
-  },
-  message: {
-    type: DataTypes.TEXT,
-    allowNull: false,
-    field: 'message'
-  },
-  type: {
-    type: DataTypes.ENUM('info', 'success', 'warning', 'error', 'promotion', 'reminder'),
-    allowNull: false,
-    defaultValue: 'info',
-    field: 'type'
-  },
-  category: {
-    type: DataTypes.ENUM(
-      'subscription',
-      'class',
-      'workout',
-      'payment',
-      'system',
-      'promotion',
-      'reminder',
-      'security'
-    ),
-    allowNull: true,
-    field: 'category'
-  },
-  priority: {
-    type: DataTypes.ENUM('low', 'normal', 'high', 'urgent'),
-    allowNull: false,
-    defaultValue: 'normal',
-    field: 'priority'
-  },
-  recipientEmail: {
-    type: DataTypes.STRING(100),
-    allowNull: true,
-    field: 'recipient_email',
+    field: 'user_id',
     references: {
       model: 'users',
-      key: 'email'
-    }
-  },
-  recipientRole: {
-    type: DataTypes.ENUM('1', '2', '3'), // 1=user, 2=owner, 3=admin
-    allowNull: true,
-    field: 'recipient_role'
-  },
-  senderEmail: {
-    type: DataTypes.STRING(100),
-    allowNull: true,
-    field: 'sender_email',
-    references: {
-      model: 'users',
-      key: 'email'
-    }
-  },
-  actionUrl: {
-    type: DataTypes.STRING(500),
-    allowNull: true,
-    field: 'action_url'
-  },
-  actionText: {
-    type: DataTypes.STRING(100),
-    allowNull: true,
-    field: 'action_text'
-  },
-  iconUrl: {
-    type: DataTypes.STRING(500),
-    allowNull: true,
-    field: 'icon_url'
-  },
-  imageUrl: {
-    type: DataTypes.STRING(500),
-    allowNull: true,
-    field: 'image_url'
-  },
-  data: {
-    type: DataTypes.JSON,
-    allowNull: true,
-    field: 'data'
-  },
-  isRead: {
-    type: DataTypes.BOOLEAN,
-    allowNull: false,
-    defaultValue: false,
-    field: 'is_read'
-  },
-  readAt: {
-    type: DataTypes.DATE,
-    allowNull: true,
-    field: 'read_at'
-  },
-  deliveryChannels: {
-    type: DataTypes.JSON, // ['email', 'push', 'sms']
-    allowNull: false,
-    defaultValue: ['push'],
-    field: 'delivery_channels'
-  },
-  deliveryStatus: {
-    type: DataTypes.JSON, // {email: 'sent', push: 'delivered', sms: 'failed'}
-    allowNull: true,
-    field: 'delivery_status'
-  },
-  scheduledFor: {
-    type: DataTypes.DATE,
-    allowNull: true,
-    field: 'scheduled_for'
-  },
-  expiresAt: {
-    type: DataTypes.DATE,
-    allowNull: true,
-    field: 'expires_at'
-  },
-  isGlobal: {
-    type: DataTypes.BOOLEAN,
-    allowNull: false,
-    defaultValue: false,
-    field: 'is_global'
-  },
-  gymId: {
-    type: DataTypes.INTEGER,
-    allowNull: true,
-    field: 'gym_id',
-    references: {
-      model: 'gyms',
       key: 'id'
     }
   },
-  tags: {
-    type: DataTypes.JSON, // ['urgent', 'subscription-expiry', 'class-reminder']
+  title: {
+    type: DataTypes.STRING(200),
+    allowNull: true
+  },
+  body: {
+    type: DataTypes.TEXT,
+    allowNull: true
+  },
+  type: {
+    type: DataTypes.ENUM('system', 'promo', 'reminder'),
+    allowNull: false,
+    defaultValue: 'system'
+  },
+  isRead: {
+    type: DataTypes.TINYINT(1),
+    allowNull: false,
+    defaultValue: 0,
+    field: 'is_read'
+  },
+  createdBy: {
+    type: DataTypes.BIGINT,
     allowNull: true,
-    field: 'tags'
+    field: 'created_by',
+    comment: 'User ID who created this record'
   },
-  createTimestamp: {
-    type: DataTypes.DATE,
-    allowNull: false,
-    defaultValue: DataTypes.NOW,
-    field: 'create_timestamp'
+  updatedBy: {
+    type: DataTypes.BIGINT,
+    allowNull: true,
+    field: 'updated_by',
+    comment: 'User ID who last updated this record'
   },
-  updateTimestamp: {
-    type: DataTypes.DATE,
+  recordStatus: {
+    type: DataTypes.TINYINT(1),
     allowNull: false,
-    defaultValue: DataTypes.NOW,
-    field: 'update_timestamp'
+    defaultValue: 1,
+    field: 'record_status',
+    comment: '1=active, 0=inactive'
+  },
+  createdBy: {
+    type: DataTypes.BIGINT,
+    allowNull: true,
+    field: 'created_by',
+    comment: 'User ID who created this record'
+  },
+  updatedBy: {
+    type: DataTypes.BIGINT,
+    allowNull: true,
+    field: 'updated_by',
+    comment: 'User ID who last updated this record'
   }
 }, {
   tableName: 'notifications',
-  timestamps: false,
+  timestamps: true,
+  createdAt: 'created_at',
+  updatedAt: 'updated_at',
   underscored: true,
-  indexes: [
-    {
-      fields: ['recipient_email', 'is_read']
-    },
-    {
-      fields: ['recipient_role', 'is_read']
-    },
-    {
-      fields: ['type', 'category']
-    },
-    {
-      fields: ['create_timestamp']
-    },
-    {
-      fields: ['is_global', 'recipient_role']
-    },
-    {
-      fields: ['gym_id']
-    },
-    {
-      fields: ['expires_at']
-    },
-    {
-      fields: ['scheduled_for']
-    },
-    {
-      fields: ['priority', 'is_read']
-    }
-  ],
-  hooks: {
-    beforeCreate: (notification) => {
-      // ID is auto-generated by database, no need to set it manually
-      
-      // Set default icon based on type
-      if (!notification.iconUrl) {
-        switch (notification.type) {
-          case 'success':
-            notification.iconUrl = '/icons/success.png';
-            break;
-          case 'warning':
-            notification.iconUrl = '/icons/warning.png';
-            break;
-          case 'error':
-            notification.iconUrl = '/icons/error.png';
-            break;
-          case 'promotion':
-            notification.iconUrl = '/icons/promotion.png';
-            break;
-          default:
-            notification.iconUrl = '/icons/info.png';
-        }
-      }
-
-      // Set default expiration (30 days)
-      if (!notification.expiresAt && notification.type !== 'system') {
-        const expirationDate = new Date();
-        expirationDate.setDate(expirationDate.getDate() + 30);
-        notification.expiresAt = expirationDate;
-      }
-    },
-    beforeUpdate: (notification) => {
-      notification.updateTimestamp = new Date();
-
-      // Set read timestamp when marking as read
-      if (notification.isRead && !notification.readAt) {
-        notification.readAt = new Date();
-      }
-    }
-  }
 });
 
 // Instance methods
@@ -238,176 +81,51 @@ Notification.prototype.toJSON = function () {
 };
 
 Notification.prototype.markAsRead = function () {
-  this.isRead = true;
-  this.readAt = new Date();
+  this.isRead = 1;
   return this.save();
-};
-
-Notification.prototype.updateDeliveryStatus = function (channel, status) {
-  if (!this.deliveryStatus) {
-    this.deliveryStatus = {};
-  }
-  this.deliveryStatus[channel] = status;
-  return this.save();
-};
-
-Notification.prototype.isExpired = function () {
-  return this.expiresAt && new Date() > this.expiresAt;
-};
-
-Notification.prototype.isScheduled = function () {
-  return this.scheduledFor && new Date() < this.scheduledFor;
 };
 
 // Static methods
-Notification.findForUser = async function (userEmail, options = {}) {
-  const where = {
-    [sequelize.Sequelize.Op.or]: [
-      { recipientEmail: userEmail },
-      { isGlobal: true }
-    ]
-  };
+Notification.findForUser = async function (userId, options = {}) {
+  const where = { userId };
 
   if (options.onlyUnread) {
-    where.isRead = false;
-  }
-
-  if (options.category) {
-    where.category = options.category;
+    where.isRead = 0;
   }
 
   if (options.type) {
     where.type = options.type;
   }
 
-  // Exclude expired notifications
-  where.expiresAt = {
-    [sequelize.Sequelize.Op.or]: [
-      { [sequelize.Sequelize.Op.gt]: new Date() },
-      { [sequelize.Sequelize.Op.is]: null }
-    ]
-  };
-
   return await this.findAll({
     where,
-    order: [
-      ['priority', 'DESC'],
-      ['createTimestamp', 'DESC']
-    ],
+    order: [['createdAt', 'DESC']],
     limit: options.limit || 50,
     offset: options.offset || 0
   });
 };
 
-Notification.findForRole = async function (role, options = {}) {
-  const where = {
-    [sequelize.Sequelize.Op.or]: [
-      { recipientRole: role },
-      { isGlobal: true }
-    ]
-  };
-
-  if (options.onlyUnread) {
-    where.isRead = false;
-  }
-
-  // Exclude expired notifications
-  where.expiresAt = {
-    [sequelize.Sequelize.Op.or]: [
-      { [sequelize.Sequelize.Op.gt]: new Date() },
-      { [sequelize.Sequelize.Op.is]: null }
-    ]
-  };
-
-  return await this.findAll({
-    where,
-    order: [
-      ['priority', 'DESC'],
-      ['createTimestamp', 'DESC']
-    ],
-    limit: options.limit || 50,
-    offset: options.offset || 0
-  });
-};
-
-Notification.getUnreadCount = async function (userEmail) {
+Notification.getUnreadCount = async function (userId) {
   return await this.count({
     where: {
-      [sequelize.Sequelize.Op.or]: [
-        { recipientEmail: userEmail },
-        { isGlobal: true }
-      ],
-      isRead: false,
-      expiresAt: {
-        [sequelize.Sequelize.Op.or]: [
-          { [sequelize.Sequelize.Op.gt]: new Date() },
-          { [sequelize.Sequelize.Op.is]: null }
-        ]
-      }
+      userId,
+      isRead: 0
     }
   });
 };
 
-Notification.markAllAsReadForUser = async function (userEmail) {
+Notification.markAllAsReadForUser = async function (userId) {
   return await this.update(
-    {
-      isRead: true,
-      readAt: new Date()
-    },
-    {
-      where: {
-        [sequelize.Sequelize.Op.or]: [
-          { recipientEmail: userEmail },
-          { isGlobal: true }
-        ],
-        isRead: false
-      }
-    }
+    { isRead: 1 },
+    { where: { userId, isRead: 0 } }
   );
-};
-
-Notification.cleanupExpiredNotifications = async function () {
-  return await this.destroy({
-    where: {
-      expiresAt: {
-        [sequelize.Sequelize.Op.lt]: new Date()
-      }
-    }
-  });
-};
-
-Notification.getScheduledNotifications = async function () {
-  return await this.findAll({
-    where: {
-      scheduledFor: {
-        [sequelize.Sequelize.Op.lte]: new Date()
-      },
-      deliveryStatus: {
-        [sequelize.Sequelize.Op.is]: null
-      }
-    },
-    order: [['priority', 'DESC'], ['scheduledFor', 'ASC']]
-  });
 };
 
 // Associations
 Notification.associate = function (models) {
   Notification.belongsTo(models.User, {
-    foreignKey: 'recipientEmail',
-    targetKey: 'email',
-    as: 'recipient'
-  });
-
-  Notification.belongsTo(models.User, {
-    foreignKey: 'senderEmail',
-    targetKey: 'email',
-    as: 'sender'
-  });
-
-  Notification.belongsTo(models.Gym, {
-    foreignKey: 'gymId',
-    targetKey: 'id',
-    as: 'gym'
+    foreignKey: 'userId',
+    as: 'user'
   });
 };
 

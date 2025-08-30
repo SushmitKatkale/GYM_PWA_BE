@@ -3,105 +3,131 @@ const { sequelize } = require('../config/database');
 
 const UserSubscription = sequelize.define('UserSubscription', {
   id: {
-    type: DataTypes.INTEGER,
+    type: DataTypes.BIGINT,
     primaryKey: true,
     autoIncrement: true
   },
-  userEmail: {
-    type: DataTypes.STRING(255),
+  userId: {
+    type: DataTypes.BIGINT,
     allowNull: false,
-    validate: {
-      isEmail: true
-    },
-    field: 'user_email'
+    field: 'user_id',
+    references: {
+      model: 'users',
+      key: 'id'
+    }
   },
   subscriptionId: {
-    type: DataTypes.INTEGER,
+    type: DataTypes.BIGINT,
     allowNull: false,
+    field: 'subscription_id',
     references: {
       model: 'subscriptions',
       key: 'id'
-    },
-    field: 'subscription_id'
+    }
   },
-  paymentId: {
-    type: DataTypes.INTEGER,
+  startDate: {
+    type: DataTypes.DATEONLY,
     allowNull: false,
-    references: {
-      model: 'payments',
-      key: 'id'
-    },
-    field: 'payment_id'
+    field: 'start_date'
   },
-  validFrom: {
-    type: DataTypes.DATE,
+  endDate: {
+    type: DataTypes.DATEONLY,
     allowNull: false,
-    field: 'valid_from'
+    field: 'end_date'
   },
-  validTo: {
-    type: DataTypes.DATE,
+  bufferApplied: {
+    type: DataTypes.TINYINT(1),
     allowNull: false,
-    field: 'valid_to'
-  },
-  bufferDays: {
-    type: DataTypes.INTEGER,
-    allowNull: true,
     defaultValue: 0,
-    field: 'buffer_days'
+    field: 'buffer_applied',
+    comment: '1=buffer purchased, 0=no buffer'
   },
-  activeStatus: {
-    type: DataTypes.BOOLEAN,
-    allowNull: false,
-    defaultValue: true,
-    field: 'active_status'
+  bufferStartDate: {
+    type: DataTypes.DATEONLY,
+    allowNull: true,
+    field: 'buffer_start_date'
   },
-  createTimestamp: {
-    type: DataTypes.DATE,
+  bufferEndDate: {
+    type: DataTypes.DATEONLY,
+    allowNull: true,
+    field: 'buffer_end_date'
+  },
+  bufferFeePaid: {
+    type: DataTypes.DECIMAL(10, 2),
     allowNull: false,
-    defaultValue: DataTypes.NOW,
-    field: 'create_timestamp'
+    defaultValue: 0.00,
+    field: 'buffer_fee_paid'
+  },
+  recordStatus: {
+    type: DataTypes.TINYINT(1),
+    allowNull: false,
+    defaultValue: 1,
+    field: 'record_status',
+    comment: '1=active, 0=inactive'
   },
   createdBy: {
-    type: DataTypes.STRING(100),
+    type: DataTypes.BIGINT,
     allowNull: true,
-    field: 'created_by'
-  },
-  updateTimestamp: {
-    type: DataTypes.DATE,
-    allowNull: false,
-    defaultValue: DataTypes.NOW,
-    field: 'update_timestamp'
+    field: 'created_by',
+    comment: 'User ID who created this record'
   },
   updatedBy: {
-    type: DataTypes.STRING(100),
+    type: DataTypes.BIGINT,
     allowNull: true,
-    field: 'updated_by'
+    field: 'updated_by',
+    comment: 'User ID who last updated this record'
   }
 }, {
   tableName: 'user_subscriptions',
-  timestamps: false,
-  indexes: [
-    {
-      fields: ['user_email']
-    },
-    {
-      fields: ['subscription_id']
-    },
-    {
-      fields: ['payment_id']
-    },
-    {
-      fields: ['valid_from', 'valid_to']
-    },
-    {
-      fields: ['active_status']
-    }
-  ],
-  hooks: {
-    beforeUpdate: (userSubscription) => {
-      userSubscription.updateTimestamp = new Date();
-    }
-  }
+  timestamps: true,
+  createdAt: 'created_at',
+  updatedAt: 'updated_at',
+  underscored: true
 });
+
+// Instance methods
+UserSubscription.prototype.isActive = function() {
+  const today = new Date();
+  const endDate = new Date(this.endDate);
+  
+  if (this.bufferApplied && this.bufferEndDate) {
+    const bufferEndDate = new Date(this.bufferEndDate);
+    return today <= bufferEndDate;
+  }
+  
+  return today <= endDate;
+};
+
+UserSubscription.prototype.isInBufferPeriod = function() {
+  if (!this.bufferApplied || !this.bufferStartDate || !this.bufferEndDate) {
+    return false;
+  }
+  
+  const today = new Date();
+  const bufferStart = new Date(this.bufferStartDate);
+  const bufferEnd = new Date(this.bufferEndDate);
+  
+  return today >= bufferStart && today <= bufferEnd;
+};
+
+UserSubscription.prototype.getDaysRemaining = function() {
+  const today = new Date();
+  let targetEndDate;
+  
+  if (this.bufferApplied && this.bufferEndDate) {
+    targetEndDate = new Date(this.bufferEndDate);
+  } else {
+    targetEndDate = new Date(this.endDate);
+  }
+  
+  const diffTime = targetEndDate - today;
+  const diffDays = Math.ceil(diffTime / (1000 * 60 * 60 * 24));
+  
+  return Math.max(0, diffDays);
+};
+
+UserSubscription.prototype.isExpired = function() {
+  return this.getDaysRemaining() === 0;
+};
 
 module.exports = UserSubscription;

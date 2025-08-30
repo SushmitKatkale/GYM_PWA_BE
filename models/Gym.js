@@ -3,98 +3,69 @@ const { sequelize } = require('../config/database');
 
 const Gym = sequelize.define('Gym', {
   id: {
-    type: DataTypes.INTEGER,
+    type: DataTypes.BIGINT,
     autoIncrement: true,
     primaryKey: true
   },
   name: {
-    type: DataTypes.STRING,
+    type: DataTypes.STRING(150),
     allowNull: false,
     validate: {
       notEmpty: true
     }
   },
-  capacity: {
-    type: DataTypes.INTEGER,
+  ownerId: {
+    type: DataTypes.BIGINT,
     allowNull: false,
-    validate: {
-      min: 1
+    field: 'owner_id',
+    references: {
+      model: 'users',
+      key: 'id'
     }
   },
   address: {
     type: DataTypes.TEXT,
-    allowNull: false,
-    validate: {
-      notEmpty: true
-    }
+    allowNull: false
+  },
+  city: {
+    type: DataTypes.STRING(100),
+    allowNull: true
+  },
+  state: {
+    type: DataTypes.STRING(100),
+    allowNull: true
+  },
+  zipCode: {
+    type: DataTypes.STRING(20),
+    allowNull: true,
+    field: 'zip_code'
   },
   latitude: {
-    type: DataTypes.DECIMAL(10, 8),
-    allowNull: true,
+    type: DataTypes.DECIMAL(10, 6),
+    allowNull: false,
     validate: {
       min: -90,
       max: 90
     }
   },
   longitude: {
-    type: DataTypes.DECIMAL(11, 8),
-    allowNull: true,
+    type: DataTypes.DECIMAL(10, 6),
+    allowNull: false,
     validate: {
       min: -180,
       max: 180
     }
   },
-  description: {
-    type: DataTypes.TEXT,
-    allowNull: true
-  },
-  openingTime: {
-    type: DataTypes.TIME,
-    allowNull: false
-  },
-  closingTime: {
-    type: DataTypes.TIME,
-    allowNull: false
-  },
-  activeStatus: {
-    type: DataTypes.BOOLEAN,
-    defaultValue: true,
-    allowNull: false
-  },
-  createTimestamp: {
-    type: DataTypes.DATE,
-    defaultValue: DataTypes.NOW,
-    allowNull: false
-  },
-  createdBy: {
-    type: DataTypes.STRING,
-    allowNull: true
-  },
-  updateTimestamp: {
-    type: DataTypes.DATE,
-    allowNull: true
-  },
-  updatedBy: {
-    type: DataTypes.STRING,
-    allowNull: true
-  },
-  ownerId: {
-    type: DataTypes.STRING(255),
-    allowNull: true,
-    validate: {
-      isEmail: true
-    }
-  },
   rating: {
-    type: DataTypes.DECIMAL(2, 1),
+    type: DataTypes.DECIMAL(3, 2),
     allowNull: true,
-    defaultValue: 0.0,
+    defaultValue: 0.00,
     validate: {
       min: 0,
       max: 5
     }
   },
-  currentOccupancy: {
+  capacity: {
     type: DataTypes.INTEGER,
     allowNull: true,
     defaultValue: 0,
@@ -102,132 +73,80 @@ const Gym = sequelize.define('Gym', {
       min: 0
     }
   },
-  city: {
-    type: DataTypes.STRING,
-    allowNull: true
-  },
-  state: {
-    type: DataTypes.STRING,
-    allowNull: true
-  },
-  zipCode: {
-    type: DataTypes.STRING(10),
-    allowNull: true
-  },
-  // Attendance tracking fields
-  checkInRadiusMeters: {
-    type: DataTypes.INTEGER,
-    allowNull: false,
-    defaultValue: 50,
-    validate: {
-      min: 10,
-      max: 1000
-    },
-    field: 'check_in_radius_meters'
-  },
-  defaultSessionDurationMinutes: {
-    type: DataTypes.INTEGER,
-    allowNull: false,
-    defaultValue: 120,
-    validate: {
-      min: 15,
-      max: 480
-    },
-    field: 'default_session_duration_minutes'
-  },
-  autoCheckoutEnabled: {
-    type: DataTypes.BOOLEAN,
-    allowNull: false,
-    defaultValue: false,
-    field: 'auto_checkout_enabled'
-  },
-  autoCheckoutAfterHours: {
-    type: DataTypes.INTEGER,
-    allowNull: false,
-    defaultValue: 24,
-    validate: {
-      min: 1,
-      max: 168
-    },
-    field: 'auto_checkout_after_hours'
-  },
-  locationVerificationRequired: {
-    type: DataTypes.BOOLEAN,
-    allowNull: false,
-    defaultValue: true,
-    field: 'location_verification_required'
-  },
-  maxOccupancy: {
-    type: DataTypes.INTEGER,
+  email: {
+    type: DataTypes.STRING(150),
     allowNull: true,
-    defaultValue: null,
     validate: {
-      min: 1
-    },
-    field: 'max_occupancy'
+      isEmail: true
+    }
   },
-  allowMultipleCheckins: {
-    type: DataTypes.BOOLEAN,
-    allowNull: false,
-    defaultValue: false,
-    field: 'allow_multiple_checkins'
+  phone: {
+    type: DataTypes.STRING(20),
+    allowNull: true
   },
-  checkInNotificationEnabled: {
-    type: DataTypes.BOOLEAN,
-    allowNull: false,
-    defaultValue: true,
-    field: 'check_in_notification_enabled'
+  websiteUrl: {
+    type: DataTypes.STRING(255),
+    allowNull: true,
+    field: 'website_url',
+    validate: {
+      isUrl: true
+    }
   },
-  checkOutNotificationEnabled: {
-    type: DataTypes.BOOLEAN,
-    allowNull: false,
-    defaultValue: true,
-    field: 'check_out_notification_enabled'
+  gstNumber: {
+    type: DataTypes.STRING(50),
+    allowNull: true,
+    field: 'gst_number'
   },
-  attendanceTrackingEnabled: {
-    type: DataTypes.BOOLEAN,
-    allowNull: false,
-    defaultValue: true,
-    field: 'attendance_tracking_enabled'
+  registrationNo: {
+    type: DataTypes.STRING(50),
+    allowNull: true,
+    field: 'registration_no'
   },
-  biometricCheckinEnabled: {
-    type: DataTypes.BOOLEAN,
-    allowNull: false,
-    defaultValue: false,
-    field: 'biometric_checkin_enabled'
+  openingTime: {
+    type: DataTypes.TIME,
+    allowNull: true,
+    field: 'opening_time'
   },
-  ownerScanEnabled: {
-    type: DataTypes.BOOLEAN,
-    allowNull: false,
-    defaultValue: true,
-    field: 'owner_scan_enabled'
+  closingTime: {
+    type: DataTypes.TIME,
+    allowNull: true,
+    field: 'closing_time'
   },
-  qrCodeCheckinEnabled: {
-    type: DataTypes.BOOLEAN,
-    allowNull: false,
-    defaultValue: true,
-    field: 'qr_code_checkin_enabled'
+  daysOpen: {
+    type: DataTypes.STRING(50),
+    allowNull: true,
+    field: 'days_open',
+    comment: 'e.g. Mon-Sat, Mon-Sun'
   },
-  uniqueCodeCheckinEnabled: {
-    type: DataTypes.BOOLEAN,
-    allowNull: false,
-    defaultValue: true,
-    field: 'unique_code_checkin_enabled'
+  description: {
+    type: DataTypes.TEXT,
+    allowNull: true
   },
-  quickCheckinEnabled: {
-    type: DataTypes.BOOLEAN,
+  createdBy: {
+    type: DataTypes.BIGINT,
+    allowNull: true,
+    field: 'created_by',
+    comment: 'User ID who created this record'
+  },
+  updatedBy: {
+    type: DataTypes.BIGINT,
+    allowNull: true,
+    field: 'updated_by',
+    comment: 'User ID who last updated this record'
+  },
+  recordStatus: {
+    type: DataTypes.TINYINT(1),
     allowNull: false,
-    defaultValue: true,
-    field: 'quick_checkin_enabled'
+    defaultValue: 1,
+    field: 'record_status',
+    comment: '1=active, 0=inactive'
   }
 }, {
   tableName: 'gyms',
-  timestamps: false, // We're using custom timestamp fields
-  hooks: {
-    beforeUpdate: (gym) => {
-      gym.updateTimestamp = new Date();
-    }
-  }
+  timestamps: true,
+  createdAt: 'created_at',
+  updatedAt: 'updated_at',
+  underscored: true
 });
 
 module.exports = Gym;

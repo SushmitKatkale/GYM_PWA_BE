@@ -16,7 +16,7 @@ const SlotChangeHistory = sequelize.define('SlotChangeHistory', {
     field: 'user_email'
   },
   userSubscriptionId: {
-    type: DataTypes.INTEGER,
+    type: DataTypes.BIGINT,
     allowNull: false,
     references: {
       model: 'user_subscriptions',
@@ -25,7 +25,7 @@ const SlotChangeHistory = sequelize.define('SlotChangeHistory', {
     field: 'user_subscription_id'
   },
   oldGymSlotId: {
-    type: DataTypes.INTEGER,
+    type: DataTypes.BIGINT,
     allowNull: true, // null for initial selection
     references: {
       model: 'gym_slots',
@@ -34,7 +34,7 @@ const SlotChangeHistory = sequelize.define('SlotChangeHistory', {
     field: 'old_gym_slot_id'
   },
   newGymSlotId: {
-    type: DataTypes.INTEGER,
+    type: DataTypes.BIGINT,
     allowNull: false,
     references: {
       model: 'gym_slots',

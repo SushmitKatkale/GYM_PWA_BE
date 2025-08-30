@@ -17,7 +17,7 @@ const generateUniqueCode = async (req, res) => {
   try {
     const { gymId, codeLength = 6, expiresInHours, maxUsage, customCode } = req.body;
     const userEmail = req.user.email;
-    const userType = req.user.type;
+    const userRole = req.user.role; // Updated to use role field
     const userId = req.user.id;
 
     // Validate required fields
@@ -36,7 +36,7 @@ const generateUniqueCode = async (req, res) => {
     }
 
     // Authorization check - only gym owner or admin can generate unique codes
-    if (userType !== '3' && gym.ownerId !== userEmail) {
+    if (userRole !== 4 && gym.owner_id !== req.user.id) { // Updated role value and owner_id field
       await transaction.rollback();
       return ResponseUtil.forbiddenError(res, 'You are not authorized to generate unique codes for this gym');
     }
@@ -148,7 +148,7 @@ const getGymUniqueCodes = async (req, res) => {
     const { gymId } = req.params;
     const { page = 1, limit = 10, activeOnly = 'true' } = req.query;
     const userEmail = req.user.email;
-    const userType = req.user.type;
+    const userRole = req.user.role; // Updated to use role field
 
     // Verify gym exists and user has permission
     const gym = await Gym.findByPk(gymId);
@@ -157,7 +157,7 @@ const getGymUniqueCodes = async (req, res) => {
     }
 
     // Authorization check
-    if (userType !== '3' && gym.ownerId !== userEmail) {
+    if (userRole !== 4 && gym.owner_id !== req.user.id) { // Updated role value and owner_id field
       return ResponseUtil.forbiddenError(res, 'You are not authorized to view unique codes for this gym');
     }
 
@@ -249,7 +249,7 @@ const updateUniqueCode = async (req, res) => {
     const { uniqueCodeId } = req.params;
     const { expiresInHours, maxUsage, isActive } = req.body;
     const userEmail = req.user.email;
-    const userType = req.user.type;
+    const userRole = req.user.role; // Updated to use role field
     const userId = req.user.id;
 
     // Find unique code
@@ -266,7 +266,7 @@ const updateUniqueCode = async (req, res) => {
     }
 
     // Authorization check
-    if (userType !== '3' && gymUniqueCode.gym.ownerId !== userEmail) {
+    if (userRole !== 4 && gymUniqueCode.gym.owner_id !== req.user.id) { // Updated role value and owner_id field
       await transaction.rollback();
       return ResponseUtil.forbiddenError(res, 'You are not authorized to update this unique code');
     }
@@ -327,7 +327,7 @@ const deleteUniqueCode = async (req, res) => {
   try {
     const { uniqueCodeId } = req.params;
     const userEmail = req.user.email;
-    const userType = req.user.type;
+    const userRole = req.user.role; // Updated to use role field
 
     // Find unique code
     const gymUniqueCode = await GymUniqueCodes.findByPk(uniqueCodeId, {
@@ -343,7 +343,7 @@ const deleteUniqueCode = async (req, res) => {
     }
 
     // Authorization check
-    if (userType !== '3' && gymUniqueCode.gym.ownerId !== userEmail) {
+    if (userRole !== 4 && gymUniqueCode.gym.owner_id !== req.user.id) { // Updated role value and owner_id field
       await transaction.rollback();
       return ResponseUtil.forbiddenError(res, 'You are not authorized to delete this unique code');
     }
@@ -375,7 +375,7 @@ const getUniqueCodeStats = async (req, res) => {
   try {
     const { gymId } = req.params;
     const userEmail = req.user.email;
-    const userType = req.user.type;
+    const userRole = req.user.role; // Updated to use role field
 
     // Verify gym exists and user has permission
     const gym = await Gym.findByPk(gymId);
@@ -384,7 +384,7 @@ const getUniqueCodeStats = async (req, res) => {
     }
 
     // Authorization check
-    if (userType !== '3' && gym.ownerId !== userEmail) {
+    if (userRole !== 4 && gym.owner_id !== req.user.id) { // Updated role value and owner_id field
       return ResponseUtil.forbiddenError(res, 'You are not authorized to view unique code statistics for this gym');
     }
 
@@ -432,7 +432,7 @@ const bulkGenerateUniqueCodes = async (req, res) => {
   try {
     const { gymId, count = 10, codeLength = 6, expiresInHours, maxUsage } = req.body;
     const userEmail = req.user.email;
-    const userType = req.user.type;
+    const userRole = req.user.role; // Updated to use role field
     const userId = req.user.id;
 
     // Validate required fields
@@ -458,7 +458,7 @@ const bulkGenerateUniqueCodes = async (req, res) => {
     }
 
     // Authorization check
-    if (userType !== '3' && gym.ownerId !== userEmail) {
+    if (userRole !== 4 && gym.owner_id !== req.user.id) { // Updated role value and owner_id field
       await transaction.rollback();
       return ResponseUtil.forbiddenError(res, 'You are not authorized to generate unique codes for this gym');
     }

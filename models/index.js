@@ -1,112 +1,102 @@
 const { sequelize, testConnection } = require('../config/database');
+
+// ========================================
+// CORE MODELS (from DB.sql)
+// ========================================
 const User = require('./User');
-const RefreshToken = require('./RefreshToken');
 const UserProfile = require('./UserProfile');
 const EmergencyContact = require('./EmergencyContact');
-const UserNotificationSettings = require('./UserNotificationSettings');
-const UserPrivacySettings = require('./UserPrivacySettings');
-const UserAppPreferences = require('./UserAppPreferences');
 const FitnessGoal = require('./FitnessGoal');
 const UserFitnessGoal = require('./UserFitnessGoal');
-const ProfileImage = require('./ProfileImage');
 
-// Define associations
-User.hasMany(RefreshToken, {
-  foreignKey: 'userId',
-  as: 'refreshTokens',
-  onDelete: 'CASCADE',
-});
+// Gym related
+const Gym = require('./Gym');
+const GymQRCodes = require('./GymQRCodes');
+const GymCheckInMethods = require('./GymCheckInMethods');
+const CheckInMethod = require('./CheckInMethod');
+const Attendance = require('./Attendance');
 
-RefreshToken.belongsTo(User, {
-  foreignKey: 'userId',
-  as: 'user',
-});
+// Subscription & Payment
+const Subscription = require('./Subscription');
+const SubscriptionFeature = require('./SubscriptionFeature');
+const UserSubscription = require('./UserSubscription');
+const Payment = require('./Payment');
+const PaymentItem = require('./PaymentItem');
+const Invoice = require('./Invoice');
+const InvoiceItem = require('./InvoiceItem');
+const Refund = require('./Refund');
 
-// Self-referencing associations for User
-User.belongsTo(User, {
-  foreignKey: 'createdBy',
-  as: 'creator',
-  constraints: false
-});
+// Wallet system
+const Wallet = require('./Wallet');
+const WalletTransaction = require('./WalletTransaction');
+const WithdrawRequest = require('./WithdrawRequest');
 
-User.belongsTo(User, {
-  foreignKey: 'updatedBy',
-  as: 'updater',
-  constraints: false
-});
+// Slot management
+const GymSlot = require('./GymSlot');
+const UserSlotBooking = require('./UserSlotBooking');
+const SlotWaitlist = require('./SlotWaitlist');
 
-// User Profile Extended Data associations
+// Advertisements & Notifications
+const Advertisement = require('./Advertisement');
+const AdvertisementAnalytics = require('./AdvertisementAnalytics');
+const Notification = require('./Notification');
+const PushSubscription = require('./PushSubscription');
+
+// Trainer & Diet system
+const GymTrainer = require('./GymTrainer');
+const DietPlan = require('./DietPlan');
+const DietPlanMeal = require('./DietPlanMeal');
+const DietChangeRequest = require('./DietChangeRequest');
+const DietPlanHistory = require('./DietPlanHistory');
+const Plan = require('./Plan');
+
+const GymAmenity = require('./GymAmenity');
+const Feature = require('./Feature');
+const GymFeature = require('./GymFeature');
+const GymUniqueCodes = require('./GymUniqueCodes');
+const SlotAvailability = require('./SlotAvailability');
+const SlotChangeHistory = require('./SlotChangeHistory');
+
+// Vendor Payment Config
+const VendorPaymentConfig = require('./VendorPaymentConfig');
+
+// Media
+const Media = require('./Media');
+
+// Authentication
+const RefreshToken = require('./RefreshToken');
+
+// ========================================
+// ASSOCIATIONS (simplified)
+// ========================================
+
+// User associations
 User.hasOne(UserProfile, {
-  foreignKey: 'userEmail',
-  sourceKey: 'email',
+  foreignKey: 'userId',
   as: 'profile',
   onDelete: 'CASCADE'
 });
 
 UserProfile.belongsTo(User, {
-  foreignKey: 'userEmail',
-  targetKey: 'email',
+  foreignKey: 'userId',
   as: 'user'
 });
 
-// Emergency Contact associations
 User.hasMany(EmergencyContact, {
-  foreignKey: 'userEmail',
-  sourceKey: 'email',
+  foreignKey: 'userId',
   as: 'emergencyContacts',
   onDelete: 'CASCADE'
 });
 
 EmergencyContact.belongsTo(User, {
-  foreignKey: 'userEmail',
-  targetKey: 'email',
+  foreignKey: 'userId',
   as: 'user'
 });
 
-// User Settings associations
-User.hasOne(UserNotificationSettings, {
-  foreignKey: 'userEmail',
-  sourceKey: 'email',
-  as: 'notificationSettings',
-  onDelete: 'CASCADE'
-});
-
-UserNotificationSettings.belongsTo(User, {
-  foreignKey: 'userEmail',
-  targetKey: 'email',
-  as: 'user'
-});
-
-User.hasOne(UserPrivacySettings, {
-  foreignKey: 'userEmail',
-  sourceKey: 'email',
-  as: 'privacySettings',
-  onDelete: 'CASCADE'
-});
-
-UserPrivacySettings.belongsTo(User, {
-  foreignKey: 'userEmail',
-  targetKey: 'email',
-  as: 'user'
-});
-
-User.hasOne(UserAppPreferences, {
-  foreignKey: 'userEmail',
-  sourceKey: 'email',
-  as: 'appPreferences',
-  onDelete: 'CASCADE'
-});
-
-UserAppPreferences.belongsTo(User, {
-  foreignKey: 'userEmail',
-  targetKey: 'email',
-  as: 'user'
-});
-
-// Fitness Goals Many-to-Many associations
+// Fitness Goals
 User.belongsToMany(FitnessGoal, {
   through: UserFitnessGoal,
-  foreignKey: 'userEmail',
+  foreignKey: 'userId',
   otherKey: 'goalId',
   as: 'fitnessGoals'
 });
@@ -114,523 +104,23 @@ User.belongsToMany(FitnessGoal, {
 FitnessGoal.belongsToMany(User, {
   through: UserFitnessGoal,
   foreignKey: 'goalId',
-  otherKey: 'userEmail',
+  otherKey: 'userId',
   as: 'users'
 });
 
-// UserFitnessGoal associations
-UserFitnessGoal.belongsTo(User, {
-  foreignKey: 'userEmail',
-  targetKey: 'email',
-  as: 'user'
-});
-
-UserFitnessGoal.belongsTo(FitnessGoal, {
-  foreignKey: 'goalId',
-  as: 'goal'
-});
-
-// ProfileImage associations
-User.hasMany(ProfileImage, {
-  foreignKey: 'userId',
-  as: 'profileImages',
-  onDelete: 'CASCADE'
-});
-
-User.hasOne(ProfileImage, {
-  foreignKey: 'userId',
-  as: 'currentProfileImage',
-  scope: {
-    isActive: true
-  }
-});
-
-ProfileImage.belongsTo(User, {
-  foreignKey: 'userId',
-  as: 'user'
-});
-
-ProfileImage.belongsTo(User, {
-  foreignKey: 'createdBy',
-  as: 'creator'
-});
-
-ProfileImage.belongsTo(User, {
-  foreignKey: 'updatedBy',
-  as: 'updater'
-});
-const Gym = require('./Gym');
-const Amenity = require('./Amenity');
-const GymImage = require('./GymImage');
-const Subscription = require('./Subscription');
-const SubscriptionFeature = require('./SubscriptionFeature');
-const UserSubscription = require('./UserSubscription');
-const Payment = require('./Payment');
-const Invoice = require('./Invoice');
-const GymSlot = require('./GymSlot');
-const SlotAvailability = require('./SlotAvailability');
-const UserSlotBooking = require('./UserSlotBooking');
-const SlotChangeHistory = require('./SlotChangeHistory');
-const SlotWaitlist = require('./SlotWaitlist');
-const VendorPaymentConfig = require('./VendorPaymentConfig');
-const Advertisement = require('./Advertisement');
-const AdvertisementMedia = require('./AdvertisementMedia');
-const AdvertisementAnalytics = require('./AdvertisementAnalytics');
-const Refund = require('./Refund');
-const Notification = require('./Notification');
-const PushSubscription = require('./PushSubscription');
-// const Review = require('./Review');
-
-// Attendance system models
-const Attendance = require('./Attendance');
-const GymCheckInMethods = require('./GymCheckInMethods');
-const GymQRCodes = require('./GymQRCodes');
-const GymUniqueCodes = require('./GymUniqueCodes');
-
-// Define relationships
 // Gym-User owner relationship
 User.hasMany(Gym, {
   foreignKey: 'ownerId',
-  sourceKey: 'email',
   as: 'ownedGyms',
-  onDelete: 'SET NULL',
+  onDelete: 'CASCADE',
 });
 
 Gym.belongsTo(User, {
   foreignKey: 'ownerId',
-  targetKey: 'email',
-  as: 'owner',
-  constraints: false
+  as: 'owner'
 });
 
-Gym.hasMany(Amenity, {
-  foreignKey: 'gymId',
-  as: 'amenities',
-  onDelete: 'CASCADE',
-});
-
-Amenity.belongsTo(Gym, {
-  foreignKey: 'gymId',
-  as: 'gym',
-});
-
-Gym.hasMany(GymImage, {
-  foreignKey: 'gymId',
-  as: 'images',
-  onDelete: 'CASCADE',
-});
-
-GymImage.belongsTo(Gym, {
-  foreignKey: 'gymId',
-  as: 'gym',
-});
-
-// Subscription relationships
-Gym.hasMany(Subscription, {
-  foreignKey: 'gymId',
-  as: 'subscriptions',
-  onDelete: 'CASCADE',
-});
-
-Subscription.belongsTo(Gym, {
-  foreignKey: 'gymId',
-  as: 'gym',
-});
-
-Subscription.hasMany(SubscriptionFeature, {
-  foreignKey: 'subscriptionId',
-  as: 'features',
-  onDelete: 'CASCADE',
-});
-
-SubscriptionFeature.belongsTo(Subscription, {
-  foreignKey: 'subscriptionId',
-  as: 'subscription',
-});
-
-// Payment relationships
-Payment.hasOne(UserSubscription, {
-  foreignKey: 'paymentId',
-  as: 'userSubscription',
-  onDelete: 'CASCADE',
-});
-
-UserSubscription.belongsTo(Payment, {
-  foreignKey: 'paymentId',
-  as: 'payment',
-});
-
-// Payment to Subscription relationship
-Payment.belongsTo(Subscription, {
-  foreignKey: 'subscriptionId',
-  as: 'subscription',
-});
-
-Subscription.hasMany(Payment, {
-  foreignKey: 'subscriptionId',
-  as: 'payments',
-  onDelete: 'CASCADE',
-});
-
-// Invoice relationships
-Payment.hasOne(Invoice, {
-  foreignKey: 'paymentId',
-  as: 'invoice',
-  onDelete: 'CASCADE',
-});
-
-Invoice.belongsTo(Payment, {
-  foreignKey: 'paymentId',
-  as: 'payment',
-});
-
-// UserSubscription to Subscription relationship
-UserSubscription.belongsTo(Subscription, {
-  foreignKey: 'subscriptionId',
-  as: 'subscription',
-});
-
-Subscription.hasMany(UserSubscription, {
-  foreignKey: 'subscriptionId',
-  as: 'userSubscriptions',
-  onDelete: 'CASCADE',
-});
-
-// Gym Slot relationships
-Gym.hasMany(GymSlot, {
-  foreignKey: 'gymId',
-  as: 'gymSlots',
-  onDelete: 'CASCADE',
-});
-
-GymSlot.belongsTo(Gym, {
-  foreignKey: 'gymId',
-  as: 'gym',
-});
-
-// Slot Availability relationships
-GymSlot.hasMany(SlotAvailability, {
-  foreignKey: 'gymSlotId',
-  as: 'slotAvailability',
-  onDelete: 'CASCADE',
-});
-
-SlotAvailability.belongsTo(GymSlot, {
-  foreignKey: 'gymSlotId',
-  as: 'gymSlot',
-});
-
-// User Slot Booking relationships
-UserSubscription.hasMany(UserSlotBooking, {
-  foreignKey: 'userSubscriptionId',
-  as: 'slotBookings',
-  onDelete: 'CASCADE',
-});
-
-UserSlotBooking.belongsTo(UserSubscription, {
-  foreignKey: 'userSubscriptionId',
-  as: 'userSubscription',
-});
-
-GymSlot.hasMany(UserSlotBooking, {
-  foreignKey: 'gymSlotId',
-  as: 'slotBookings',
-  onDelete: 'CASCADE',
-});
-
-UserSlotBooking.belongsTo(GymSlot, {
-  foreignKey: 'gymSlotId',
-  as: 'gymSlot',
-});
-
-// Slot Change History relationships
-UserSubscription.hasMany(SlotChangeHistory, {
-  foreignKey: 'userSubscriptionId',
-  as: 'slotChangeHistory',
-  onDelete: 'CASCADE',
-});
-
-SlotChangeHistory.belongsTo(UserSubscription, {
-  foreignKey: 'userSubscriptionId',
-  as: 'userSubscription',
-});
-
-GymSlot.hasMany(SlotChangeHistory, {
-  foreignKey: 'oldGymSlotId',
-  as: 'oldSlotChanges',
-  onDelete: 'SET NULL',
-});
-
-GymSlot.hasMany(SlotChangeHistory, {
-  foreignKey: 'newGymSlotId',
-  as: 'newSlotChanges',
-  onDelete: 'CASCADE',
-});
-
-SlotChangeHistory.belongsTo(GymSlot, {
-  foreignKey: 'oldGymSlotId',
-  as: 'oldGymSlot',
-});
-
-SlotChangeHistory.belongsTo(GymSlot, {
-  foreignKey: 'newGymSlotId',
-  as: 'newGymSlot',
-});
-
-// Slot Waitlist relationships
-GymSlot.hasMany(SlotWaitlist, {
-  foreignKey: 'gymSlotId',
-  as: 'waitlist',
-  onDelete: 'CASCADE',
-});
-
-SlotWaitlist.belongsTo(GymSlot, {
-  foreignKey: 'gymSlotId',
-  as: 'gymSlot',
-});
-
-// VendorPaymentConfig relationships
-Gym.hasMany(VendorPaymentConfig, {
-  foreignKey: 'gymId',
-  as: 'vendorConfigs',
-  onDelete: 'CASCADE',
-});
-
-VendorPaymentConfig.belongsTo(Gym, {
-  foreignKey: 'gymId',
-  as: 'gym',
-});
-
-User.hasMany(VendorPaymentConfig, {
-  foreignKey: 'ownerEmail',
-  sourceKey: 'email',
-  as: 'vendorConfigs',
-  onDelete: 'CASCADE',
-});
-
-VendorPaymentConfig.belongsTo(User, {
-  foreignKey: 'ownerEmail',
-  targetKey: 'email',
-  as: 'owner',
-});
-
-// Payment to VendorPaymentConfig relationship
-Payment.belongsTo(VendorPaymentConfig, {
-  foreignKey: 'vendorConfigId',
-  as: 'vendorConfig',
-});
-
-VendorPaymentConfig.hasMany(Payment, {
-  foreignKey: 'vendorConfigId',
-  as: 'payments',
-  onDelete: 'SET NULL',
-});
-
-// Refund relationships
-Payment.hasMany(Refund, {
-  foreignKey: 'paymentId',
-  as: 'refunds',
-  onDelete: 'CASCADE',
-});
-
-Refund.belongsTo(Payment, {
-  foreignKey: 'paymentId',
-  as: 'payment',
-});
-
-UserSubscription.hasMany(Refund, {
-  foreignKey: 'subscriptionId',
-  as: 'refunds',
-  onDelete: 'CASCADE',
-});
-
-Refund.belongsTo(UserSubscription, {
-  foreignKey: 'subscriptionId',
-  as: 'subscription',
-});
-
-User.hasMany(Refund, {
-  foreignKey: 'userEmail',
-  sourceKey: 'email',
-  as: 'refunds',
-  onDelete: 'CASCADE',
-});
-
-Refund.belongsTo(User, {
-  foreignKey: 'userEmail',
-  targetKey: 'email',
-  as: 'user',
-});
-
-// Advertisement relationships
-Advertisement.hasMany(AdvertisementMedia, {
-  foreignKey: 'advertisementId',
-  as: 'media',
-  onDelete: 'CASCADE',
-});
-
-AdvertisementMedia.belongsTo(Advertisement, {
-  foreignKey: 'advertisementId',
-  as: 'advertisement',
-});
-
-Advertisement.hasMany(AdvertisementAnalytics, {
-  foreignKey: 'advertisementId',
-  as: 'analytics',
-  onDelete: 'CASCADE',
-});
-
-AdvertisementAnalytics.belongsTo(Advertisement, {
-  foreignKey: 'advertisementId',
-  as: 'advertisement',
-});
-
-// User relationships for advertisements
-User.hasMany(Advertisement, {
-  foreignKey: 'createdBy',
-  sourceKey: 'id',
-  as: 'createdAdvertisements',
-  onDelete: 'SET NULL',
-});
-
-User.hasMany(Advertisement, {
-  foreignKey: 'updatedBy',
-  sourceKey: 'id',
-  as: 'updatedAdvertisements',
-  onDelete: 'SET NULL',
-});
-
-Advertisement.belongsTo(User, {
-  foreignKey: 'createdBy',
-  targetKey: 'id',
-  as: 'creator',
-  constraints: false
-});
-
-Advertisement.belongsTo(User, {
-  foreignKey: 'updatedBy',
-  targetKey: 'id',
-  as: 'updater',
-  constraints: false
-});
-
-// Notification relationships
-User.hasMany(Notification, {
-  foreignKey: 'recipientEmail',
-  sourceKey: 'email',
-  as: 'receivedNotifications',
-  onDelete: 'CASCADE'
-});
-
-Notification.belongsTo(User, {
-  foreignKey: 'recipientEmail',
-  targetKey: 'email',
-  as: 'recipient'
-});
-
-User.hasMany(Notification, {
-  foreignKey: 'senderEmail',
-  sourceKey: 'email',
-  as: 'sentNotifications',
-  onDelete: 'SET NULL'
-});
-
-Notification.belongsTo(User, {
-  foreignKey: 'senderEmail',
-  targetKey: 'email',
-  as: 'sender'
-});
-
-Gym.hasMany(Notification, {
-  foreignKey: 'gymId',
-  as: 'notifications',
-  onDelete: 'CASCADE'
-});
-
-Notification.belongsTo(Gym, {
-  foreignKey: 'gymId',
-  as: 'gym'
-});
-
-// Push Subscription relationships
-User.hasMany(PushSubscription, {
-  foreignKey: 'userEmail',
-  sourceKey: 'email',
-  as: 'pushSubscriptions',
-  onDelete: 'CASCADE'
-});
-
-PushSubscription.belongsTo(User, {
-  foreignKey: 'userEmail',
-  targetKey: 'email',
-  as: 'user'
-});
-
-// Review relationships (temporarily disabled)
-// User.hasMany(Review, {
-//   foreignKey: 'userEmail',
-//   sourceKey: 'email',
-//   as: 'reviews',
-//   onDelete: 'CASCADE'
-// });
-
-// Review.belongsTo(User, {
-//   foreignKey: 'userEmail',
-//   targetKey: 'email',
-//   as: 'user'
-// });
-
-// Gym.hasMany(Review, {
-//   foreignKey: 'gymId',
-//   as: 'reviews',
-//   onDelete: 'CASCADE'
-// });
-
-// Review.belongsTo(Gym, {
-//   foreignKey: 'gymId',
-//   as: 'gym'
-// });
-
-// Attendance system relationships
-// User - Attendance relationships
-User.hasMany(Attendance, {
-  foreignKey: 'userEmail',
-  sourceKey: 'email',
-  as: 'attendances',
-  onDelete: 'CASCADE'
-});
-
-Attendance.belongsTo(User, {
-  foreignKey: 'userEmail',
-  targetKey: 'email',
-  as: 'user'
-});
-
-// Gym - Attendance relationships
-Gym.hasMany(Attendance, {
-  foreignKey: 'gymId',
-  as: 'attendances',
-  onDelete: 'CASCADE'
-});
-
-Attendance.belongsTo(Gym, {
-  foreignKey: 'gymId',
-  as: 'gym'
-});
-
-// Gym - Check-in Methods relationships
-Gym.hasMany(GymCheckInMethods, {
-  foreignKey: 'gymId',
-  as: 'checkInMethods',
-  onDelete: 'CASCADE'
-});
-
-GymCheckInMethods.belongsTo(Gym, {
-  foreignKey: 'gymId',
-  as: 'gym'
-});
-
-// Gym - QR Codes relationships
+// Gym-QR Codes
 Gym.hasMany(GymQRCodes, {
   foreignKey: 'gymId',
   as: 'qrCodes',
@@ -642,140 +132,433 @@ GymQRCodes.belongsTo(Gym, {
   as: 'gym'
 });
 
-// User creator relationships for QR codes
-User.hasMany(GymQRCodes, {
-  foreignKey: 'createdBy',
-  sourceKey: 'id',
-  as: 'createdQRCodes',
-  onDelete: 'SET NULL'
-});
-
-GymQRCodes.belongsTo(User, {
-  foreignKey: 'createdBy',
-  targetKey: 'id',
-  as: 'creator',
-  constraints: false
-});
-
-User.hasMany(GymQRCodes, {
-  foreignKey: 'updatedBy',
-  sourceKey: 'id',
-  as: 'updatedQRCodes',
-  onDelete: 'SET NULL'
-});
-
-GymQRCodes.belongsTo(User, {
-  foreignKey: 'updatedBy',
-  targetKey: 'id',
-  as: 'updater',
-  constraints: false
-});
-
-// Gym - Unique Codes relationships
-Gym.hasMany(GymUniqueCodes, {
-  foreignKey: 'gymId',
-  as: 'uniqueCodes',
+// Attendance
+User.hasMany(Attendance, {
+  foreignKey: 'userId',
+  as: 'attendances',
   onDelete: 'CASCADE'
 });
 
-GymUniqueCodes.belongsTo(Gym, {
+Attendance.belongsTo(User, {
+  foreignKey: 'userId',
+  as: 'user'
+});
+
+Gym.hasMany(Attendance, {
+  foreignKey: 'gymId',
+  as: 'attendances',
+  onDelete: 'CASCADE'
+});
+
+Attendance.belongsTo(Gym, {
   foreignKey: 'gymId',
   as: 'gym'
 });
 
-// User creator relationships for unique codes
-User.hasMany(GymUniqueCodes, {
-  foreignKey: 'createdBy',
-  sourceKey: 'id',
-  as: 'createdUniqueCodes',
-  onDelete: 'SET NULL'
+// Subscriptions
+Gym.hasMany(Subscription, {
+  foreignKey: 'gymId',
+  as: 'subscriptions',
+  onDelete: 'CASCADE',
 });
 
-GymUniqueCodes.belongsTo(User, {
-  foreignKey: 'createdBy',
-  targetKey: 'id',
-  as: 'creator',
-  constraints: false
+Subscription.belongsTo(Gym, {
+  foreignKey: 'gymId',
+  as: 'gym',
 });
 
-User.hasMany(GymUniqueCodes, {
-  foreignKey: 'updatedBy',
-  sourceKey: 'id',
-  as: 'updatedUniqueCodes',
-  onDelete: 'SET NULL'
+User.hasMany(UserSubscription, {
+  foreignKey: 'userId',
+  as: 'subscriptions',
+  onDelete: 'CASCADE',
 });
 
-GymUniqueCodes.belongsTo(User, {
-  foreignKey: 'updatedBy',
-  targetKey: 'id',
-  as: 'updater',
-  constraints: false
+UserSubscription.belongsTo(User, {
+  foreignKey: 'userId',
+  as: 'user',
 });
 
-// User default gym relationship
-User.belongsTo(Gym, {
-  foreignKey: 'defaultGymId',
-  as: 'defaultGym',
-  constraints: false
+UserSubscription.belongsTo(Subscription, {
+  foreignKey: 'subscriptionId',
+  as: 'subscription',
 });
 
-// Sync models with database (in development)
+// Payments
+User.hasMany(Payment, {
+  foreignKey: 'userId',
+  as: 'payments',
+  onDelete: 'CASCADE',
+});
+
+Payment.belongsTo(User, {
+  foreignKey: 'userId',
+  as: 'user',
+});
+
+Gym.hasMany(Payment, {
+  foreignKey: 'gymId',
+  as: 'payments',
+  onDelete: 'CASCADE',
+});
+
+Payment.belongsTo(Gym, {
+  foreignKey: 'gymId',
+  as: 'gym',
+});
+
+// Payment Items
+Payment.hasMany(PaymentItem, {
+  foreignKey: 'paymentId',
+  as: 'items',
+  onDelete: 'CASCADE',
+});
+
+PaymentItem.belongsTo(Payment, {
+  foreignKey: 'paymentId',
+  as: 'payment',
+});
+
+// Notifications
+User.hasMany(Notification, {
+  foreignKey: 'userId',
+  as: 'notifications',
+  onDelete: 'CASCADE'
+});
+
+Notification.belongsTo(User, {
+  foreignKey: 'userId',
+  as: 'user'
+});
+
+// Advertisements
+Advertisement.hasMany(AdvertisementAnalytics, {
+  foreignKey: 'advertisementId',
+  as: 'analytics',
+  onDelete: 'CASCADE',
+});
+
+AdvertisementAnalytics.belongsTo(Advertisement, {
+  foreignKey: 'advertisementId',
+  as: 'advertisement',
+});
+
+// Gym Features (Many-to-Many)
+Gym.belongsToMany(Feature, {
+  through: GymFeature,
+  foreignKey: 'gymId',
+  otherKey: 'featureId',
+  as: 'features'
+});
+
+Feature.belongsToMany(Gym, {
+  through: GymFeature,
+  foreignKey: 'featureId',
+  otherKey: 'gymId',
+  as: 'gyms'
+});
+
+// Gym Slots
+Gym.hasMany(GymSlot, {
+  foreignKey: 'gymId',
+  as: 'slots',
+  onDelete: 'CASCADE'
+});
+
+GymSlot.belongsTo(Gym, {
+  foreignKey: 'gymId',
+  as: 'gym'
+});
+
+// User Slot Bookings
+User.hasMany(UserSlotBooking, {
+  foreignKey: 'userId',
+  as: 'slotBookings',
+  onDelete: 'CASCADE'
+});
+
+UserSlotBooking.belongsTo(User, {
+  foreignKey: 'userId',
+  as: 'user'
+});
+
+GymSlot.hasMany(UserSlotBooking, {
+  foreignKey: 'slotId',
+  as: 'bookings',
+  onDelete: 'CASCADE'
+});
+
+UserSlotBooking.belongsTo(GymSlot, {
+  foreignKey: 'slotId',
+  as: 'slot'
+});
+
+// Slot Waitlist
+GymSlot.hasMany(SlotWaitlist, {
+  foreignKey: 'slotId',
+  as: 'waitlist',
+  onDelete: 'CASCADE'
+});
+
+SlotWaitlist.belongsTo(GymSlot, {
+  foreignKey: 'slotId',
+  as: 'slot'
+});
+
+User.hasMany(SlotWaitlist, {
+  foreignKey: 'userId',
+  as: 'waitlistEntries',
+  onDelete: 'CASCADE'
+});
+
+SlotWaitlist.belongsTo(User, {
+  foreignKey: 'userId',
+  as: 'user'
+});
+
+// Gym Trainers (Many-to-Many through GymTrainer)
+Gym.belongsToMany(User, {
+  through: GymTrainer,
+  foreignKey: 'gymId',
+  otherKey: 'trainerId',
+  as: 'trainers',
+  scope: {
+    role: 3 // Only users with trainer role
+  }
+});
+
+User.belongsToMany(Gym, {
+  through: GymTrainer,
+  foreignKey: 'trainerId',
+  otherKey: 'gymId',
+  as: 'assignedGyms'
+});
+
+// Diet Plans
+User.hasMany(DietPlan, {
+  foreignKey: 'trainerId',
+  as: 'createdDietPlans',
+  onDelete: 'CASCADE'
+});
+
+User.hasMany(DietPlan, {
+  foreignKey: 'userId',
+  as: 'dietPlans',
+  onDelete: 'CASCADE'
+});
+
+DietPlan.belongsTo(User, {
+  foreignKey: 'trainerId',
+  as: 'trainer'
+});
+
+DietPlan.belongsTo(User, {
+  foreignKey: 'userId',
+  as: 'user'
+});
+
+// Diet Plan Meals
+DietPlan.hasMany(DietPlanMeal, {
+  foreignKey: 'planId',
+  as: 'meals',
+  onDelete: 'CASCADE'
+});
+
+DietPlanMeal.belongsTo(DietPlan, {
+  foreignKey: 'planId',
+  as: 'plan'
+});
+
+// Wallet
+User.hasOne(Wallet, {
+  foreignKey: 'ownerId',
+  as: 'wallet',
+  onDelete: 'CASCADE',
+  scope: {
+    ownerType: ['admin', 'owner']
+  }
+});
+
+Wallet.belongsTo(User, {
+  foreignKey: 'ownerId',
+  as: 'owner'
+});
+
+// Wallet Transactions
+Wallet.hasMany(WalletTransaction, {
+  foreignKey: 'walletId',
+  as: 'transactions',
+  onDelete: 'CASCADE'
+});
+
+WalletTransaction.belongsTo(Wallet, {
+  foreignKey: 'walletId',
+  as: 'wallet'
+});
+
+// Withdraw Requests
+User.hasMany(WithdrawRequest, {
+  foreignKey: 'ownerId',
+  as: 'withdrawRequests',
+  onDelete: 'CASCADE'
+});
+
+WithdrawRequest.belongsTo(User, {
+  foreignKey: 'ownerId',
+  as: 'owner'
+});
+
+Wallet.hasMany(WithdrawRequest, {
+  foreignKey: 'walletId',
+  as: 'withdrawRequests',
+  onDelete: 'CASCADE'
+});
+
+WithdrawRequest.belongsTo(Wallet, {
+  foreignKey: 'walletId',
+  as: 'wallet'
+});
+
+// Invoices
+User.hasMany(Invoice, {
+  foreignKey: 'userId',
+  as: 'invoices',
+  onDelete: 'CASCADE'
+});
+
+Invoice.belongsTo(User, {
+  foreignKey: 'userId',
+  as: 'user'
+});
+
+Gym.hasMany(Invoice, {
+  foreignKey: 'gymId',
+  as: 'invoices',
+  onDelete: 'CASCADE'
+});
+
+Invoice.belongsTo(Gym, {
+  foreignKey: 'gymId',
+  as: 'gym'
+});
+
+// Invoice Items
+Invoice.hasMany(InvoiceItem, {
+  foreignKey: 'invoiceId',
+  as: 'items',
+  onDelete: 'CASCADE'
+});
+
+InvoiceItem.belongsTo(Invoice, {
+  foreignKey: 'invoiceId',
+  as: 'invoice'
+});
+
+// Refunds
+Payment.hasMany(Refund, {
+  foreignKey: 'paymentId',
+  as: 'refunds',
+  onDelete: 'CASCADE'
+});
+
+Refund.belongsTo(Payment, {
+  foreignKey: 'paymentId',
+  as: 'payment'
+});
+
+// Push Subscriptions
+User.hasMany(PushSubscription, {
+  foreignKey: 'userId',
+  as: 'pushSubscriptions',
+  onDelete: 'CASCADE'
+});
+
+PushSubscription.belongsTo(User, {
+  foreignKey: 'userId',
+  as: 'user'
+});
+
+// Check-in Methods associations
+Gym.belongsToMany(CheckInMethod, {
+  through: GymCheckInMethods,
+  foreignKey: 'gymId',
+  otherKey: 'methodId',
+  as: 'checkinMethods'
+});
+
+CheckInMethod.belongsToMany(Gym, {
+  through: GymCheckInMethods,
+  foreignKey: 'methodId',
+  otherKey: 'gymId',
+  as: 'gyms'
+});
+
+Attendance.belongsTo(CheckInMethod, {
+  foreignKey: 'methodId',
+  as: 'checkinMethod'
+});
+
+// Gym Amenities association
+Gym.hasMany(GymAmenity, {
+  foreignKey: 'gymId',
+  as: 'amenities',
+  onDelete: 'CASCADE'
+});
+
+GymAmenity.belongsTo(Gym, {
+  foreignKey: 'gymId',
+  as: 'gym'
+});
+
+// Subscription Features association
+Subscription.hasMany(SubscriptionFeature, {
+  foreignKey: 'subscriptionId',
+  as: 'features',
+  onDelete: 'CASCADE'
+});
+
+SubscriptionFeature.belongsTo(Subscription, {
+  foreignKey: 'subscriptionId',
+  as: 'subscription'
+});
+
+// Refresh Token associations
+User.hasMany(RefreshToken, {
+  foreignKey: 'userId',
+  as: 'refreshTokens',
+  onDelete: 'CASCADE'
+});
+
+RefreshToken.belongsTo(User, {
+  foreignKey: 'userId',
+  as: 'user'
+});
+
+// Media associations (polymorphic)
+// Note: Media table uses entity_type and entity_id for polymorphic associations
+// These would need to be handled programmatically rather than through Sequelize associations
+
+// ========================================
+// DATABASE SYNC
+// ========================================
 const syncDatabase = async () => {
   try {
+    console.log('🔄 Synchronizing database models...');
+    
     // Use alter: true in development to modify tables without losing data
-    // Only use force: true when you explicitly want to reset the database
     const syncOptions = process.env.NODE_ENV === 'production' ? 
       { alter: false } : 
-      { alter: true }; // This modifies tables without dropping data
+      { alter: true };
     
     await sequelize.sync(syncOptions);
     console.log('✅ Database models synchronized successfully.');
     
     // Create defaults (only in development)
     if (process.env.NODE_ENV !== 'production') {
-      await createDefaultAdmin();
       await createDefaultFitnessGoals();
     }
   } catch (error) {
     console.error('❌ Error synchronizing database models:', error.message);
-    console.error('Full error:', error);
-    
-    // If sync fails, try dropping all tables and recreating
-    if (error.message.includes('Too many keys') || error.message.includes('ER_TOO_MANY_KEYS')) {
-      console.log('🔄 Attempting to fix "too many keys" error by recreating database...');
-      try {
-        await sequelize.drop();
-        await sequelize.sync({ force: false });
-        console.log('✅ Database recreated successfully.');
-        await createDefaultAdmin();
-      } catch (retryError) {
-        console.error('❌ Failed to recreate database:', retryError.message);
-      }
-    }
-  }
-};
-
-// Create default admin user
-const createDefaultAdmin = async () => {
-  try {
-    const adminExists = await User.findOne({ where: { type: '3' } });
-    
-    if (!adminExists) {
-      await User.create({
-        id: 'ADMIN001', // Explicitly provide an ID for the admin
-        firstName: 'Admin',
-        lastName: 'User',
-        username: 'admin',
-        email: 'admin@gym.com',
-        password: 'Admin123!',
-        type: '3',
-        activeStatus: '1',
-        isVerified: true // Admin is pre-verified
-      });
-      console.log('✅ Default admin user created (admin@gym.com / Admin123!)');
-    }
-  } catch (error) {
-    console.log('⚠️  Could not create default admin:', error.message);
+    throw error;
   }
 };
 
@@ -783,19 +566,19 @@ const createDefaultAdmin = async () => {
 const createDefaultFitnessGoals = async () => {
   try {
     const goals = [
-      { goalName: 'Weight Loss', description: 'Focus on losing weight and reducing body fat' },
-      { goalName: 'Muscle Building', description: 'Build lean muscle mass and strength' },
-      { goalName: 'Endurance', description: 'Improve cardiovascular endurance and stamina' },
-      { goalName: 'Flexibility', description: 'Enhance flexibility and mobility' },
-      { goalName: 'General Fitness', description: 'Overall health and fitness improvement' },
-      { goalName: 'Strength Training', description: 'Focus on building raw strength' },
-      { goalName: 'Cardio Health', description: 'Improve heart health and cardiovascular system' }
+      { goal_name: 'Weight Loss', description: 'Focus on losing weight and reducing body fat' },
+      { goal_name: 'Muscle Building', description: 'Build lean muscle mass and strength' },
+      { goal_name: 'Endurance', description: 'Improve cardiovascular endurance and stamina' },
+      { goal_name: 'Flexibility', description: 'Enhance flexibility and mobility' },
+      { goal_name: 'General Fitness', description: 'Overall health and fitness improvement' },
+      { goal_name: 'Strength Training', description: 'Focus on building raw strength' },
+      { goal_name: 'Cardio Health', description: 'Improve heart health and cardiovascular system' }
     ];
 
     for (const goal of goals) {
       await FitnessGoal.findOrCreate({
-        where: { goalName: goal.goalName },
-        defaults: goal
+        where: { goalName: goal.goal_name },
+        defaults: { goalName: goal.goal_name, description: goal.description }
       });
     }
     console.log('✅ Default fitness goals initialized');
@@ -804,74 +587,50 @@ const createDefaultFitnessGoals = async () => {
   }
 };
 
-// Create default settings for a user
-const createDefaultUserSettings = async (userEmail) => {
-  try {
-    // Create default notification settings
-    await UserNotificationSettings.findOrCreate({
-      where: { userEmail },
-      defaults: { userEmail }
-    });
-
-    // Create default privacy settings
-    await UserPrivacySettings.findOrCreate({
-      where: { userEmail },
-      defaults: { userEmail }
-    });
-
-    // Create default app preferences
-    await UserAppPreferences.findOrCreate({
-      where: { userEmail },
-      defaults: { userEmail }
-    });
-
-    console.log(`✅ Default settings created for user: ${userEmail}`);
-  } catch (error) {
-    console.log(`⚠️  Could not create default settings for ${userEmail}:`, error.message);
-  }
-};
-
 module.exports = {
   sequelize,
   User,
-  RefreshToken,
   UserProfile,
   EmergencyContact,
-  UserNotificationSettings,
-  UserPrivacySettings,
-  UserAppPreferences,
   FitnessGoal,
   UserFitnessGoal,
-  ProfileImage,
   Gym,
-  Amenity,
-  GymImage,
+  GymQRCodes,
+  GymCheckInMethods,
+  CheckInMethod,
+  Attendance,
   Subscription,
   SubscriptionFeature,
   UserSubscription,
   Payment,
+  PaymentItem,
   Invoice,
-  GymSlot,
-  SlotAvailability,
-  UserSlotBooking,
-  SlotChangeHistory,
-  SlotWaitlist,
-  VendorPaymentConfig,
+  InvoiceItem,
   Refund,
+  Wallet,
+  WalletTransaction,
+  WithdrawRequest,
+  GymSlot,
+  UserSlotBooking,
+  SlotWaitlist,
+  Advertisement,
+  AdvertisementAnalytics,
   Notification,
   PushSubscription,
-  // Review,
-  Advertisement,
-  AdvertisementMedia,
-  AdvertisementAnalytics,
-  // Attendance system models
-  Attendance,
-  GymCheckInMethods,
-  GymQRCodes,
+  GymTrainer,
+  DietPlan,
+  DietPlanMeal,
+  DietChangeRequest,
+  DietPlanHistory,
+  Plan,
+  GymAmenity,
+  GymFeature,
   GymUniqueCodes,
+  SlotAvailability,
+  SlotChangeHistory,
+  VendorPaymentConfig,
+  Media,
+  RefreshToken,
   syncDatabase,
-  testConnection,
-  createDefaultAdmin,
-  createDefaultFitnessGoals,
-  createDefaultUserSettings,
+  testConnection
 };

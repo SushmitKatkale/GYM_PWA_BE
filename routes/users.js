@@ -16,90 +16,6 @@ const userRouter = express.Router();
 
 /**
  * @swagger
- * components:
- *   schemas:
- *     UserNew:
- *       type: object
- *       required:
- *         - firstName
- *         - lastName
- *         - username
- *         - email
- *         - password
- *       properties:
- *         firstName:
- *           type: string
- *           minLength: 2
- *           maxLength: 50
- *           description: User's first name
- *         lastName:
- *           type: string
- *           minLength: 2
- *           maxLength: 50
- *           description: User's last name
- *         username:
- *           type: string
- *           minLength: 3
- *           maxLength: 50
- *           pattern: '^[a-zA-Z0-9]+$'
- *           description: Unique username (alphanumeric only)
- *         email:
- *           type: string
- *           format: email
- *           description: Unique email address
- *         password:
- *           type: string
- *           minLength: 8
- *           maxLength: 100
- *           description: Password with special characters
- *         phoneNumber:
- *           type: string
- *           pattern: '^[+]?[0-9\s\-\(\)]+$'
- *           description: Phone number
- *         type:
- *           type: string
- *           enum: ['1', '2', '3']
- *           description: '1-user, 2-owner, 3-admin'
- *           default: '1'
- *         activeStatus:
- *           type: string
- *           enum: ['0', '1']
- *           description: '0-inactive, 1-active'
- *           default: '1'
- *     UserResponse:
- *       type: object
- *       properties:
- *         id:
- *           type: string
- *           description: Unique 7-8 character alphanumeric ID
- *         firstName:
- *           type: string
- *         lastName:
- *           type: string
- *         username:
- *           type: string
- *         email:
- *           type: string
- *         phoneNumber:
- *           type: string
- *         type:
- *           type: string
- *         activeStatus:
- *           type: string
- *         createTimestamp:
- *           type: string
- *           format: date-time
- *         createdBy:
- *           type: string
- *         updateTimestamp:
- *           type: string
- *           format: date-time
- *         updatedBy:
- *           type: string
- */
-
-/**
- * @swagger
  * /api/users:
  *   post:
  *     tags: [User Management]
@@ -114,14 +30,14 @@ const userRouter = express.Router();
  *           schema:
  *             $ref: '#/components/schemas/UserNew'
  *           example:
- *             firstName: 'John'
- *             lastName: 'Doe'
- *             username: 'johndoe'
+ *             firstName: 'Sushmit'
+ *             lastName: 'Katkale'
+ *             username: 'Sushmit'
  *             email: 'john@example.com'
  *             password: 'SecurePass123!'
- *             phoneNumber: '+1234567890'
- *             type: '1'
- *             activeStatus: '1'
+ *             phone: '+1234567890'
+ *             role: 1
+ *             recordStatus: 1
  *     responses:
  *       201:
  *         description: User created successfully
@@ -191,7 +107,7 @@ userRouter.post('/', validate(createUserSchema), authenticate, authorize('3'), U
  *         name: sortBy
  *         schema:
  *           type: string
- *           enum: ['createTimestamp', 'updateTimestamp', 'firstName', 'lastName', 'username', 'email']
+ *           enum: ['created_at','firstName', 'lastName', 'username', 'email']
  *           default: 'createTimestamp'
  *         description: Sort by field
  *       - in: query
@@ -215,7 +131,7 @@ userRouter.get('/', validateQuery(queryParamsSchema), authenticate, authorize('3
  * @swagger
  * /api/users/profile:
  *   get:
- *     tags: [User Management]
+ *     tags: [User Profile Management]
  *     summary: Get current user profile
  *     description: Retrieve the profile information of the currently authenticated user based on JWT token
  *     security:
@@ -296,7 +212,7 @@ userRouter.delete('/profile/emergency-contacts/:contactId', authenticate, UserCo
  * @swagger
  * /api/users/profile/image:
  *   post:
- *     tags: [User Profile]
+ *     tags: [User Profile Management]
  *     summary: Upload profile image
  *     description: Upload a profile image for the current user
  *     security:
@@ -328,7 +244,7 @@ userRouter.post('/profile/image', authenticate, profileImageUpload.single('image
  * @swagger
  * /api/users/profile/image/url:
  *   get:
- *     tags: [User Profile]
+ *     tags: [User Profile Management]
  *     summary: Get current user's profile image URL
  *     description: Retrieve the URL of the current user's active profile image
  *     security:
@@ -352,14 +268,15 @@ userRouter.post('/profile/image', authenticate, profileImageUpload.single('image
 userRouter.get('/profile/image/url', authenticate, UserController.getProfileImageUrl);
 
 /**
- * /api/users/profile/image/file/{imageId}:
+ * @swagger
+ * /api/users/profile/image/file/{userId}:
  *   get:
- *     tags: [User Profile]
+ *     tags: [User Profile Management]
  *     summary: Serve profile image file
  *     description: Serve the actual profile image file (public access for img tags)
  *     parameters:
  *       - in: path
- *         name: imageId
+ *         name: userId
  *         required: true
  *         schema:
  *           type: string
@@ -375,13 +292,13 @@ userRouter.get('/profile/image/url', authenticate, UserController.getProfileImag
  *       404:
  *         description: Profile image not found
  */
-userRouter.get('/profile/image/file/:imageId', UserController.getProfileImageFile);
+userRouter.get('/profile/image/file/:userId', UserController.getProfileImageFile);
 
 /**
  * @swagger
  * /api/users/profile/image/{imageId}:
  *   delete:
- *     tags: [User Profile]
+ *     tags: [User Profile Management]
  *     summary: Delete profile image
  *     description: Delete a specific profile image by ID
  *     security:
@@ -470,14 +387,14 @@ userRouter.get('/:email', authenticate, authorize('3'), UserController.getUserBy
  *                 type: string
  *               username:
  *                 type: string
- *               phoneNumber:
+ *               phone:
  *                 type: string
- *               type:
- *                 type: string
- *                 enum: ['1', '2', '3']
- *               activeStatus:
- *                 type: string
- *                 enum: ['0', '1']
+ *               role:
+ *                 type: number
+ *                 enum: [1, 2, 3, 4]
+ *               recordStatus:
+ *                 type: number
+ *                 enum: [0, 1]
  *     responses:
  *       200:
  *         description: User updated successfully
@@ -489,6 +406,91 @@ userRouter.get('/:email', authenticate, authorize('3'), UserController.getUserBy
  *         description: Username or email already exists
  */
 userRouter.put('/:email', validate(updateUserSchema), authenticate, authorize('3'), UserController.updateUser);
+
+/**
+ * @swagger
+ * /api/users/{userId}/toggle:
+ *   put:
+ *     tags: [User Management]
+ *     summary: Toggle user status (Admin only)
+ *     description: Activate or deactivate a user
+ *     security:
+ *       - bearerAuth: []
+ *     parameters:
+ *       - in: path
+ *         name: userId
+ *         required: true
+ *         schema:
+ *           type: integer
+ *         description: User ID
+ *     requestBody:
+ *       required: true
+ *       content:
+ *         application/json:
+ *           schema:
+ *             type: object
+ *             required:
+ *               - recordStatus
+ *             properties:
+ *               recordStatus:
+ *                 type: number
+ *                 enum: [0, 1]
+ *                 description: 0 for inactive, 1 for active
+ *     responses:
+ *       200:
+ *         description: User status updated successfully
+ *       404:
+ *         description: User not found
+ */
+userRouter.put('/:userId/toggle', validate(toggleStatusSchema), authenticate, authorize('3'), UserController.toggleUserStatus);
+
+/**
+ * @swagger
+ * /api/users/{userId}/verify:
+ *   put:
+ *     tags: [User Management]
+ *     summary: Verify user (Admin only)
+ *     description: Mark a user as verified
+ *     security:
+ *       - bearerAuth: []
+ *     parameters:
+ *       - in: path
+ *         name: userId
+ *         required: true
+ *         schema:
+ *           type: integer
+ *         description: User ID
+ *     responses:
+ *       200:
+ *         description: User verified successfully
+ *       404:
+ *         description: User not found
+ */
+userRouter.put('/:userId/verify', authenticate, authorize('3'), UserController.verifyUser);
+
+/**
+ * @swagger
+ * /api/users/{userId}/unverify:
+ *   put:
+ *     tags: [User Management]
+ *     summary: Unverify user (Admin only)
+ *     description: Mark a user as unverified
+ *     security:
+ *       - bearerAuth: []
+ *     parameters:
+ *       - in: path
+ *         name: userId
+ *         required: true
+ *         schema:
+ *           type: integer
+ *         description: User ID
+ *     responses:
+ *       200:
+ *         description: User unverified successfully
+ *       404:
+ *         description: User not found
+ */
+userRouter.put('/:userId/unverify', authenticate, authorize('3'), UserController.unverifyUser);
 
 /**
  * @swagger
@@ -514,69 +516,6 @@ userRouter.put('/:email', validate(updateUserSchema), authenticate, authorize('3
  *         description: User not found
  */
 userRouter.delete('/:email', authenticate, authorize('3'), UserController.deleteUser);
-
-/**
- * @swagger
- * /api/users/hard/{email}:
- *   delete:
- *     tags: [User Management]
- *     summary: Permanently delete user (Admin only)
- *     description: Permanently remove user from database
- *     security:
- *       - bearerAuth: []
- *     parameters:
- *       - in: path
- *         name: email
- *         required: true
- *         schema:
- *           type: string
- *           format: email
- *         description: User email address
- *     responses:
- *       200:
- *         description: User permanently deleted
- *       404:
- *         description: User not found
- */
-userRouter.delete('/hard/:email', authenticate, authorize('3'), UserController.hardDeleteUser);
-
-/**
- * @swagger
- * /api/users/toggle/{email}:
- *   put:
- *     tags: [User Management]
- *     summary: Toggle user active status (Admin only)
- *     description: Activate or deactivate a user
- *     security:
- *       - bearerAuth: []
- *     parameters:
- *       - in: path
- *         name: email
- *         required: true
- *         schema:
- *           type: string
- *           format: email
- *         description: User email address
- *     requestBody:
- *       required: true
- *       content:
- *         application/json:
- *           schema:
- *             type: object
- *             required:
- *               - activeStatus
- *             properties:
- *               activeStatus:
- *                 type: string
- *                 enum: ['0', '1']
- *                 description: '0-inactive, 1-active'
- *     responses:
- *       200:
- *         description: User status updated successfully
- *       404:
- *         description: User not found
- */
-userRouter.put('/toggle/:email', validate(toggleStatusSchema), authenticate, authorize('3'), UserController.toggleUserStatus);
 
 /**
  * @swagger
@@ -621,55 +560,6 @@ userRouter.put('/toggle/:email', validate(toggleStatusSchema), authenticate, aut
  */
 userRouter.get('/stats', authenticate, authorize('3'), UserController.getUserStats);
 
-/**
- * @swagger
- * /api/users/{email}/verify:
- *   put:
- *     tags: [User Management]
- *     summary: Verify user account (Admin only)
- *     description: Mark user account as verified
- *     security:
- *       - bearerAuth: []
- *     parameters:
- *       - in: path
- *         name: email
- *         required: true
- *         schema:
- *           type: string
- *           format: email
- *         description: User email address
- *     responses:
- *       200:
- *         description: User verified successfully
- *       404:
- *         description: User not found
- */
-userRouter.put('/:email/verify', authenticate, authorize('3'), UserController.verifyUser);
-
-/**
- * @swagger
- * /api/users/{email}/unverify:
- *   put:
- *     tags: [User Management]
- *     summary: Unverify user account (Admin only)
- *     description: Remove verification from user account
- *     security:
- *       - bearerAuth: []
- *     parameters:
- *       - in: path
- *         name: email
- *         required: true
- *         schema:
- *           type: string
- *           format: email
- *         description: User email address
- *     responses:
- *       200:
- *         description: User unverified successfully
- *       404:
- *         description: User not found
- */
-userRouter.put('/:email/unverify', authenticate, authorize('3'), UserController.unverifyUser);
 
 /**
  * @swagger

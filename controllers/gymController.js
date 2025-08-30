@@ -1,4 +1,4 @@
-const { Gym, Amenity, GymImage, User, Subscription, SubscriptionFeature, sequelize } = require('../models');
+const { Gym, Media, User, Subscription, SubscriptionFeature, sequelize, GymAmenity, GymFeature } = require('../models');
 const ResponseUtil = require('../utils/response');
 const DataFilter = require('../utils/dataFilter');
 const { Op } = require('sequelize');
@@ -20,7 +20,14 @@ const createGym = async (req, res) => {
       description,
       rating,
       currentOccupancy,
-      operatingHours,
+      email,
+      phone,
+      websiteUrl,
+      gstNumber,
+      registrationNo,
+      openingTime,
+      closingTime,
+      daysOpen,
       amenities = [],
       plans = [],
       ownerId,
@@ -28,30 +35,34 @@ const createGym = async (req, res) => {
     } = req.body;
 
     // Validate required fields
-    if (!name || !capacity || !address || !operatingHours) {
+    if (!name || !address || !latitude || !longitude || !ownerId) {
       await transaction.rollback();
-      return ResponseUtil.error(res, 'Missing required fields: name, capacity, address, operatingHours', 400);
+      return ResponseUtil.error(res, 'Missing required fields: name, address, latitude, longitude, ownerId', 400);
+    }
+
+    let gymData = {
+      name: name,
+      ownerId: ownerId,
+      address: address,
+      latitude: latitude,
+      longitude: longitude,
+      rating: rating,
+      capacity: capacity,
+      email: email,
+      phone: phone,
+      websiteUrl: websiteUrl,
+      gstNumber: gstNumber,
+      registrationNo: registrationNo,
+      openingTime: openingTime,
+      closingTime: closingTime,
+      daysOpen: daysOpen,
+      description: description,
+      createdBy: req.user.id,
+      recordStatus: 1
     }
 
     // Create the gym
-    const gym = await Gym.create({
-      name,
-      capacity,
-      address,
-      city,
-      state,
-      zipCode,
-      latitude,
-      longitude,
-      description,
-      rating: rating || 0.0,
-      currentOccupancy: currentOccupancy || 0,
-      openingTime: operatingHours.open,
-      closingTime: operatingHours.close,
-      ownerId,
-      createdBy,
-      activeStatus: true
-    }, { transaction });
+    const gym = await Gym.create(gymData, { transaction });
 
     // Create amenities if provided
     if (amenities && amenities.length > 0) {
@@ -59,35 +70,37 @@ const createGym = async (req, res) => {
         name: amenity.name,
         description: amenity.description,
         gymId: gym.id,
-        createdBy,
-        activeStatus: true
+        createdBy: req.user.id,
+        recordStatus: 1
       }));
-      await Amenity.bulkCreate(amenityData, { transaction });
+      await GymAmenity.bulkCreate(amenityData, { transaction });
     }
 
     // Create subscription plans and their features if provided
     if (plans && plans.length > 0) {
       for (const plan of plans) {
-        const subscription = await Subscription.create({
-          title: plan.title,
-          validityDays: plan.validityDays,
-          price: plan.price,
-          discountedPrice: plan.discountedPrice,
-          isMostPopular: plan.isMostPopular || false,
-          isCheapest: plan.isCheapest || false,
+        const createdPlan = await Subscription.create({
           gymId: gym.id,
-          createdBy,
-          activeStatus: true
+          name: plan.title,
+          price: plan.price,
+          validityDays: plan.validityDays,
+          discountPercent: plan.discountPercent || 0,
+          bufferDays: plan.bufferDays || 0,
+          bufferFee: plan.bufferFee || 0,
+          createdBy: req.user.id,
+          recordStatus: 1
         }, { transaction });
 
         // Create subscription features if provided
         if (plan.features && plan.features.length > 0) {
           const featureData = plan.features.map(feature => ({
+            subscriptionId: createdPlan.id,
             title: feature.title,
+            description: feature.description || '',
             isHighlighted: feature.isHighlighted || false,
-            subscriptionId: subscription.id,
-            createdBy,
-            activeStatus: true
+            displayOrder: 0,
+            createdBy: req.user.id,
+            recordStatus: 1
           }));
           await SubscriptionFeature.bulkCreate(featureData, { transaction });
         }
@@ -101,20 +114,20 @@ const createGym = async (req, res) => {
     const createdGym = await Gym.findByPk(gym.id, {
       include: [
         {
-          model: Amenity,
+          model: GymAmenity,
           as: 'amenities',
-          where: { activeStatus: true },
+          where: { recordStatus: true },
           required: false
         },
         {
           model: Subscription,
           as: 'subscriptions',
-          where: { activeStatus: true },
+          where: { recordStatus: true },
           required: false,
           include: [{
             model: SubscriptionFeature,
             as: 'features',
-            where: { activeStatus: true },
+            where: { recordStatus: true },
             required: false
           }]
         },
@@ -142,53 +155,94 @@ const getAllGyms = async (req, res) => {
       page = 1,
       limit = 10,
       search = '',
-      activeOnly = 'true'
+      activeOnly = 'true',
+      owner = '',
+      minRating = '',
+      capacity = ''
     } = req.query;
+
+    console.log('DEBUG: Received query params:', { page, limit, search, activeOnly, owner, minRating, capacity });
 
     const offset = (page - 1) * limit;
     const whereClause = {};
+    const ownerWhereClause = {};
 
     if (activeOnly === 'true') {
-      whereClause.activeStatus = true;
+      whereClause.recordStatus = true;
     }
 
-    if (search) {
+    // Search in gym name and address
+    if (search && search.trim().length > 0) {
       whereClause[Op.or] = [
         { name: { [Op.like]: `%${search}%` } },
-        { address: { [Op.like]: `%${search}%` } }
+        { address: { [Op.like]: `%${search}%` } },
+        { city: { [Op.like]: `%${search}%` } },
+        { state: { [Op.like]: `%${search}%` } }
       ];
     }
 
+    // Filter by owner name or email
+    if (owner && owner.trim().length > 0) {
+      ownerWhereClause[Op.or] = [
+        { firstName: { [Op.like]: `%${owner}%` } },
+        { lastName: { [Op.like]: `%${owner}%` } },
+        { email: { [Op.like]: `%${owner}%` } },
+        sequelize.where(
+          sequelize.fn('CONCAT', sequelize.col('firstName'), ' ', sequelize.col('lastName')),
+          { [Op.like]: `%${owner}%` }
+        )
+      ];
+    }
+
+    // Filter by minimum rating
+    if (minRating && minRating !== '') {
+      const ratingValue = parseFloat(minRating.replace('+', ''));
+      if (!isNaN(ratingValue)) {
+        whereClause.rating = { [Op.gte]: ratingValue };
+      }
+    }
+
+    // Filter by capacity range
+    if (capacity && capacity !== '') {
+      switch (capacity) {
+        case 'small':
+          whereClause.capacity = { [Op.lte]: 50 };
+          break;
+        case 'medium':
+          whereClause.capacity = { [Op.and]: [{ [Op.gt]: 50 }, { [Op.lte]: 200 }] };
+          break;
+        case 'large':
+          whereClause.capacity = { [Op.gt]: 200 };
+          break;
+      }
+    }
+
     // Apply ownership filter for owners (only their own gyms)
-    if (req.user.type === '2') { // Owner
-      whereClause.ownerId = req.user.email;
+    if (req.user.role === 2) { // Owner (updated role system: 1=member, 2=owner, 3=trainer, 4=admin)
+      whereClause.ownerId = req.user.id; // Use user.id instead of email
     }
     // Admin gets all gyms (no additional filter needed)
 
+    whereClause.recordStatus = [0, 1];
+    
     const { count, rows } = await Gym.findAndCountAll({
       where: whereClause,
       include: [
         {
-          model: Amenity,
+          model: GymAmenity,
           as: 'amenities',
-          where: { activeStatus: true },
-          required: false
-        },
-        {
-          model: GymImage,
-          as: 'images',
-          where: { activeStatus: true },
+          where: { recordStatus: true },
           required: false
         },
         {
           model: Subscription,
           as: 'subscriptions',
-          where: { activeStatus: true },
+          where: { recordStatus: true },
           required: false,
           include: [{
             model: SubscriptionFeature,
             as: 'features',
-            where: { activeStatus: true },
+            where: { recordStatus: true },
             required: false
           }]
         },
@@ -196,12 +250,13 @@ const getAllGyms = async (req, res) => {
           model: User,
           as: 'owner',
           attributes: ['id', 'firstName', 'lastName', 'email'],
-          required: false
+          where: Object.keys(ownerWhereClause).length > 0 ? ownerWhereClause : undefined,
+          required: Object.keys(ownerWhereClause).length > 0 ? true : false
         }
       ],
       limit: parseInt(limit),
       offset: parseInt(offset),
-      order: [['createTimestamp', 'DESC']]
+      order: [['created_at', 'DESC']]
     });
 
     // Apply role-based data filtering
@@ -212,8 +267,8 @@ const getAllGyms = async (req, res) => {
       gyms: filteredGyms,
       pagination: {
         currentPage: parseInt(page),
-        totalPages: Math.ceil(count / limit),
-        totalItems: count,
+        totalPages: Math.ceil(gymsData.length / limit),
+        totalItems: gymsData.length,
         itemsPerPage: parseInt(limit)
       }
     }, 'Gyms retrieved successfully');
@@ -231,26 +286,20 @@ const getGymById = async (req, res) => {
     const gym = await Gym.findByPk(id, {
       include: [
         {
-          model: Amenity,
+          model: GymAmenity,
           as: 'amenities',
-          where: { activeStatus: true },
-          required: false
-        },
-        {
-          model: GymImage,
-          as: 'images',
-          where: { activeStatus: true },
+          where: { recordStatus: true },
           required: false
         },
         {
           model: Subscription,
           as: 'subscriptions',
-          where: { activeStatus: true },
+          where: { recordStatus: true },
           required: false,
           include: [{
             model: SubscriptionFeature,
             as: 'features',
-            where: { activeStatus: true },
+            where: { recordStatus: true },
             required: false
           }]
         },
@@ -296,6 +345,12 @@ const updateGym = async (req, res) => {
       description,
       rating,
       currentOccupancy,
+      email,
+      phone,
+      websiteUrl,
+      gstNumber,
+      registrationNo,
+      daysOpen,
       operatingHours,
       updatedBy,
       amenities = [],
@@ -320,21 +375,27 @@ const updateGym = async (req, res) => {
       description,
       rating,
       currentOccupancy,
+      email,
+      phone,
+      websiteUrl,
+      gstNumber,
+      registrationNo,
+      daysOpen,
       openingTime: operatingHours?.open,
       closingTime: operatingHours?.close,
       updatedBy,
-      updateTimestamp: new Date()
+      updatedAt: new Date()
     });
 
     if (amenities.length) {
-      await Amenity.destroy({ where: { gymId: id } });
+      await GymAmenity.destroy({ where: { gymId: id } });
       const amenityData = amenities.map(({ name, description }) => ({
         name,
         description,
         gymId: id,
-        activeStatus: true
+        recordStatus: true
       }));
-      await Amenity.bulkCreate(amenityData);
+      await GymAmenity.bulkCreate(amenityData);
     }
 
     if (plans.length) {
@@ -348,14 +409,14 @@ const updateGym = async (req, res) => {
           isMostPopular: plan.isMostPopular || false,
           isCheapest: plan.isCheapest || false,
           gymId: id,
-          activeStatus: true
+          recordStatus: true
         });
         if (plan.features && plan.features.length) {
           const featureData = plan.features.map(({ title, isHighlighted }) => ({
             title,
             isHighlighted,
             subscriptionId: createdPlan.id,
-            activeStatus: true
+            recordStatus: true
           }));
           await SubscriptionFeature.bulkCreate(featureData);
         }
@@ -365,26 +426,20 @@ const updateGym = async (req, res) => {
     const updatedGym = await Gym.findByPk(id, {
       include: [
         {
-          model: Amenity,
+          model: GymAmenity,
           as: 'amenities',
-          where: { activeStatus: true },
-          required: false
-        },
-        {
-          model: GymImage,
-          as: 'images',
-          where: { activeStatus: true },
+          where: { recordStatus: true },
           required: false
         },
         {
           model: Subscription,
           as: 'subscriptions',
-          where: { activeStatus: true },
+          where: { recordStatus: true },
           required: false,
           include: [{
             model: SubscriptionFeature,
             as: 'features',
-            where: { activeStatus: true },
+            where: { recordStatus: true },
             required: false
           }]
         },
@@ -402,7 +457,7 @@ const updateGym = async (req, res) => {
       console.log('Headers already sent before success response');
       return;
     }
-    
+
     return ResponseUtil.success(res, updatedGym, 'Gym updated successfully');
   } catch (error) {
     console.error('Error updating gym:', error);
@@ -414,7 +469,7 @@ const updateGym = async (req, res) => {
   }
 };
 
-// Soft delete gym (set activeStatus to false)
+// Soft delete gym (set recordStatus to false)
 const deleteGym = async (req, res) => {
   try {
     const { id } = req.params;
@@ -426,9 +481,9 @@ const deleteGym = async (req, res) => {
     }
 
     await gym.update({
-      activeStatus: false,
+      recordStatus: false,
       updatedBy,
-      updateTimestamp: new Date()
+      updatedAt: new Date()
     });
 
     return ResponseUtil.success(res, null, 'Gym deleted successfully');
@@ -457,7 +512,7 @@ const getPublicGyms = async (req, res) => {
     } = req.query;
 
     const offset = (page - 1) * limit;
-    const whereClause = { activeStatus: true };
+    const whereClause = { recordStatus: true };
 
     if (minRating) {
       whereClause.rating = { [Op.gte]: parseFloat(minRating) };
@@ -483,20 +538,20 @@ const getPublicGyms = async (req, res) => {
       where: whereClause,
       include: [
         {
-          model: Amenity,
+          model: GymAmenity,
           as: 'amenities',
-          where: { activeStatus: true },
+          where: { recordStatus: true },
           required: amenities ? true : false
         },
         {
           model: Subscription,
           as: 'subscriptions',
-          where: { activeStatus: true },
+          where: { recordStatus: true },
           required: false,
           include: [{
             model: SubscriptionFeature,
             as: 'features',
-            where: { activeStatus: true },
+            where: { recordStatus: true },
             required: false
           }]
         },

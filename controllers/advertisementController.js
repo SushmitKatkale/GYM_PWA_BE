@@ -1,6 +1,6 @@
 const { 
   Advertisement, 
-  AdvertisementMedia, 
+  Media, 
   AdvertisementAnalytics,
   User,
   sequelize 
@@ -28,8 +28,15 @@ class AdvertisementController {
       // Handle media if provided
       if (req.body.media && Array.isArray(req.body.media)) {
         for (const mediaItem of req.body.media) {
-          await AdvertisementMedia.create({
-            advertisementId: advertisement.id,
+          await Media.create({
+            entity_type: 'advertisement',
+            entity_id: advertisement.id,
+            media_type: mediaItem.mediaType || 'image',
+            location: mediaItem.location || mediaItem.mediaUrl,
+            url: mediaItem.url || mediaItem.mediaUrl,
+            alt_text: mediaItem.altText || mediaItem.mediaAltText,
+            mime_type: mediaItem.mimeType,
+            created_by: req.user ? req.user.id : null,
             ...mediaItem
           }, { transaction });
         }
@@ -41,11 +48,6 @@ class AdvertisementController {
       const createdAdvertisement = await Advertisement.findByPk(advertisement.id, {
         include: [
           {
-            model: AdvertisementMedia,
-            as: 'media',
-            order: [['mediaOrder', 'ASC']]
-          },
-          {
             model: User,
             as: 'creator',
             attributes: ['id', 'firstName', 'lastName', 'username']
@@ -53,7 +55,23 @@ class AdvertisementController {
         ]
       });
 
-      return ResponseUtil.success(res, createdAdvertisement, 'Advertisement created successfully', 201);
+      // Get advertisement media separately using the Media model
+      const advertisementMedia = await Media.findAll({
+        where: {
+          entity_type: 'advertisement',
+          entity_id: advertisement.id,
+          record_status: 1
+        },
+        order: [['created_at', 'ASC']]
+      });
+
+      // Add media to the response
+      const responseData = {
+        ...createdAdvertisement.toJSON(),
+        media: advertisementMedia
+      };
+
+      return ResponseUtil.success(res, responseData, 'Advertisement created successfully', 201);
     } catch (error) {
       await transaction.rollback();
       
@@ -82,7 +100,7 @@ class AdvertisementController {
         maxBudget,
         createdBy,
         hasActiveSchedule,
-        sortBy = 'createTimestamp',
+        sortBy = 'created_at', // Updated field name
         sortOrder = 'DESC'
       } = req.query;
 
@@ -152,11 +170,6 @@ class AdvertisementController {
         order: [[sortBy, sortOrder.toUpperCase()]],
         include: [
           {
-            model: AdvertisementMedia,
-            as: 'media',
-            order: [['mediaOrder', 'ASC']]
-          },
-          {
             model: User,
             as: 'creator',
             attributes: ['id', 'firstName', 'lastName', 'username'],
@@ -169,6 +182,34 @@ class AdvertisementController {
             required: false,
           }
         ]
+      });
+
+      // Get media for all advertisements
+      const advertisementIds = result.rows.map(ad => ad.id);
+      const advertisementMediaMap = {};
+      
+      if (advertisementIds.length > 0) {
+        const allMedia = await Media.findAll({
+          where: {
+            entity_type: 'advertisement',
+            entity_id: { [Op.in]: advertisementIds },
+            record_status: 1
+          },
+          order: [['created_at', 'ASC']]
+        });
+        
+        // Group media by advertisement ID
+        allMedia.forEach(media => {
+          if (!advertisementMediaMap[media.entity_id]) {
+            advertisementMediaMap[media.entity_id] = [];
+          }
+          advertisementMediaMap[media.entity_id].push(media);
+        });
+      }
+      
+      // Add media to each advertisement
+      result.rows.forEach(ad => {
+        ad.dataValues.media = advertisementMediaMap[ad.id] || [];
       });
 
       // Calculate stats
@@ -200,11 +241,6 @@ class AdvertisementController {
       const advertisement = await Advertisement.findByPk(id, {
         include: [
           {
-            model: AdvertisementMedia,
-            as: 'media',
-            order: [['mediaOrder', 'ASC']]
-          },
-          {
             model: User,
             as: 'creator',
             attributes: ['id', 'firstName', 'lastName', 'username']
@@ -221,7 +257,23 @@ class AdvertisementController {
         return ResponseUtil.notFoundError(res, 'Advertisement not found');
       }
 
-      return ResponseUtil.success(res, advertisement);
+      // Get advertisement media separately
+      const advertisementMedia = await Media.findAll({
+        where: {
+          entity_type: 'advertisement',
+          entity_id: id,
+          record_status: 1
+        },
+        order: [['created_at', 'ASC']]
+      });
+
+      // Add media to the response
+      const responseData = {
+        ...advertisement.toJSON(),
+        media: advertisementMedia
+      };
+
+      return ResponseUtil.success(res, responseData);
     } catch (error) {
       console.error('Error fetching advertisement:', error);
       return ResponseUtil.error(res, 'Failed to fetch advertisement');
@@ -253,15 +305,27 @@ class AdvertisementController {
       if (req.body.media && Array.isArray(req.body.media) && req.body.replaceAllMedia === true) {
         // Only replace all media if explicitly requested
         // Remove existing media
-        await AdvertisementMedia.destroy({ 
-          where: { advertisementId: id },
+        await Media.update({ 
+          record_status: 0 
+        }, {
+          where: { 
+            entity_type: 'advertisement',
+            entity_id: id 
+          },
           transaction 
         });
 
         // Add new media
         for (const mediaItem of req.body.media) {
-          await AdvertisementMedia.create({
-            advertisementId: id,
+          await Media.create({
+            entity_type: 'advertisement',
+            entity_id: id,
+            media_type: mediaItem.mediaType || 'image',
+            location: mediaItem.location || mediaItem.mediaUrl,
+            url: mediaItem.url || mediaItem.mediaUrl,
+            alt_text: mediaItem.altText || mediaItem.mediaAltText,
+            mime_type: mediaItem.mimeType,
+            created_by: req.user ? req.user.id : null,
             ...mediaItem
           }, { transaction });
         }
@@ -272,11 +336,6 @@ class AdvertisementController {
       // Fetch updated advertisement with media
       const updatedAdvertisement = await Advertisement.findByPk(id, {
         include: [
-          {
-            model: AdvertisementMedia,
-            as: 'media',
-            order: [['mediaOrder', 'ASC']]
-          },
           {
             model: User,
             as: 'creator',
@@ -290,7 +349,22 @@ class AdvertisementController {
         ]
       });
 
-      return ResponseUtil.success(res, updatedAdvertisement, 'Advertisement updated successfully');
+      // Get updated advertisement media
+      const updatedMedia = await Media.findAll({
+        where: {
+          entity_type: 'advertisement',
+          entity_id: id,
+          record_status: 1
+        },
+        order: [['created_at', 'ASC']]
+      });
+
+      const responseData = {
+        ...updatedAdvertisement.toJSON(),
+        media: updatedMedia
+      };
+
+      return ResponseUtil.success(res, responseData, 'Advertisement updated successfully');
     } catch (error) {
       await transaction.rollback();
       
@@ -308,24 +382,42 @@ class AdvertisementController {
     try {
       const { id } = req.params;
 
-      const advertisement = await Advertisement.findByPk(id, {
-        include: [{ model: AdvertisementMedia, as: 'media' }]
-      });
+      const advertisement = await Advertisement.findByPk(id);
 
       if (!advertisement) {
         return ResponseUtil.notFoundError(res, 'Advertisement not found');
       }
 
+      // Get advertisement media
+      const advertisementMedia = await Media.findAll({
+        where: {
+          entity_type: 'advertisement',
+          entity_id: id,
+          record_status: 1
+        }
+      });
+
       // Delete associated media files
-      if (advertisement.media) {
-        for (const media of advertisement.media) {
+      if (advertisementMedia && advertisementMedia.length > 0) {
+        for (const media of advertisementMedia) {
           try {
-            const filePath = path.join('uploads', path.basename(media.mediaUrl));
+            const filePath = path.join('uploads', path.basename(media.url || media.location));
             await fs.unlink(filePath);
           } catch (fileError) {
             console.warn('Failed to delete media file:', fileError.message);
           }
         }
+
+        // Mark media as deleted
+        await Media.update(
+          { record_status: 0 },
+          {
+            where: {
+              entity_type: 'advertisement',
+              entity_id: id
+            }
+          }
+        );
       }
 
       await advertisement.destroy();
@@ -345,15 +437,23 @@ class AdvertisementController {
       const { id } = req.params;
       const { title } = req.body;
 
-      const originalAd = await Advertisement.findByPk(id, {
-        include: [{ model: AdvertisementMedia, as: 'media' }],
-        transaction
-      });
+      const originalAd = await Advertisement.findByPk(id, { transaction });
 
       if (!originalAd) {
         await transaction.rollback();
         return ResponseUtil.notFoundError(res, 'Advertisement not found');
       }
+
+      // Get original advertisement media
+      const originalMedia = await Media.findAll({
+        where: {
+          entity_type: 'advertisement',
+          entity_id: id,
+          record_status: 1
+        },
+        transaction
+      });
+
 
       // Create duplicate advertisement
       const duplicateData = {
@@ -369,25 +469,27 @@ class AdvertisementController {
 
       delete duplicateData.media;
       delete duplicateData.analytics;
-      delete duplicateData.createTimestamp;
-      delete duplicateData.updateTimestamp;
+      delete duplicateData.created_at; // Updated field name
+      delete duplicateData.updated_at; // Updated field name
 
       const duplicateAd = await Advertisement.create(duplicateData, { transaction });
 
       // Duplicate media
-      if (originalAd.media) {
-        for (const media of originalAd.media) {
-          await AdvertisementMedia.create({
-            advertisementId: duplicateAd.id,
-            mediaType: media.mediaType,
-            mediaUrl: media.mediaUrl,
-            mediaAltText: media.mediaAltText,
-            mediaOrder: media.mediaOrder,
-            fileSize: media.fileSize,
-            mimeType: media.mimeType,
+      if (originalMedia && originalMedia.length > 0) {
+        for (const media of originalMedia) {
+          await Media.create({
+            entity_type: 'advertisement',
+            entity_id: duplicateAd.id,
+            media_type: media.media_type,
+            location: media.location,
+            url: media.url,
+            alt_text: media.alt_text,
+            mime_type: media.mime_type,
+            file_size: media.file_size,
             width: media.width,
             height: media.height,
-            duration: media.duration
+            duration: media.duration,
+            created_by: req.user ? req.user.id : null
           }, { transaction });
         }
       }
@@ -395,17 +497,24 @@ class AdvertisementController {
       await transaction.commit();
 
       // Fetch the duplicated advertisement with media
-      const duplicatedAdvertisement = await Advertisement.findByPk(duplicateAd.id, {
-        include: [
-          {
-            model: AdvertisementMedia,
-            as: 'media',
-            order: [['mediaOrder', 'ASC']]
-          }
-        ]
+      const duplicatedAdvertisement = await Advertisement.findByPk(duplicateAd.id);
+      
+      // Get duplicated advertisement media
+      const duplicatedMedia = await Media.findAll({
+        where: {
+          entity_type: 'advertisement',
+          entity_id: duplicateAd.id,
+          record_status: 1
+        },
+        order: [['created_at', 'ASC']]
       });
 
-      return ResponseUtil.success(res, duplicatedAdvertisement, 'Advertisement duplicated successfully', 201);
+      const responseData = {
+        ...duplicatedAdvertisement.toJSON(),
+        media: duplicatedMedia
+      };
+
+      return ResponseUtil.success(res, responseData, 'Advertisement duplicated successfully', 201);
     } catch (error) {
       await transaction.rollback();
       console.error('Error duplicating advertisement:', error);
@@ -434,17 +543,24 @@ class AdvertisementController {
         updatedBy: req.user ? req.user.id : null
       });
 
-      const updatedAdvertisement = await Advertisement.findByPk(id, {
-        include: [
-          {
-            model: AdvertisementMedia,
-            as: 'media',
-            order: [['mediaOrder', 'ASC']]
-          }
-        ]
+      const updatedAdvertisement = await Advertisement.findByPk(id);
+      
+      // Get updated advertisement media
+      const updatedMedia = await Media.findAll({
+        where: {
+          entity_type: 'advertisement',
+          entity_id: id,
+          record_status: 1
+        },
+        order: [['created_at', 'ASC']]
       });
 
-      return ResponseUtil.success(res, updatedAdvertisement, `Advertisement ${status === 'active' ? 'activated' : 'deactivated'} successfully`);
+      const responseData = {
+        ...updatedAdvertisement.toJSON(),
+        media: updatedMedia
+      };
+
+      return ResponseUtil.success(res, responseData, `Advertisement ${status === 'active' ? 'activated' : 'deactivated'} successfully`);
     } catch (error) {
       console.error('Error toggling advertisement status:', error);
       return ResponseUtil.error(res, 'Failed to update advertisement status');
@@ -766,18 +882,40 @@ class AdvertisementController {
         limit: parseInt(limit),
         order: [
           ['priority', 'DESC'],
-          ['createTimestamp', 'DESC']
-        ],
-        include: [
-          {
-            model: AdvertisementMedia,
-            as: 'media',
-            order: [['mediaOrder', 'ASC']]
-          }
+          ['created_at', 'DESC'] // Updated field name
         ]
       });
 
-      return ResponseUtil.success(res, advertisements);
+      // Get media for all active advertisements
+      const advertisementIds = advertisements.map(ad => ad.id);
+      const advertisementMediaMap = {};
+      
+      if (advertisementIds.length > 0) {
+        const allMedia = await Media.findAll({
+          where: {
+            entity_type: 'advertisement',
+            entity_id: { [Op.in]: advertisementIds },
+            record_status: 1
+          },
+          order: [['created_at', 'ASC']]
+        });
+        
+        // Group media by advertisement ID
+        allMedia.forEach(media => {
+          if (!advertisementMediaMap[media.entity_id]) {
+            advertisementMediaMap[media.entity_id] = [];
+          }
+          advertisementMediaMap[media.entity_id].push(media);
+        });
+      }
+      
+      // Add media to each advertisement
+      const advertisementsWithMedia = advertisements.map(ad => ({
+        ...ad.toJSON(),
+        media: advertisementMediaMap[ad.id] || []
+      }));
+
+      return ResponseUtil.success(res, advertisementsWithMedia);
     } catch (error) {
       console.error('Error fetching active advertisements:', error);
       return ResponseUtil.error(res, 'Failed to fetch active advertisements');

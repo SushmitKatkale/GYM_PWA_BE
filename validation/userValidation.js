@@ -43,19 +43,19 @@ const createUserSchema = Joi.object({
       'any.required': 'Password is required'
     }),
   
-  phoneNumber: Joi.string()
+  phone: Joi.string()
     .pattern(/^[+]?[0-9\s\-\(\)]+$/)
     .allow(null, '')
     .messages({
       'string.pattern.base': 'Phone number must contain only numbers, spaces, hyphens, parentheses, and plus sign'
     }),
   
-  type: Joi.string().valid('1', '2', '3').default('1').messages({
-    'any.only': 'Type must be 1 (user), 2 (owner), or 3 (admin)'
+  role: Joi.number().valid(1, 2, 3, 4).default(1).messages({
+    'any.only': 'Role must be 1 (member), 2 (owner), 3 (trainer), or 4 (admin)'
   }),
   
-  activeStatus: Joi.string().valid('0', '1').default('1').messages({
-    'any.only': 'Active status must be 0 (inactive) or 1 (active)'
+  recordStatus: Joi.number().valid(0, 1).default(1).messages({
+    'any.only': 'Record status must be 0 (inactive) or 1 (active)'
   })
 });
 
@@ -85,19 +85,19 @@ const updateUserSchema = Joi.object({
     'string.email': 'Email must be a valid email address'
   }),
   
-  phoneNumber: Joi.string()
+  phone: Joi.string()
     .pattern(/^[+]?[0-9\s\-\(\)]+$/)
     .allow(null, '')
     .messages({
       'string.pattern.base': 'Phone number must contain only numbers, spaces, hyphens, parentheses, and plus sign'
     }),
   
-  type: Joi.string().valid('1', '2', '3').messages({
-    'any.only': 'Type must be 1 (user), 2 (owner), or 3 (admin)'
+  role: Joi.number().valid(1, 2, 3, 4).messages({
+    'any.only': 'Role must be 1 (member), 2 (owner), 3 (trainer), or 4 (admin)'
   }),
   
-  activeStatus: Joi.string().valid('0', '1').messages({
-    'any.only': 'Active status must be 0 (inactive) or 1 (active)'
+  recordStatus: Joi.number().valid(0, 1).messages({
+    'any.only': 'Record status must be 0 (inactive) or 1 (active)'
   })
 });
 
@@ -123,9 +123,9 @@ const changePasswordSchema = Joi.object({
 
 // Toggle status validation schema
 const toggleStatusSchema = Joi.object({
-  activeStatus: Joi.string().valid('0', '1').required().messages({
-    'any.only': 'Active status must be 0 (inactive) or 1 (active)',
-    'any.required': 'Active status is required'
+  recordStatus: Joi.number().valid(0, 1).required().messages({
+    'any.only': 'Record status must be 0 (inactive) or 1 (active)',
+    'any.required': 'Record status is required'
   })
 });
 
@@ -211,14 +211,7 @@ const queryParamsSchema = Joi.object({
     'number.max': 'Days must not exceed 365'
   }),
   
-  sortBy: Joi.string().valid(
-    'createTimestamp', 
-    'updateTimestamp', 
-    'firstName', 
-    'lastName', 
-    'username', 
-    'email'
-  ).default('createTimestamp').messages({
+  sortBy: Joi.string().valid('created_at','firstName', 'lastName', 'username', 'email').default('created_at').messages({
     'any.only': 'Sort by must be one of: createTimestamp, updateTimestamp, firstName, lastName, username, email'
   }),
   

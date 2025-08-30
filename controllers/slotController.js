@@ -30,7 +30,7 @@ const createGymSlot = async (req, res) => {
     }
 
     const { gymId, startTime, endTime, capacity, daysOfWeek, isActive = true } = req.body;
-    const createdBy = req.user.email;
+    const createdBy = req.user.id; // Updated to use user ID
 
     // Check if gym exists
     const gym = await Gym.findByPk(gymId, { transaction });
@@ -179,13 +179,17 @@ const bookSlot = async (req, res) => {
     }
 
     const { gymSlotId, bookingDate, bookingType = 'regular' } = req.body;
-    const userEmail = req.user.email;
+    const userEmail = req.user.email; // Keep for backward compatibility
+    const userId = req.user.id; // Use user ID as primary identifier
 
-    // Get user's active subscription
+    // Get user's active subscription (support both user_id and userEmail)
     const userSubscription = await UserSubscription.findOne({
       where: {
-        userEmail,
-        activeStatus: true,
+        [Op.or]: [
+          { user_id: userId },
+          { userEmail: userEmail }
+        ],
+        record_status: 1, // Updated field name
         validFrom: { [Op.lte]: new Date() },
         validTo: { [Op.gte]: new Date() }
       },
@@ -216,10 +220,13 @@ const bookSlot = async (req, res) => {
       });
     }
 
-    // Check if user already has a booking for this date
+    // Check if user already has a booking for this date (support both user_id and userEmail)
     const existingBooking = await UserSlotBooking.findOne({
       where: {
-        userEmail,
+        [Op.or]: [
+          { user_id: userId },
+          { userEmail: userEmail }
+        ],
         bookingDate,
         bookingStatus: { [Op.in]: ['active', 'checked_in'] }
       },
@@ -269,7 +276,8 @@ const bookSlot = async (req, res) => {
 
       if (!existingWaitlist) {
         await SlotWaitlist.create({
-          userEmail,
+          user_id: userId, // Use user ID
+          userEmail, // Keep for backward compatibility
           gymSlotId,
           requestedDate: bookingDate,
           priorityScore: 1,
@@ -287,7 +295,8 @@ const bookSlot = async (req, res) => {
 
     // Create booking
     const booking = await UserSlotBooking.create({
-      userEmail,
+      user_id: userId, // Use user ID
+      userEmail, // Keep for backward compatibility
       userSubscriptionId: userSubscription.id,
       gymSlotId,
       bookingDate,
@@ -304,7 +313,8 @@ const bookSlot = async (req, res) => {
     // Record in change history if it's not the initial selection
     if (bookingType !== 'regular') {
       await SlotChangeHistory.create({
-        userEmail,
+        user_id: userId, // Use user ID
+        userEmail, // Keep for backward compatibility
         userSubscriptionId: userSubscription.id,
         newGymSlotId: gymSlotId,
         changeDate: new Date(),
@@ -312,7 +322,7 @@ const bookSlot = async (req, res) => {
         changeType: bookingType === 'one_time_change' ? 'temporary_change' : 'permanent_change',
         effectiveFromDate: bookingDate,
         effectiveToDate: bookingDate,
-        requestedBy: userEmail,
+        requestedBy: userId, // Use user ID
         approvalStatus: 'approved'
       }, { transaction });
     }
@@ -347,12 +357,16 @@ const cancelBooking = async (req, res) => {
     const { bookingId } = req.params;
     const { cancellationReason } = req.body;
     const userEmail = req.user.email;
+    const userId = req.user.id; // Add user ID support
 
-    // Find booking with lock
+    // Find booking with lock (support both user_id and userEmail)
     const booking = await UserSlotBooking.findOne({
       where: {
         id: bookingId,
-        userEmail,
+        [Op.or]: [
+          { user_id: userId },
+          { userEmail: userEmail }
+        ],
         bookingStatus: { [Op.in]: ['active'] }
       },
       lock: Transaction.LOCK.UPDATE,
@@ -418,11 +432,14 @@ const cancelBooking = async (req, res) => {
       });
 
       if (waitlistEntry) {
-        // Auto-book for waitlisted user
+        // Auto-book for waitlisted user (support both user_id and userEmail)
         const waitlistUserSubscription = await UserSubscription.findOne({
           where: {
-            userEmail: waitlistEntry.userEmail,
-            activeStatus: true,
+            [Op.or]: [
+              { user_id: waitlistEntry.user_id },
+              { userEmail: waitlistEntry.userEmail }
+            ],
+            record_status: 1, // Updated field name
             validFrom: { [Op.lte]: new Date() },
             validTo: { [Op.gte]: new Date() }
           },
@@ -431,7 +448,8 @@ const cancelBooking = async (req, res) => {
 
         if (waitlistUserSubscription) {
           await UserSlotBooking.create({
-            userEmail: waitlistEntry.userEmail,
+            user_id: waitlistEntry.user_id, // Use user ID
+            userEmail: waitlistEntry.userEmail, // Keep for backward compatibility
             userSubscriptionId: waitlistUserSubscription.id,
             gymSlotId: booking.gymSlotId,
             bookingDate: booking.bookingDate,
@@ -480,11 +498,15 @@ const checkInSlot = async (req, res) => {
   try {
     const { bookingId } = req.params;
     const userEmail = req.user.email;
+    const userId = req.user.id; // Add user ID support
 
     const booking = await UserSlotBooking.findOne({
       where: {
         id: bookingId,
-        userEmail,
+        [Op.or]: [
+          { user_id: userId },
+          { userEmail: userEmail }
+        ],
         bookingStatus: 'active',
         bookingDate: new Date().toISOString().split('T')[0] // Today's date
       },
@@ -548,11 +570,15 @@ const checkOutSlot = async (req, res) => {
   try {
     const { bookingId } = req.params;
     const userEmail = req.user.email;
+    const userId = req.user.id; // Add user ID support
 
     const booking = await UserSlotBooking.findOne({
       where: {
         id: bookingId,
-        userEmail,
+        [Op.or]: [
+          { user_id: userId },
+          { userEmail: userEmail }
+        ],
         bookingStatus: 'checked_in'
       },
       transaction
@@ -596,12 +622,19 @@ const checkOutSlot = async (req, res) => {
 const getUserBookings = async (req, res) => {
   try {
     const userEmail = req.user.email;
+    const userId = req.user.id; // Add user ID support
     const { status, startDate, endDate } = req.query;
     const page = parseInt(req.query.page) || 1;
     const limit = parseInt(req.query.limit) || 10;
     const offset = (page - 1) * limit;
 
-    const whereClause = { userEmail };
+    // Support both user_id and userEmail for backward compatibility
+    const whereClause = {
+      [Op.or]: [
+        { user_id: userId },
+        { userEmail: userEmail }
+      ]
+    };
     if (status) whereClause.bookingStatus = status;
     if (startDate && endDate) {
       whereClause.bookingDate = {
@@ -717,7 +750,7 @@ const updateGymSlot = async (req, res) => {
   try {
     const { id } = req.params;
     const { startTime, endTime, capacity, daysOfWeek, isActive } = req.body;
-    const updatedBy = req.user.email;
+    const updatedBy = req.user.id; // Updated to use user ID
 
     // Find the slot
     const gymSlot = await GymSlot.findByPk(id, { transaction });
@@ -804,7 +837,7 @@ const deleteGymSlot = async (req, res) => {
   
   try {
     const { id } = req.params;
-    const updatedBy = req.user.email;
+    const updatedBy = req.user.id; // Updated to use user ID
 
     // Find the slot
     const gymSlot = await GymSlot.findByPk(id, { transaction });

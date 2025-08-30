@@ -8,7 +8,7 @@ const ResponseUtil = require('../utils/response');
 const checkGymOwnership = async (req, res, next) => {
   try {
     const userId = req.user.id;
-    const userType = req.user.type;
+    const userType = req.user.role;
     const gymId = req.params.id || req.params.gymId;
 
     // Admin can access any gym

@@ -11,8 +11,8 @@ const registerSchema = Joi.object({
   firstName: Joi.string().min(2).max(50).required(),
   lastName: Joi.string().min(2).max(50).required(),
   phoneNumber: Joi.string().pattern(/^[+]?[0-9\s\-\(\)]+$/).allow(null, '').optional(),
-  type: Joi.string().valid('1', '2', '3').default('1').optional(),
-  activeStatus: Joi.string().valid('0', '1').default('1').optional()
+  type: Joi.string().valid('1').default('1').optional(),
+  activeStatus: Joi.string().valid('1').default('1').optional()
 });
 
 // User login validation schema
