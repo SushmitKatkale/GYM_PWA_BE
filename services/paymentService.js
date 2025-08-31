@@ -125,7 +125,7 @@ async function determinePaymentGateway(gymId) {
  * Create payment order with automatic gateway selection
  */
 async function initiatePayment(paymentData) {
-  const { gymId, subscriptionId, baseAmount, gstAmount, totalAmount, userEmail } = paymentData;
+  const { gymId, subscriptionId, baseAmount, gstAmount, totalAmount, userEmail, userId } = paymentData;
 
   try {
     // Get user details
@@ -207,7 +207,9 @@ async function createRazorpayPayment({ subscription, vendorConfig, baseAmount, g
 
   // Save payment record with GST details
   const payment = await Payment.create({
-    paymentAmount: totalAmount, // Total amount including GST
+    userId: userId, // Required field
+    gymId: subscription.gymId, // Required field 
+    amount: totalAmount, // Required field - Total amount including GST
     paymentRefNo: order.receipt,
     razorpayOrderId: order.id,
     vendorConfigId: vendorConfig.id,
@@ -257,7 +259,9 @@ async function createPhonepePayment({ subscription, baseAmount, gstAmount, total
 
   // Save payment record first to get payment ID
   const payment = await Payment.create({
-    paymentAmount: totalAmount, // Total amount including GST
+    userId: user.id, // Required field
+    gymId: subscription.gymId, // Required field
+    amount: totalAmount, // Required field - Total amount including GST
     paymentRefNo: merchantTransactionId,
     phonepeTransactionId: merchantTransactionId,
     subscriptionId: subscription.id,

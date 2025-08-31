@@ -19,21 +19,26 @@ const Advertisement = sequelize.define('Advertisement', {
     type: DataTypes.TEXT,
     allowNull: true
   },
+  content: {
+    type: DataTypes.TEXT,
+    allowNull: true
+  },
+  adType: {
+    type: DataTypes.ENUM('banner', 'popup', 'card', 'video', 'carousel'),
+    allowNull: false,
+    defaultValue: 'banner',
+    field: 'ad_type'
+  },
+  targetAudience: {
+    type: DataTypes.ENUM('all', 'members', 'gym_owners', 'specific_gyms', 'location_based'),
+    allowNull: false,
+    defaultValue: 'all',
+    field: 'target_audience'
+  },
   targetUrl: {
     type: DataTypes.STRING(255),
     allowNull: true,
     field: 'target_url'
-  },
-  type: {
-    type: DataTypes.ENUM('banner', 'popup', 'carousel'),
-    allowNull: false,
-    defaultValue: 'banner'
-  },
-  targetRole: {
-    type: DataTypes.ENUM('all', 'member', 'owner', 'trainer', 'admin'),
-    allowNull: false,
-    defaultValue: 'all',
-    field: 'target_role'
   },
   targetGymId: {
     type: DataTypes.BIGINT,
@@ -59,24 +64,34 @@ const Advertisement = sequelize.define('Advertisement', {
     }
   },
   startDate: {
-    type: DataTypes.DATEONLY,
-    allowNull: false,
+    type: DataTypes.DATE,
+    allowNull: true,
     field: 'start_date'
   },
   endDate: {
-    type: DataTypes.DATEONLY,
-    allowNull: false,
-    field: 'end_date',
+    type: DataTypes.DATE,
+    allowNull: true,
+    field: 'end_date'
+  },
+  budget: {
+    type: DataTypes.DECIMAL(10, 2),
+    allowNull: true,
     validate: {
-      isAfterStart(value) {
-        if (value && this.startDate && new Date(value) <= new Date(this.startDate)) {
-          throw new Error('End date must be after start date');
-        }
-      }
+      min: 0
     }
   },
+  clicks: {
+    type: DataTypes.BIGINT,
+    allowNull: false,
+    defaultValue: 0
+  },
+  impressions: {
+    type: DataTypes.BIGINT,
+    allowNull: false,
+    defaultValue: 0
+  },
   status: {
-    type: DataTypes.ENUM('draft', 'active', 'expired'),
+    type: DataTypes.ENUM('draft', 'active', 'inactive', 'expired'),
     defaultValue: 'draft',
     allowNull: false
   },
@@ -98,18 +113,6 @@ const Advertisement = sequelize.define('Advertisement', {
     defaultValue: 1,
     field: 'record_status',
     comment: '1=active, 0=inactive'
-  },
-  createdBy: {
-    type: DataTypes.BIGINT,
-    allowNull: true,
-    field: 'created_by',
-    comment: 'User ID who created this record'
-  },
-  updatedBy: {
-    type: DataTypes.BIGINT,
-    allowNull: true,
-    field: 'updated_by',
-    comment: 'User ID who last updated this record'
   }
 }, {
   tableName: 'advertisements',
@@ -122,7 +125,7 @@ const Advertisement = sequelize.define('Advertisement', {
       fields: ['status']
     },
     {
-      fields: ['type']
+      fields: ['ad_type']
     },
     {
       fields: ['start_date', 'end_date']
@@ -131,7 +134,7 @@ const Advertisement = sequelize.define('Advertisement', {
       fields: ['priority']
     },
     {
-      fields: ['target_role', 'target_gym_id', 'target_location']
+      fields: ['target_audience', 'target_gym_id', 'target_location']
     }
   ]
 });
@@ -153,22 +156,35 @@ Advertisement.prototype.isExpired = function () {
 };
 
 // Static methods
-Advertisement.getActiveAds = async function (userRole = 'all', gymId = null, location = null) {
+Advertisement.getActiveAds = async function (targetAudience = 'all', gymId = null, location = null) {
   const where = {
     status: 'active',
-    startDate: {
-      [sequelize.Sequelize.Op.lte]: new Date()
-    },
-    endDate: {
-      [sequelize.Sequelize.Op.gte]: new Date()
-    }
+    recordStatus: 1
   };
 
-  // Target role filtering
+  // Date filtering - only include ads that are currently active
+  const now = new Date();
   where[sequelize.Sequelize.Op.or] = [
-    { targetRole: 'all' },
-    { targetRole: userRole }
+    { startDate: null },
+    { startDate: { [sequelize.Sequelize.Op.lte]: now } }
   ];
+  
+  where[sequelize.Sequelize.Op.and] = [
+    {
+      [sequelize.Sequelize.Op.or]: [
+        { endDate: null },
+        { endDate: { [sequelize.Sequelize.Op.gte]: now } }
+      ]
+    }
+  ];
+
+  // Target audience filtering
+  if (targetAudience && targetAudience !== 'all') {
+    where[sequelize.Sequelize.Op.or] = [
+      { targetAudience: 'all' },
+      { targetAudience: targetAudience }
+    ];
+  }
 
   // Target gym filtering
   if (gymId) {
@@ -198,7 +214,7 @@ Advertisement.getActiveAds = async function (userRole = 'all', gymId = null, loc
 
   return await this.findAll({
     where,
-    order: [['priority', 'DESC'], ['createdAt', 'DESC']]
+    order: [['priority', 'DESC'], ['created_at', 'DESC']]
   });
 };
 

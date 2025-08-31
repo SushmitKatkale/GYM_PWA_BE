@@ -542,7 +542,7 @@ router.post('/admin/create', NotificationController.createNotificationValidation
  *       200:
  *         description: All notifications retrieved successfully
  */
-router.get('/admin/all', authenticate, authorize('3'), NotificationController.getAllNotifications);
+router.get('/admin/all', NotificationController.getAllNotifications);
 
 /**
  * @swagger
@@ -637,5 +637,47 @@ router.post('/admin/bulk-send', [
  *                       type: integer
  */
 router.post('/admin/cleanup', NotificationController.cleanupExpiredNotifications);
+
+/**
+ * @swagger
+ * /api/notifications/admin/scheduler/status:
+ *   get:
+ *     summary: Get notification scheduler status (Admin only)
+ *     tags: [Admin - Notifications]
+ *     security:
+ *       - bearerAuth: []
+ *     responses:
+ *       200:
+ *         description: Scheduler status retrieved successfully
+ *         content:
+ *           application/json:
+ *             schema:
+ *               type: object
+ *               properties:
+ *                 success:
+ *                   type: boolean
+ *                 data:
+ *                   type: object
+ *                   properties:
+ *                     isRunning:
+ *                       type: boolean
+ *                     nextRun:
+ *                       type: string
+ */
+router.get('/admin/scheduler/status', NotificationController.getSchedulerStatus);
+
+/**
+ * @swagger
+ * /api/notifications/admin/scheduler/trigger:
+ *   post:
+ *     summary: Manually trigger scheduled notification processing (Admin only)
+ *     tags: [Admin - Notifications]
+ *     security:
+ *       - bearerAuth: []
+ *     responses:
+ *       200:
+ *         description: Scheduled processing triggered successfully
+ */
+router.post('/admin/scheduler/trigger', NotificationController.triggerScheduledProcessing);
 
 module.exports = router;

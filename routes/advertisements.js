@@ -3,8 +3,7 @@ const multer = require('multer');
 const path = require('path');
 const fs = require('fs').promises;
 const AdvertisementController = require('../controllers/advertisementController');
-const { authenticate } = require('../middleware/auth');
-const adminAuth = require('../middleware/adminAuth');
+const { authenticate, authorize } = require('../middleware/auth');
 const router = express.Router();
 
 // Configure multer for file uploads
@@ -210,7 +209,7 @@ router.post('/:id/track', AdvertisementController.trackEvent);
  *       200:
  *         description: Statistics retrieved successfully
  */
-router.get('/stats', authenticate, adminAuth, AdvertisementController.getStats);
+router.get('/stats', authenticate, authorize('3'), AdvertisementController.getStats);
 
 // Bulk operations (must be before parameterized routes)
 
@@ -243,7 +242,7 @@ router.get('/stats', authenticate, adminAuth, AdvertisementController.getStats);
 //  *       200:
 //  *         description: Advertisements updated successfully
 //  */
-// router.patch('/bulk-update', auth, adminAuth, AdvertisementController.bulkUpdate);
+// router.patch('/bulk-update', auth, authorize('3'), AdvertisementController.bulkUpdate);
 // 
 // /**
 //  * @swagger
@@ -270,7 +269,7 @@ router.get('/stats', authenticate, adminAuth, AdvertisementController.getStats);
 //  *       200:
 //  *         description: Advertisements deleted successfully
 //  */
-// router.post('/bulk-delete', auth, adminAuth, AdvertisementController.bulkDelete);
+// router.post('/bulk-delete', auth, authorize('3'), AdvertisementController.bulkDelete);
 
 /**
  * @swagger
@@ -309,7 +308,7 @@ router.get('/stats', authenticate, adminAuth, AdvertisementController.getStats);
  *       200:
  *         description: Advertisements retrieved successfully
  */
-router.get('/', authenticate, adminAuth, AdvertisementController.getAllAdvertisements);
+router.get('/', authenticate, authorize('3'), AdvertisementController.getAllAdvertisements);
 
 /**
  * @swagger
@@ -331,7 +330,7 @@ router.get('/', authenticate, adminAuth, AdvertisementController.getAllAdvertise
  *       404:
  *         description: Advertisement not found
  */
-router.get('/:id', authenticate, adminAuth, AdvertisementController.getAdvertisementById);
+router.get('/:id', authenticate, authorize('3'), AdvertisementController.getAdvertisementById);
 
 /**
  * @swagger
@@ -381,7 +380,7 @@ router.get('/:id', authenticate, adminAuth, AdvertisementController.getAdvertise
  *       400:
  *         description: Validation error
  */
-router.post('/', authenticate, adminAuth, AdvertisementController.createAdvertisement);
+router.post('/', authenticate, authorize('3'), AdvertisementController.createAdvertisement);
 
 /**
  * @swagger
@@ -403,7 +402,7 @@ router.post('/', authenticate, adminAuth, AdvertisementController.createAdvertis
  *       404:
  *         description: Advertisement not found
  */
-router.put('/:id', authenticate, adminAuth, AdvertisementController.updateAdvertisement);
+router.put('/:id', authenticate, authorize('3'), AdvertisementController.updateAdvertisement);
 
 /**
  * @swagger
@@ -425,7 +424,7 @@ router.put('/:id', authenticate, adminAuth, AdvertisementController.updateAdvert
  *       404:
  *         description: Advertisement not found
  */
-router.delete('/:id', authenticate, adminAuth, AdvertisementController.deleteAdvertisement);
+router.delete('/:id', authenticate, authorize('3'), AdvertisementController.deleteAdvertisement);
 
 /**
  * @swagger
@@ -454,7 +453,7 @@ router.delete('/:id', authenticate, adminAuth, AdvertisementController.deleteAdv
  *       201:
  *         description: Advertisement duplicated successfully
  */
-router.post('/:id/duplicate', authenticate, adminAuth, AdvertisementController.duplicateAdvertisement);
+router.post('/:id/duplicate', authenticate, authorize('3'), AdvertisementController.duplicateAdvertisement);
 
 /**
  * @swagger
@@ -486,7 +485,7 @@ router.post('/:id/duplicate', authenticate, adminAuth, AdvertisementController.d
  *       200:
  *         description: Advertisement status updated successfully
  */
-router.put('/:id/status', authenticate, adminAuth, AdvertisementController.toggleAdvertisementStatus);
+router.put('/:id/status', authenticate, authorize('3'), AdvertisementController.toggleAdvertisementStatus);
 
 /**
  * @swagger
@@ -516,7 +515,7 @@ router.put('/:id/status', authenticate, adminAuth, AdvertisementController.toggl
  *       200:
  *         description: Performance metrics retrieved successfully
  */
-router.get('/:id/performance', authenticate, adminAuth, AdvertisementController.getPerformance);
+router.get('/:id/performance', authenticate, authorize('3'), AdvertisementController.getPerformance);
 
 // Media Management routes
 
@@ -553,9 +552,9 @@ router.get('/:id/performance', authenticate, adminAuth, AdvertisementController.
  *       200:
  *         description: Media uploaded successfully
  */
-router.post('/:id/media', authenticate, adminAuth, upload.single('file'), async (req, res) => {
+router.post('/:id/media', authenticate, authorize('3'), upload.single('file'), async (req, res) => {
   try {
-    const { Advertisement, AdvertisementMedia } = require('../models');
+    const { Advertisement, Media } = require('../models');
     const { id } = req.params;
     const { mediaType, altText } = req.body;
 
@@ -584,39 +583,30 @@ router.post('/:id/media', authenticate, adminAuth, upload.single('file'), async 
     // Get file stats for additional metadata
     const stats = await fs.stat(req.file.path);
 
-    // Get the next media order for this advertisement
-    const maxOrderResult = await AdvertisementMedia.findOne({
-      where: { advertisementId: id },
-      order: [['mediaOrder', 'DESC']],
-      attributes: ['mediaOrder']
-    });
-    const mediaOrder = (maxOrderResult?.mediaOrder || 0) + 1;
-
-    // Create media record in database
-    const mediaRecord = await AdvertisementMedia.create({
-      advertisementId: id,
+    // Create media record using the general Media model
+    const mediaRecord = await Media.createMedia({
+      entityType: 'advertisement',
+      entityId: id,
       mediaType: mediaType || 'image',
-      mediaUrl: fullMediaUrl,
-      mediaAltText: altText || null,
-      mediaOrder: mediaOrder,
-      fileSize: stats.size,
+      location: req.file.path,
+      url: fullMediaUrl,
+      altText: altText || null,
       mimeType: req.file.mimetype
     });
 
-    // Update advertisement's updateTimestamp
-    await advertisement.update({ updateTimestamp: new Date() });
+    // Update advertisement's updated_at timestamp
+    await advertisement.update({ updated_at: new Date() });
 
     const responseData = {
       id: mediaRecord.id,
       advertisementId: id,
       mediaUrl: fullMediaUrl,
       mediaType: mediaRecord.mediaType,
-      mediaAltText: mediaRecord.mediaAltText,
-      mediaOrder: mediaRecord.mediaOrder,
+      altText: mediaRecord.altText,
       fileName: req.file.originalname,
       fileSize: stats.size,
       mimeType: req.file.mimetype,
-      createTimestamp: mediaRecord.createTimestamp
+      createdAt: mediaRecord.created_at
     };
 
     res.json({
@@ -661,30 +651,43 @@ router.post('/:id/media', authenticate, adminAuth, upload.single('file'), async 
  *       200:
  *         description: Media retrieved successfully
  */
-router.get('/:id/media', authenticate, adminAuth, async (req, res) => {
+router.get('/:id/media', authenticate, authorize('3'), async (req, res) => {
   try {
-    const { AdvertisementMedia } = require('../models');
+    const { Media } = require('../models');
     const { id } = req.params;
 
-    const media = await AdvertisementMedia.findAll({
-      where: { advertisementId: id },
-      order: [['mediaOrder', 'ASC']],
+    const media = await Media.findAll({
+      where: { 
+        entity_type: 'advertisement',
+        entity_id: id,
+        record_status: 1
+      },
+      order: [['created_at', 'DESC']],
       attributes: [
         'id',
-        'advertisementId',
-        'mediaType',
-        'mediaUrl',
-        'mediaAltText',
-        'mediaOrder',
-        'fileSize',
-        'mimeType',
-        'createTimestamp'
+        'entity_id',
+        'media_type',
+        'url',
+        'alt_text',
+        'mime_type',
+        'created_at'
       ]
     });
 
+    // Transform response to match expected format
+    const transformedMedia = media.map(item => ({
+      id: item.id,
+      advertisementId: item.entity_id,
+      mediaUrl: item.url,
+      mediaType: item.media_type,
+      altText: item.alt_text,
+      mimeType: item.mime_type,
+      createdAt: item.created_at
+    }));
+
     res.json({
       success: true,
-      data: media
+      data: transformedMedia
     });
   } catch (error) {
     console.error('Error retrieving media:', error);
@@ -718,15 +721,16 @@ router.get('/:id/media', authenticate, adminAuth, async (req, res) => {
  *       200:
  *         description: Media deleted successfully
  */
-router.delete('/:id/media/:mediaId', authenticate, adminAuth, async (req, res) => {
+router.delete('/:id/media/:mediaId', authenticate, authorize('3'), async (req, res) => {
   try {
-    const { AdvertisementMedia } = require('../models');
+    const { Media } = require('../models');
     const { id, mediaId } = req.params;
 
-    const media = await AdvertisementMedia.findOne({
+    const media = await Media.findOne({
       where: {
         id: mediaId,
-        advertisementId: id
+        entity_type: 'advertisement',
+        entity_id: id
       }
     });
 
@@ -739,14 +743,14 @@ router.delete('/:id/media/:mediaId', authenticate, adminAuth, async (req, res) =
 
     // Delete file from filesystem
     try {
-      const filePath = path.join('uploads', 'advertisements', path.basename(media.mediaUrl));
+      const filePath = media.location;
       await fs.unlink(filePath);
     } catch (fileError) {
       console.warn('Failed to delete media file:', fileError.message);
     }
 
-    // Delete from database
-    await media.destroy();
+    // Delete from database (soft delete by setting record_status to 0)
+    await media.update({ record_status: 0 });
 
     res.json({
       success: true,

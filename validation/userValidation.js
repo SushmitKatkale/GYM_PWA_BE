@@ -148,8 +148,8 @@ const queryParamsSchema = Joi.object({
     'string.base': 'Search must be a string'
   }),
   
-  type: Joi.string().valid('1', '2', '3').messages({
-    'any.only': 'Type must be 1 (user), 2 (owner), or 3 (admin)'
+  type: Joi.string().valid('1', '2', '3', '4').messages({
+    'any.only': 'Type must be 1 (member), 2 (owner), 3 (trainer), or 4 (admin)'
   }),
   
   activeStatus: Joi.string().valid('0', '1').messages({
@@ -212,7 +212,7 @@ const queryParamsSchema = Joi.object({
   }),
   
   sortBy: Joi.string().valid('created_at','firstName', 'lastName', 'username', 'email').default('created_at').messages({
-    'any.only': 'Sort by must be one of: createTimestamp, updateTimestamp, firstName, lastName, username, email'
+    'any.only': 'Sort by must be one of: created_at, firstName, lastName, username, email'
   }),
   
   sortOrder: Joi.string().valid('ASC', 'DESC', 'asc', 'desc').default('DESC').messages({

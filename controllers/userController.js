@@ -79,7 +79,7 @@ class UserController {
 
       // Only filter by recordStatus if explicitly provided
       if (recordStatus !== undefined && recordStatus !== null && recordStatus !== '') {
-        whereClause.record_status = recordStatus == '1' ? 1 : 0; // Convert to proper record_status
+        whereClause.recordStatus = recordStatus == '1' ? 1 : 0; // Use model field name
       }
       // If no recordStatus filter is provided, include both active and inactive users
 
@@ -136,7 +136,8 @@ class UserController {
         };
       }
 
-      whereClause.recordStatus = [0, 1];
+      // Remove this line as it overrides the recordStatus filter above
+      // whereClause.recordStatus = [0, 1];
 
       const result = await User.findAndCountAll({
         where: whereClause,
@@ -150,7 +151,7 @@ class UserController {
 
       // Calculate stats with updated field names
       const totalUsersCount = await User.count();
-      const activeUsersCount = await User.count({ where: { record_status: 1 } });
+      const activeUsersCount = await User.count({ where: { recordStatus: 1 } });
       const verifiedUsersCount = totalUsersCount;
 
       // Get current month's start date
@@ -172,8 +173,8 @@ class UserController {
         unverifiedUsers: totalUsersCount - verifiedUsersCount,
         members: await User.count({ where: { role: 1 } }), // Updated role mapping
         gymOwners: await User.count({ where: { role: 2 } }),
-        trainers: await User.count({ where: { role: 4 } }),
-        admins: await User.count({ where: { role: 3 } }),
+        trainers: await User.count({ where: { role: 3 } }),
+        admins: await User.count({ where: { role: 4 } }),
         newUsersThisMonth
       };
 
@@ -340,30 +341,38 @@ class UserController {
       const { type } = req.params;
       const { page = 1, limit = 10 } = req.query;
 
-      if (!['1', '2', '3'].includes(type)) {
+      if (!['1', '2', '3', '4'].includes(type)) {
         return ResponseUtil.error(res, 'Invalid user type', 400);
       }
 
       const offset = (parseInt(page) - 1) * parseInt(limit);
 
       const result = await User.findAndCountAll({
-        where: { type }, // Remove recordStatus filter to include inactive users
+        where: { role: type }, // Use 'role' field instead of 'type'
         limit: parseInt(limit),
         offset,
-        order: [['createdAt', 'DESC']],
+        order: [['created_at', 'DESC']],
         attributes: { exclude: ['password'] }
       });
 
       const users = result.rows.map(user => user.toJSON());
 
-      return ResponseUtil.paginated(
-        res,
+      const typeNames = {
+        '1': 'Members',
+        '2': 'Gym Owners', 
+        '3': 'Trainers',
+        '4': 'Admins'
+      };
+
+      return ResponseUtil.success(res, {
         users,
-        result.count,
-        parseInt(page),
-        parseInt(limit),
-        `${type == '1' ? 'Users' : type == '2' ? 'Owners' : 'Admins'} retrieved successfully`
-      );
+        pagination: {
+          currentPage: parseInt(page),
+          totalPages: Math.ceil(result.count / parseInt(limit)),
+          total: result.count,
+          limit: parseInt(limit)
+        }
+      }, `${typeNames[type]} retrieved successfully`);
     } catch (error) {
       return ResponseUtil.error(res, 'Failed to retrieve users by type');
     }

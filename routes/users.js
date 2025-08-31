@@ -95,20 +95,20 @@ userRouter.post('/', validate(createUserSchema), authenticate, authorize('3'), U
  *         name: type
  *         schema:
  *           type: string
- *           enum: ['1', '2', '3']
- *         description: Filter by user type
+ *           enum: ['1', '2', '3', '4']
+ *         description: Filter by user type (1=member, 2=owner, 3=trainer, 4=admin)
  *       - in: query
- *         name: activeStatus
+ *         name: recordStatus
  *         schema:
  *           type: string
  *           enum: ['0', '1']
- *         description: Filter by active status
+ *         description: Filter by record status
  *       - in: query
  *         name: sortBy
  *         schema:
  *           type: string
  *           enum: ['created_at','firstName', 'lastName', 'username', 'email']
- *           default: 'createTimestamp'
+ *           default: 'created_at'
  *         description: Sort by field
  *       - in: query
  *         name: sortOrder
@@ -813,8 +813,8 @@ userRouter.post('/notify', authenticate, authorize('3'), UserController.sendNoti
  *         required: true
  *         schema:
  *           type: string
- *           enum: ['1', '2', '3']
- *         description: User type (1-user, 2-owner, 3-admin)
+ *           enum: ['1', '2', '3', '4']
+ *         description: User type (1=member, 2=owner, 3=trainer, 4=admin)
  *       - in: query
  *         name: page
  *         schema:

@@ -139,7 +139,7 @@ class NotificationService {
       }
 
       // Check notification type specific settings
-      if (options.type === 'promotional' && !userSettings.promotionalEmails) {
+      if (options?.type === 'promotional' && !userSettings.promotionalEmails) {
         console.log(`Promotional emails disabled for user: ${userEmail}`);
         return { success: false, reason: 'Promotional emails disabled' };
       }

@@ -5,6 +5,7 @@ const { sequelize, testConnection } = require('../config/database');
 // ========================================
 const User = require('./User');
 const UserProfile = require('./UserProfile');
+const UserNotificationSettings = require('./UserNotificationSettings');
 const EmergencyContact = require('./EmergencyContact');
 const FitnessGoal = require('./FitnessGoal');
 const UserFitnessGoal = require('./UserFitnessGoal');
@@ -78,6 +79,18 @@ User.hasOne(UserProfile, {
 });
 
 UserProfile.belongsTo(User, {
+  foreignKey: 'userId',
+  as: 'user'
+});
+
+// User Notification Settings
+User.hasOne(UserNotificationSettings, {
+  foreignKey: 'userId',
+  as: 'notificationSettings',
+  onDelete: 'CASCADE'
+});
+
+UserNotificationSettings.belongsTo(User, {
   foreignKey: 'userId',
   as: 'user'
 });
@@ -218,16 +231,29 @@ PaymentItem.belongsTo(Payment, {
   as: 'payment',
 });
 
-// Notifications
+// Notifications - Updated to support new notification system
+// Recipients (who receive notifications)
 User.hasMany(Notification, {
-  foreignKey: 'userId',
-  as: 'notifications',
+  foreignKey: 'recipient_id',
+  as: 'receivedNotifications',
   onDelete: 'CASCADE'
 });
 
 Notification.belongsTo(User, {
-  foreignKey: 'userId',
-  as: 'user'
+  foreignKey: 'recipient_id',
+  as: 'recipient'
+});
+
+// Senders (who send notifications)
+User.hasMany(Notification, {
+  foreignKey: 'sender_id',
+  as: 'sentNotifications',
+  onDelete: 'SET NULL' // Don't delete notifications if sender is deleted
+});
+
+Notification.belongsTo(User, {
+  foreignKey: 'sender_id',
+  as: 'sender'
 });
 
 // Advertisements
@@ -240,6 +266,29 @@ Advertisement.hasMany(AdvertisementAnalytics, {
 AdvertisementAnalytics.belongsTo(Advertisement, {
   foreignKey: 'advertisementId',
   as: 'advertisement',
+});
+
+// Advertisement-User associations for creator/updater
+User.hasMany(Advertisement, {
+  foreignKey: 'createdBy',
+  as: 'createdAdvertisements',
+  onDelete: 'SET NULL'
+});
+
+Advertisement.belongsTo(User, {
+  foreignKey: 'createdBy',
+  as: 'creator'
+});
+
+User.hasMany(Advertisement, {
+  foreignKey: 'updatedBy',
+  as: 'updatedAdvertisements',
+  onDelete: 'SET NULL'
+});
+
+Advertisement.belongsTo(User, {
+  foreignKey: 'updatedBy',
+  as: 'updater'
 });
 
 // Gym Features (Many-to-Many)
@@ -549,7 +598,17 @@ const syncDatabase = async () => {
       { alter: false } : 
       { alter: true };
     
-    await sequelize.sync(syncOptions);
+    // Sync only the Notification model to create the table with new schema
+    if (process.env.NODE_ENV !== 'production') {
+      try {
+        // Create only the notifications table and user_notification_settings table
+        await Notification.sync({ force: true });
+        await UserNotificationSettings.sync({ force: true });
+        console.log('✅ Notifications and UserNotificationSettings tables created successfully');
+      } catch (error) {
+        console.log('⚠️ Error creating notification tables:', error.message);
+      }
+    }
     console.log('✅ Database models synchronized successfully.');
     
     // Create defaults (only in development)
@@ -591,6 +650,7 @@ module.exports = {
   sequelize,
   User,
   UserProfile,
+  UserNotificationSettings,
   EmergencyContact,
   FitnessGoal,
   UserFitnessGoal,
