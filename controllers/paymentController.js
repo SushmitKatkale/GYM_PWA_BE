@@ -1,29 +1,46 @@
 const paymentService = require('../services/paymentService');
 const ResponseUtil = require('../utils/response');
+const { Subscription, SubscriptionFeature, Gym } = require('../models');
 
 /**
  * Initiate payment with automatic gateway selection
  */
 async function initiatePayment(req, res) {
   try {
-    const { gymId, subscriptionId, amount } = req.body;
+    let { gymId, subscriptionId, isBuffer } = req.body;
     const userId = req.user.id; // Updated to use user ID
     const userEmail = req.user.email; // Keep for backward compatibility
 
     // Validation
-    if (!gymId || !subscriptionId || !amount) {
+    if (!gymId || !subscriptionId) {
       return ResponseUtil.error(res, 'Missing required fields: gymId, subscriptionId, amount', 400);
     }
+
+    let subscriptionModel = await Subscription.findByPk(subscriptionId);
+    if (!subscriptionModel && subscriptionModel.gymId !== parseInt(gymId)) {
+      return ResponseUtil.error(res, 'Subscription not found', 404);
+    }
+
+    let amount = parseFloat(subscriptionModel.price);
 
     if (amount <= 0) {
       return ResponseUtil.error(res, 'Amount must be greater than 0', 400);
     }
 
     // Calculate total amount including 18% GST
-    const baseAmount = parseFloat(amount);
-    const gstAmount = Math.round(baseAmount * 0.18 * 100) / 100; // Round to 2 decimal places
-    const totalAmountWithGST = baseAmount + gstAmount;
+    let baseAmount = parseFloat(amount);
+    if (subscriptionModel.discountPercent) {
+      baseAmount = baseAmount - (baseAmount * (parseFloat(subscriptionModel.discountPercent) / 100));
+    }
 
+    if (isBuffer && subscriptionModel.bufferFee) {
+      baseAmount += parseFloat(subscriptionModel.bufferFee);
+    }
+
+    let gstAmount = baseAmount * 0.18; // Round to 2 decimal places
+    let totalAmountWithGST = baseAmount + gstAmount;
+    totalAmountWithGST = parseFloat(totalAmountWithGST.toFixed(2));
+    
     console.log(`💰 Payment calculation: Base: ₹${baseAmount}, GST (18%): ₹${gstAmount}, Total: ₹${totalAmountWithGST}`);
 
     // Initiate payment with GST included
@@ -34,7 +51,8 @@ async function initiatePayment(req, res) {
       gstAmount,
       totalAmount: totalAmountWithGST,
       userEmail,
-      userId // Add user ID to payment data
+      userId,
+      isBuffer: isBuffer
     });
 
     return ResponseUtil.success(res, paymentData, 'Payment initiated successfully with 18% GST included');
@@ -173,6 +191,15 @@ async function verifyPaymentStatus(req, res) {
   }
 }
 
+function getStringStatus(code) {
+  switch (code) {
+    case 0: return 'pending';
+    case 1: return 'success';
+    case 2: return 'failed';
+    default: return 'unknown';
+  }
+}
+
 /**
  * Get comprehensive payment status with post-payment processing
  * This endpoint handles payment status after redirect from gateway
@@ -190,9 +217,9 @@ async function getPaymentStatusWithProcessing(req, res) {
 
     const response = {
       paymentId: result.payment.id,
-      status: result.payment.status,
+      status: getStringStatus(result.payment.status),
       gateway: result.payment.gateway,
-      amount: result.payment.paymentAmount,
+      amount: result.payment.amount,
       userEmail: result.payment.userEmail,
       userId: result.payment.userId, // Add user ID to response
       subscription: result.subscription,

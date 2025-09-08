@@ -491,13 +491,11 @@ router.get('/', authenticate, async (req, res) => {
 router.get('/:id', authenticate, async (req, res) => {
   try {
     const userEmail = req.user.email;
-    const subscriptionId = req.params.id;
+    const userId = req.params.id;
 
-    const subscription = await UserSubscription.findOne({
+    const subscription = await UserSubscription.findAll({
       where: {
-        id: subscriptionId,
-        userEmail,
-        activeStatus: true
+        userId: userId
       },
       include: [
         {
@@ -506,15 +504,13 @@ router.get('/:id', authenticate, async (req, res) => {
           include: [
             {
               model: Gym,
-              as: 'gym',
-              attributes: ['id', 'name', 'address', 'city', 'phoneNumber']
+              as: 'gym'
             }
           ]
         },
         {
           model: Payment,
-          as: 'payment',
-          attributes: ['id', 'paymentAmount', 'status', 'gateway', 'completedAt']
+          as: 'payment'
         }
       ]
     });

@@ -196,6 +196,18 @@ UserSubscription.belongsTo(Subscription, {
   as: 'subscription',
 });
 
+// UserSubscription-Payment association
+UserSubscription.belongsTo(Payment, {
+  foreignKey: 'paymentId',
+  as: 'payment',
+});
+
+Payment.hasMany(UserSubscription, {
+  foreignKey: 'paymentId',
+  as: 'userSubscriptions',
+  onDelete: 'CASCADE',
+});
+
 // Payments
 User.hasMany(Payment, {
   foreignKey: 'userId',
@@ -217,6 +229,18 @@ Gym.hasMany(Payment, {
 Payment.belongsTo(Gym, {
   foreignKey: 'gymId',
   as: 'gym',
+});
+
+// Payment-Subscription association
+Payment.belongsTo(Subscription, {
+  foreignKey: 'subscriptionId',
+  as: 'subscription',
+});
+
+Subscription.hasMany(Payment, {
+  foreignKey: 'subscriptionId',
+  as: 'payments',
+  onDelete: 'CASCADE',
 });
 
 // Payment Items

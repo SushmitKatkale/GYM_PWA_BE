@@ -27,7 +27,7 @@ const adminAuth = async (req, res, next) => {
     const user = await User.findByPk(decoded.id, {
       where: { 
         record_status: 1,
-        role: 3 // Admin only (1=member, 2=owner, 3=admin, 4=trainer)
+        role: 4 // Admin only (1=member, 2=owner, 3=trainer, 4=admin)
       }
     });
 

@@ -25,6 +25,15 @@ const UserSubscription = sequelize.define('UserSubscription', {
       key: 'id'
     }
   },
+  paymentId: {
+    type: DataTypes.BIGINT,
+    allowNull: false,
+    field: 'payment_id',
+    references: {
+      model: 'payments',
+      key: 'id'
+    }
+  },
   startDate: {
     type: DataTypes.DATEONLY,
     allowNull: false,
@@ -86,47 +95,47 @@ const UserSubscription = sequelize.define('UserSubscription', {
 });
 
 // Instance methods
-UserSubscription.prototype.isActive = function() {
+UserSubscription.prototype.isActive = function () {
   const today = new Date();
   const endDate = new Date(this.endDate);
-  
+
   if (this.bufferApplied && this.bufferEndDate) {
     const bufferEndDate = new Date(this.bufferEndDate);
     return today <= bufferEndDate;
   }
-  
+
   return today <= endDate;
 };
 
-UserSubscription.prototype.isInBufferPeriod = function() {
+UserSubscription.prototype.isInBufferPeriod = function () {
   if (!this.bufferApplied || !this.bufferStartDate || !this.bufferEndDate) {
     return false;
   }
-  
+
   const today = new Date();
   const bufferStart = new Date(this.bufferStartDate);
   const bufferEnd = new Date(this.bufferEndDate);
-  
+
   return today >= bufferStart && today <= bufferEnd;
 };
 
-UserSubscription.prototype.getDaysRemaining = function() {
+UserSubscription.prototype.getDaysRemaining = function () {
   const today = new Date();
   let targetEndDate;
-  
+
   if (this.bufferApplied && this.bufferEndDate) {
     targetEndDate = new Date(this.bufferEndDate);
   } else {
     targetEndDate = new Date(this.endDate);
   }
-  
+
   const diffTime = targetEndDate - today;
   const diffDays = Math.ceil(diffTime / (1000 * 60 * 60 * 24));
-  
+
   return Math.max(0, diffDays);
 };
 
-UserSubscription.prototype.isExpired = function() {
+UserSubscription.prototype.isExpired = function () {
   return this.getDaysRemaining() === 0;
 };
 

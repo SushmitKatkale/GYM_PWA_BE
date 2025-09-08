@@ -89,17 +89,17 @@ async function createOrderWithRazorpay(subscriptionId, totalAmount) {
 async function determinePaymentGateway(gymId) {
   try {
     const vendorConfig = await VendorPaymentConfig.findOne({
-      where: { 
+      where: {
         gymId,
-        activeStatus: true 
+        activeStatus: true
       }
     });
 
     // Check if Razorpay is configured and active
-    if (vendorConfig && 
-        vendorConfig.razorpayVendorId && 
-        vendorConfig.isRazorpayActive && 
-        vendorConfig.activeStatus) {
+    if (vendorConfig &&
+      vendorConfig.razorpayVendorId &&
+      vendorConfig.isRazorpayActive &&
+      vendorConfig.activeStatus) {
       return {
         gateway: 'razorpay',
         config: vendorConfig
@@ -125,7 +125,7 @@ async function determinePaymentGateway(gymId) {
  * Create payment order with automatic gateway selection
  */
 async function initiatePayment(paymentData) {
-  const { gymId, subscriptionId, baseAmount, gstAmount, totalAmount, userEmail, userId } = paymentData;
+  const { gymId, subscriptionId, baseAmount, gstAmount, totalAmount, userEmail, userId, isBuffer } = paymentData;
 
   try {
     // Get user details
@@ -147,7 +147,7 @@ async function initiatePayment(paymentData) {
 
     // Determine payment gateway
     const { gateway, config } = await determinePaymentGateway(gymId);
-    
+
     console.log(`Using payment gateway: ${gateway} for gym ${gymId}`);
     console.log(`Payment breakdown: Base: ₹${baseAmount}, GST: ₹${gstAmount}, Total: ₹${totalAmount}`);
 
@@ -158,7 +158,8 @@ async function initiatePayment(paymentData) {
         baseAmount,
         gstAmount,
         totalAmount,
-        userEmail
+        userEmail,
+        isBuffer
       });
     } else {
       return await createPhonepePayment({
@@ -167,7 +168,8 @@ async function initiatePayment(paymentData) {
         gstAmount,
         totalAmount,
         userEmail,
-        user
+        user,
+        isBuffer
       });
     }
   } catch (error) {
@@ -254,7 +256,7 @@ async function createRazorpayPayment({ subscription, vendorConfig, baseAmount, g
 /**
  * Create PhonePe payment (fallback) with GST
  */
-async function createPhonepePayment({ subscription, baseAmount, gstAmount, totalAmount, userEmail, user }) {
+async function createPhonepePayment({ subscription, baseAmount, gstAmount, totalAmount, userEmail, user, isBuffer }) {
   const merchantTransactionId = phonepeService.generateMerchantTransactionId();
 
   // Save payment record first to get payment ID
@@ -263,15 +265,15 @@ async function createPhonepePayment({ subscription, baseAmount, gstAmount, total
     gymId: subscription.gymId, // Required field
     amount: totalAmount, // Required field - Total amount including GST
     paymentRefNo: merchantTransactionId,
-    phonepeTransactionId: merchantTransactionId,
     subscriptionId: subscription.id,
     userEmail,
     gateway: 'phonepe',
-    status: 'pending',
+    status: 0,
     commission: 0, // No commission for PhonePe fallback
     gstOnCommission: 0,
     totalDeduction: 0,
     vendorAmount: totalAmount, // Full amount goes to one account
+    isBuffer: isBuffer ? 1 : 0,
     // Add GST breakdown to payment record
     cutCalculationDetails: {
       baseAmount,
@@ -315,7 +317,7 @@ async function createPhonepePayment({ subscription, baseAmount, gstAmount, total
 async function handleRazorpayCallback(paymentData) {
   try {
     const { razorpay_payment_id, razorpay_order_id, razorpay_signature } = paymentData;
-    
+
     // Verify signature
     const generatedSignature = crypto
       .createHmac('sha256', process.env.RAZORPAY_KEY_SECRET)
@@ -333,7 +335,7 @@ async function handleRazorpayCallback(paymentData) {
 
     if (payment) {
       const wasPaymentPending = payment.status === 'pending';
-      
+
       await payment.update({
         razorpayPaymentId: razorpay_payment_id,
         transactionId: razorpay_payment_id,
@@ -366,14 +368,14 @@ async function handleRazorpayCallback(paymentData) {
 async function handlePhonepeCallback(webhookData, xVerifyHeader) {
   try {
     const processedWebhook = await phonepeService.processWebhook(webhookData, xVerifyHeader);
-    
+
     if (!processedWebhook.success) {
       throw new Error('Invalid PhonePe webhook');
     }
 
     const { data } = processedWebhook;
     const paymentStatus = phonepeService.convertPaymentStatus(data.code);
-    
+
     // Update payment record
     const payment = await Payment.findOne({
       where: { phonepeTransactionId: data.merchantTransactionId }
@@ -388,12 +390,12 @@ async function handlePhonepeCallback(webhookData, xVerifyHeader) {
         completedAt: paymentStatus === 'completed' ? new Date() : null,
         gatewayResponse: JSON.stringify(data)
       };
-      
+
       // Extract additional fields if available
       if (data.bankRefNo || data.referenceId) {
         updateData.bankRefNo = data.bankRefNo || data.referenceId;
       }
-      
+
       // Update payment method if available
       if (data.paymentMethod) {
         const paymentMethod = data.paymentMethod.toLowerCase();
@@ -409,13 +411,13 @@ async function handlePhonepeCallback(webhookData, xVerifyHeader) {
           updateData.paidVia = 'wallet';
         }
       }
-      
+
       console.log('Updating payment with PhonePe webhook data:', {
         paymentId: payment.id,
         status: paymentStatus,
         updateFields: Object.keys(updateData)
       });
-      
+
       const wasPaymentPending = payment.status === 'pending';
       await payment.update(updateData);
 
@@ -444,7 +446,7 @@ async function sendPaymentCompletionEmail(paymentId) {
   try {
     const { UserSubscription, User } = require('../models');
     const mailService = require('./mailService');
-    
+
     // Get payment with related data
     const payment = await Payment.findByPk(paymentId, {
       include: [{
@@ -507,6 +509,19 @@ async function sendPaymentCompletionEmail(paymentId) {
   }
 }
 
+function getIntegerStatus(status) {
+  switch (status) {
+    case 'pending':
+      return 0;
+    case 'completed':
+      return 1;
+    case 'failed':
+    case 'cancelled':
+      return 2;
+  }
+  return 0;
+}
+
 /**
  * Process payment status after redirect from gateway and update related records
  */
@@ -514,7 +529,7 @@ async function processPaymentStatus(paymentId) {
   try {
     const { UserSubscription, User } = require('../models');
     const mailService = require('./mailService');
-    
+
     // Get payment with related data including subscription and gym information
     const payment = await Payment.findByPk(paymentId, {
       include: [{
@@ -538,67 +553,67 @@ async function processPaymentStatus(paymentId) {
     let shouldSendPaymentEmail = false; // Track if we need to send email
 
     // Check payment status from gateway if still pending
-    if (payment.status === 'pending') {
-      if (payment.gateway === 'phonepe' && payment.phonepeTransactionId) {
+    if (payment.status == getIntegerStatus('pending')) {
+      if (payment.gateway === 'phonepe' && payment.paymentRefNo) {
         // Check PhonePe payment status
-        const statusCheck = await phonepeService.checkPaymentStatus(payment.phonepeTransactionId);
-        
+        const statusCheck = await phonepeService.checkPaymentStatus(payment.paymentRefNo);
+
         if (statusCheck.success && statusCheck.data) {
           const responseData = statusCheck.data;
           const newStatus = phonepeService.convertPaymentStatus(responseData.state);
-          
+
           // Extract detailed payment information
           const paymentDetails = phonepeService.extractPaymentDetails(responseData);
-          
+
           // Prepare update object with all available data from PhonePe response
           const updateData = {
-            status: newStatus,
+            status: getIntegerStatus(newStatus),
             completedAt: newStatus === 'completed' ? new Date() : null,
             gatewayResponse: JSON.stringify(responseData)
           };
-          
+
           // Update with extracted payment details
           if (paymentDetails.transactionId) {
             updateData.phonepePaymentId = paymentDetails.transactionId;
             updateData.transactionId = paymentDetails.transactionId;
           }
-          
+
           // Update payment method
           if (paymentDetails.paymentMethod) {
             updateData.paidVia = phonepeService.convertPaymentMethod(paymentDetails.paymentMethod);
           }
-          
+
           // Update bank information
           if (paymentDetails.bankId) {
             updateData.bankId = paymentDetails.bankId;
           }
-          
+
           if (paymentDetails.bankTransactionId) {
             updateData.bankRefNo = paymentDetails.bankTransactionId;
           }
-          
+
           // Update authorization and reference codes
           if (paymentDetails.authorizationCode) {
             updateData.authorizationCode = paymentDetails.authorizationCode;
           }
-          
+
           if (paymentDetails.arn) {
             updateData.arn = paymentDetails.arn;
           }
-          
+
           if (paymentDetails.brn) {
             updateData.brn = paymentDetails.brn;
           }
-          
+
           if (paymentDetails.serviceTransactionId) {
             updateData.serviceTransactionId = paymentDetails.serviceTransactionId;
           }
-          
+
           // Update payment reference number if not already set
           if (!payment.paymentRefNo) {
-            updateData.paymentRefNo = payment.phonepeTransactionId;
+            updateData.paymentRefNo = payment.paymentRefNo;
           }
-          
+
           console.log('Updating payment with detailed PhonePe response data:', {
             paymentId: payment.id,
             newStatus,
@@ -610,21 +625,21 @@ async function processPaymentStatus(paymentId) {
               amount: paymentDetails.amount
             }
           });
-          
+
           // Update payment record
           await payment.update(updateData);
-          
-          paymentStatus = newStatus;
+
+          paymentStatus = getIntegerStatus(newStatus);
           // Mark for email if status changed to completed
-          if (newStatus === 'completed' && payment.status === 'pending') {
+          if (newStatus === 'completed' && payment.status === 0) {
             shouldSendPaymentEmail = true;
           }
         }
-      } else if (payment.gateway === 'razorpay' && payment.razorpayOrderId) {
+      } else if (payment.gateway === 'razorpay' && payment.transactionId) {
         // Check Razorpay payment status
         try {
           const razorpayOrder = await razorpayInstance.orders.fetch(payment.razorpayOrderId);
-          
+
           if (razorpayOrder.status === 'paid') {
             await payment.update({
               status: 'completed',
@@ -643,7 +658,7 @@ async function processPaymentStatus(paymentId) {
     }
 
     // Process successful payment
-    if (paymentStatus === 'completed') {
+    if (paymentStatus === getIntegerStatus('completed')) {
       // Create user subscription if not exists
       const existingUserSub = await UserSubscription.findOne({
         where: { paymentId: payment.id }
@@ -652,16 +667,29 @@ async function processPaymentStatus(paymentId) {
       if (!existingUserSub) {
         const validFrom = new Date();
         const validTo = new Date();
+        
         validTo.setDate(validTo.getDate() + payment.subscription.validityDays);
+        const bufferStartDate = new Date(validFrom);
+        bufferStartDate.setDate(bufferStartDate.getDate() + 1); // Buffer starts the day after subscription starts
+        
+        if(payment.isBuffer){
+          validTo.setDate(validTo.getDate() + parseInt(payment.subscription.bufferDays)); // Add 7 buffer days
+        }
+
+        const bufferEndDate = new Date(validTo);
 
         userSubscription = await UserSubscription.create({
-          userEmail: payment.userEmail,
+          userId: payment.userId,
           subscriptionId: payment.subscriptionId,
           paymentId: payment.id,
-          validFrom,
-          validTo,
-          bufferDays: 0,
-          activeStatus: true
+          startDate: validFrom,
+          endDate: validTo,
+          bufferDays: parseInt(payment.subscription.bufferDays),
+          bufferApplied: payment.isBuffer ? 1 : 0,
+          bufferStartDate: bufferStartDate,
+          bufferEndDate: bufferEndDate,
+          bufferFeePaid: parseFloat(payment.isBuffer ? payment.subscription.bufferFee : 0),
+          recordStatus: 1
         });
       } else {
         userSubscription = existingUserSub;
@@ -671,7 +699,7 @@ async function processPaymentStatus(paymentId) {
       if (shouldSendPaymentEmail || !existingUserSub) {
         try {
           // Get user details for personalized email
-          const user = await User.findOne({ where: { email: payment.userEmail } });
+          const user = await User.findByPk(payment.userId);
           const userName = user ? `${user.firstName} ${user.lastName}`.trim() : 'Valued Customer';
 
           await mailService.sendPaymentConfirmation({
@@ -696,10 +724,10 @@ async function processPaymentStatus(paymentId) {
 
       message = 'Payment completed successfully! Your subscription is now active.';
       nextAction = 'redirect_to_gym';
-    } else if (paymentStatus === 'failed') {
+    } else if (paymentStatus === getIntegerStatus('failed') ) {
       message = 'Payment failed. Please try again or contact support.';
       nextAction = 'retry_payment';
-    } else if (paymentStatus === 'cancelled') {
+    } else if (paymentStatus === getIntegerStatus('cancelled')) {
       message = 'Payment was cancelled. You can retry the payment anytime.';
       nextAction = 'retry_payment';
     } else {

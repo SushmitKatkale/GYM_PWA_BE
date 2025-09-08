@@ -25,6 +25,22 @@ const Payment = sequelize.define('Payment', {
       key: 'id'
     }
   },
+  subscriptionId: {
+    type: DataTypes.BIGINT,
+    allowNull: true,
+    field: 'subscription_id',
+    references: {
+      model: 'subscriptions',
+      key: 'id'
+    }
+  },
+  isBuffer: {
+    type: DataTypes.TINYINT,
+    allowNull: false,
+    field: 'is_buffer',
+    defaultValue: 0,
+    comment: '1-true,0-false'
+  },
   amount: {
     type: DataTypes.DECIMAL(10, 2),
     allowNull: false,
@@ -59,6 +75,11 @@ const Payment = sequelize.define('Payment', {
     allowNull: true,
     defaultValue: 0,
     field: 'gst_percent'
+  },
+  gatewayResponse: {
+    type: DataTypes.STRING(2500),
+    allowNull: true,
+    field: 'gateway_response'
   },
   createdBy: {
     type: DataTypes.BIGINT,
