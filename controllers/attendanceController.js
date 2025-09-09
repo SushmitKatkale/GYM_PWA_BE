@@ -795,46 +795,23 @@ const getUserAttendance = async (req, res) => {
 const getActiveSession = async (req, res) => {
   try {
     const { userId } = req.params;
-    const userEmail = req.user.email;
-    const userType = req.user.type;
-
-    // Determine target user email
-    let targetUserEmail = userId;
-
-    // If userId looks like an email, use it directly
-    // Otherwise, try to find user by ID
-    if (!userId.includes('@')) {
-      const user = await User.findByPk(userId);
-      if (!user) {
-        return ResponseUtil.notFoundError(res, 'User not found');
-      }
-      targetUserEmail = user.email;
-    }
-
-    // Authorization: users can only see their own data unless they're admin/owner
-    if (userType === '1' && targetUserEmail !== userEmail) {
-      return ResponseUtil.forbiddenError(res, 'Not authorized to view this user\'s active session');
-    }
 
     // Get active session
     const activeSession = await Attendance.findOne({
       where: {
-        userEmail: targetUserEmail,
-        checkOutTime: null,
-        isActive: true
+        userId: userId,
+        checkOutTime: null
       },
       include: [{
         model: Gym,
-        as: 'gym',
-        attributes: ['id', 'name', 'address', 'latitude', 'longitude']
+        as: 'gym'
       }],
       order: [['checkInTime', 'DESC']]
     });
 
     if (!activeSession) {
       return ResponseUtil.success(res, {
-        activeSession: null,
-        isActive: false
+        activeSession: null
       }, 'No active session found');
     }
 
