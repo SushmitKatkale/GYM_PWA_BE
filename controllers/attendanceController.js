@@ -2,9 +2,13 @@ const {
   Attendance,
   Gym,
   User,
+  CheckInMethod,
   GymCheckInMethods,
   GymQRCodes,
   GymUniqueCodes,
+  UserSubscription,
+  Subscription,
+  Payment,
   sequelize
 } = require('../models');
 const ResponseUtil = require('../utils/response');
@@ -12,543 +16,726 @@ const locationService = require('../services/locationService');
 const { Op } = require('sequelize');
 
 /**
- * Quick check-in based on user location and subscribed gyms
- * Uses location to find nearby gyms and allows check-in
+ * Helper function to get check-in method ID by name
  */
-const quickCheckIn = async (req, res) => {
+const getMethodId = async (methodName) => {
+  const method = await CheckInMethod.findOne({
+    where: { name: methodName }
+  });
+  return method ? method.id : null;
+};
+
+/**
+ * Helper function to check if user has active check-in
+ */
+const hasActiveCheckIn = async (userId) => {
+  return await Attendance.findOne({
+    where: {
+      userId,
+      checkOutTime: null
+    }
+  });
+};
+
+/**
+ * Unified check-in endpoint that handles different check-in methods
+ */
+const checkIn = async (req, res) => {
   const transaction = await sequelize.transaction();
 
   try {
-    const { location, accuracy, gymId } = req.body;
-    const { latitude, longitude } = location;
-    const userId = req.user.id; // Updated to use user ID
-    const userEmail = req.user.email; // Keep for backward compatibility
+    const {
+      method,
+      gymId,
+      qrCode,
+      uniqueCode,
+      userQRCode,
+      latitude,
+      longitude,
+      attendanceType = 'normal'
+    } = req.body;
 
-    // Validate required fields
+    const userId = req.user.id;
+
     if (!latitude || !longitude) {
-      await transaction.rollback();
       return ResponseUtil.validationError(res, {
         latitude: 'Latitude is required',
         longitude: 'Longitude is required'
       });
     }
 
-    // Validate location coordinates
-    if (!locationService.validateCoordinates(latitude, longitude)) {
+    // Validate required fields
+    if (!method) {
       await transaction.rollback();
       return ResponseUtil.validationError(res, {
-        location: 'Invalid latitude or longitude coordinates'
+        method: 'Check-in method is required'
       });
     }
 
-    // Check if user has an active check-in - support both user ID and email
-    const activeCheckInWhere = {
-      checkOutTime: null,
-      isActive: true
-    };
-    if (userId) {
-      activeCheckInWhere.userId = userId;
-    } else {
-      activeCheckInWhere.userEmail = userEmail;
+    // Get method ID
+    const methodId = await getMethodId(method);
+    if (!methodId) {
+      await transaction.rollback();
+      return ResponseUtil.validationError(res, {
+        method: 'Invalid check-in method'
+      });
     }
-    
-    const activeCheckIn = await Attendance.findOne({
-      where: activeCheckInWhere
+
+    const subscrpbedGyms = await UserSubscription.findAll({
+      where: {
+        userId: userId,
+        endDate: { [Op.gte]: new Date() }
+      },
+      include: [
+        {
+          model: Subscription,
+          as: 'subscription',
+          include: [{
+            model: Gym,
+            as: 'gym',
+            include: [{
+              model: User,
+              as: 'owner'
+            }]
+          }]
+        },
+        {
+          model: Payment,
+          as: 'payment'
+        }
+      ]
     });
 
+    if (subscrpbedGyms.length === 0) {
+      await transaction.rollback();
+      return ResponseUtil.forbiddenError(res, 'You do not have an active subscription to any gym.');
+    }
+
+    // Check if user already has an active check-in
+    const activeCheckIn = await hasActiveCheckIn(userId);
     if (activeCheckIn) {
       await transaction.rollback();
       return ResponseUtil.conflictError(res, 'You are already checked in. Please check out first.');
     }
 
-    // Get user's active subscriptions (subscriptions that haven't expired)
-    const { UserSubscription, Subscription } = require('../models');
-    const subscriptionWhere = {
-      record_status: 1, // Updated field name
-      validTo: { [Op.gte]: new Date() } // Only check if subscription hasn't expired
-    };
-    if (userId) {
-      subscriptionWhere.userId = userId;
+    let targetGymId = null;
+    let neabySubscribedGyms = [];
+
+    if (gymId && method == 'owner_scan_user') {
+      targetGymId = gymId;
     } else {
-      subscriptionWhere.userEmail = userEmail;
+      neabySubscribedGyms = await fetchNeabySubscribedGymsInRange(latitude, longitude, subscrpbedGyms, process.env.GYMS_CHECKIN_RANGE_METERS || 1000); // 1000m range
+      if (neabySubscribedGyms.length === 0) {
+        await transaction.rollback();
+        return ResponseUtil.notFoundError(res, 'No nearby subscribed gyms found.');
+      }
+      targetGymId = neabySubscribedGyms[0].gym.id; // Closest gym
     }
-    
-    const activeSubscriptions = await UserSubscription.findAll({
-      where: subscriptionWhere,
-      include: [{
-        model: Subscription,
-        as: 'subscription',
-        required: true,
-        include: [{
-          model: Gym,
-          as: 'gym',
-          required: true,
-          where: {
-            record_status: 1, // Updated field name
-            attendanceTrackingEnabled: true
-          }
-        }]
-      }]
+
+    if(targetGymId === null) {
+      await transaction.rollback();
+      return ResponseUtil.validationError(res, {
+        gym: 'Unable to determine target gym for check-in'
+      });
+    }
+
+    let targetGymCheckInMethods = await GymCheckInMethods.findOne({
+      where: {
+        gymId: targetGymId,
+        methodId: methodId,
+      }
     });
 
-    if (activeSubscriptions.length === 0) {
+    if (!targetGymCheckInMethods) {
       await transaction.rollback();
-      return ResponseUtil.notFoundError(res, 'No active gym subscriptions found. Please subscribe to a gym first.');
+      return ResponseUtil.forbiddenError(res, 'The selected gym does not support any check-in methods.');
     }
+    
 
-    // Check which subscribed gyms allow quick check-in and user is within range
-    const availableGyms = [];
-    for (const subscription of activeSubscriptions) {
-      const gym = subscription.subscription.gym;
-      
-      // Check if gym has quick check-in enabled
-      const checkInMethods = await GymCheckInMethods.findOne({
-        where: {
-          gymId: gym.id,
-          methodType: 'quick_checkin',
-          isActive: true
+    let validationResult = { isValid: true };
+
+    // Handle different check-in methods
+    switch (method) {
+      case 'quick_checkin':
+        const result = await handleQuickCheckIn(userId, latitude, longitude, transaction);
+        if (!result.success) {
+          await transaction.rollback();
+          return result.response;
         }
-      });
+        targetGymId = result.gymId;
+        validationResult = result.validation;
+        break;
 
-      if (checkInMethods && checkInMethods.isActive) {
-        // Validate location against gym's check-in radius
-        const locationValidation = await locationService.validateLocationForGym(
-          latitude,
-          longitude,
-          gym.id
-        );
+      case 'gym_qr_scan':
+        if (!qrCode) {
+          await transaction.rollback();
+          return ResponseUtil.validationError(res, { qrCode: 'QR code is required' });
+        }
+        const qrResult = await handleQRCheckIn(qrCode, latitude, longitude, transaction);
+        if (!qrResult.success) {
+          await transaction.rollback();
+          return qrResult.response;
+        }
+        targetGymId = qrResult.gymId;
+        break;
 
-        if (locationValidation.isValid) {
-          availableGyms.push({
-            gym: gym.toJSON(),
-            subscription: {
-              id: subscription.id,
-              validTo: subscription.validTo,
-              subscriptionTitle: subscription.subscription.title
-            },
-            distance: locationValidation.distance,
-            distanceText: locationValidation.distanceText,
-            walkingDuration: locationValidation.walkingDuration,
-            accuracy: locationValidation.locationAccuracy
+      case 'gym_code':
+        if (!uniqueCode) {
+          await transaction.rollback();
+          return ResponseUtil.validationError(res, { uniqueCode: 'Unique code is required' });
+        }
+        const codeResult = await handleUniqueCodeCheckIn(uniqueCode, latitude, longitude, transaction);
+        if (!codeResult.success) {
+          await transaction.rollback();
+          return codeResult.response;
+        }
+        targetGymId = codeResult.gymId;
+        break;
+
+      case 'owner_scan_user':
+        if (!userQRCode || !gymId) {
+          await transaction.rollback();
+          return ResponseUtil.validationError(res, {
+            userQRCode: 'User QR code is required',
+            gymId: 'Gym ID is required'
           });
         }
+        const ownerResult = await handleOwnerScanCheckIn(userQRCode, gymId, req.user.id, transaction);
+        if (!ownerResult.success) {
+          await transaction.rollback();
+          return ownerResult.response;
+        }
+        targetGymId = gymId;
+        break;
+
+      default:
+        await transaction.rollback();
+        return ResponseUtil.validationError(res, {
+          method: 'Unsupported check-in method'
+        });
+    }
+
+    // Create attendance record
+    const attendanceData = {
+      userId,
+      gymId: targetGymId,
+      attendanceType,
+      methodId,
+      checkInTime: new Date(),
+      latitude: latitude || null,
+      longitude: longitude || null,
+      createdBy: userId,
+      updatedBy: userId,
+      recordStatus: 1
+    };
+
+    const attendance = await Attendance.create(attendanceData, { transaction });
+
+    // Get gym and user information for response
+    const gym = await Gym.findByPk(targetGymId, {
+      attributes: ['id', 'name', 'address', 'latitude', 'longitude']
+    });
+
+    const user = await User.findByPk(userId, {
+      attributes: ['id', 'firstName', 'lastName', 'email']
+    });
+
+    const checkInMethodInfo = await CheckInMethod.findByPk(methodId);
+
+    await transaction.commit();
+
+    return ResponseUtil.success(res, {
+      attendance: {
+        id: attendance.id,
+        gymId: attendance.gymId,
+        userId: attendance.userId,
+        attendanceType: attendance.attendanceType,
+        checkInTime: attendance.checkInTime,
+        method: checkInMethodInfo.name
+      },
+      gym,
+      user,
+      message: `Successfully checked in to ${gym.name}`
+    }, 'Check-in successful', 201);
+
+  } catch (error) {
+    await transaction.rollback();
+    console.error('Error in check-in:', error);
+    return ResponseUtil.error(res, 'Failed to process check-in', 500);
+  }
+};
+
+/**
+ * Handle quick check-in logic
+ */
+const handleQuickCheckIn = async (userId, latitude, longitude, transaction) => {
+  if (!latitude || !longitude) {
+    return {
+      success: false,
+      response: ResponseUtil.validationError(null, {
+        location: 'Latitude and longitude are required for quick check-in'
+      })
+    };
+  }
+
+  // Validate coordinates
+  if (!locationService.validateCoordinates(latitude, longitude)) {
+    return {
+      success: false,
+      response: ResponseUtil.validationError(null, {
+        location: 'Invalid coordinates'
+      })
+    };
+  }
+
+  // Get user's active subscriptions
+  const activeSubscriptions = await UserSubscription.findAll({
+    where: {
+      userId,
+      recordStatus: 1,
+      validTo: { [Op.gte]: new Date() }
+    },
+    include: [{
+      model: Subscription,
+      as: 'subscription',
+      required: true,
+      include: [{
+        model: Gym,
+        as: 'gym',
+        required: true,
+        where: { recordStatus: 1 }
+      }]
+    }]
+  });
+
+  if (activeSubscriptions.length === 0) {
+    return {
+      success: false,
+      response: ResponseUtil.notFoundError(null, 'No active gym subscriptions found')
+    };
+  }
+
+  // Find nearby gyms within check-in range
+  let closestGym = null;
+  let minDistance = Infinity;
+
+  for (const subscription of activeSubscriptions) {
+    const gym = subscription.subscription.gym;
+
+    // Check if gym supports quick check-in
+    const gymMethod = await GymCheckInMethods.findOne({
+      where: {
+        gymId: gym.id,
+        methodType: 'quick_checkin',
+        isActive: true
+      }
+    });
+
+    if (gymMethod) {
+      const validation = await locationService.validateLocationForGym(
+        latitude,
+        longitude,
+        gym.id
+      );
+
+      if (validation.isValid && validation.distance < minDistance) {
+        minDistance = validation.distance;
+        closestGym = gym.id;
       }
     }
+  }
 
-    if (availableGyms.length === 0) {
-      await transaction.rollback();
-      return ResponseUtil.notFoundError(res, 'You are not within check-in range of any of your subscribed gyms, or they do not have quick check-in enabled.');
-    }
+  if (!closestGym) {
+    return {
+      success: false,
+      response: ResponseUtil.notFoundError(null, 'No nearby gyms available for quick check-in')
+    };
+  }
 
-    // Select the closest gym for auto check-in
-    const selectedGym = availableGyms.reduce((closest, gym) =>
-      gym.distance < closest.distance ? gym : closest
+  return {
+    success: true,
+    gymId: closestGym,
+    validation: { distance: minDistance }
+  };
+};
+
+/**
+ * Handle QR code check-in logic
+ */
+const handleQRCheckIn = async (qrCode, latitude, longitude, transaction) => {
+  const gymQRCode = await GymQRCodes.findOne({
+    where: {
+      qrCode,
+      isActive: true
+    },
+    include: [{
+      model: Gym,
+      as: 'gym',
+      required: true
+    }]
+  });
+
+  if (!gymQRCode) {
+    return {
+      success: false,
+      response: ResponseUtil.notFoundError(null, 'Invalid or expired QR code')
+    };
+  }
+
+  // Check if QR code is expired
+  if (gymQRCode.expiresAt && new Date() > gymQRCode.expiresAt) {
+    return {
+      success: false,
+      response: ResponseUtil.validationError(null, {
+        qrCode: 'QR code has expired'
+      })
+    };
+  }
+
+  // Validate location if required
+  const gymSettings = await GymCheckInMethods.findOne({
+    where: { gymId: gymQRCode.gymId }
+  });
+
+  if (gymSettings && gymSettings.qrCodeLocationRequired && latitude && longitude) {
+    const validation = await locationService.validateLocationForGym(
+      latitude,
+      longitude,
+      gymQRCode.gymId
     );
 
-    // Create attendance record
-    const attendanceData = {
-      gymId: selectedGym.gym.id,
-      checkInTime: new Date(),
-      checkInMethod: 'quick_checkin',
-      userLocationLat: latitude,
-      userLocationLng: longitude,
-      distanceFromGym: selectedGym.distance,
-      isActive: true,
-      createdBy: userId || userEmail,
-      updatedBy: userId || userEmail
+    if (!validation.isValid) {
+      return {
+        success: false,
+        response: ResponseUtil.validationError(null, {
+          location: `You must be within ${gymSettings.checkInRadius || 100}m of the gym`
+        })
+      };
+    }
+  }
+
+  // Update QR code usage
+  await gymQRCode.increment('usageCount', { transaction });
+
+  return {
+    success: true,
+    gymId: gymQRCode.gymId
+  };
+};
+
+/**
+ * Handle unique code check-in logic
+ */
+const handleUniqueCodeCheckIn = async (uniqueCode, latitude, longitude, transaction) => {
+  const gymUniqueCode = await GymUniqueCodes.findOne({
+    where: {
+      uniqueCode: uniqueCode.toUpperCase(),
+      isActive: true
+    },
+    include: [{
+      model: Gym,
+      as: 'gym',
+      required: true
+    }]
+  });
+
+  if (!gymUniqueCode) {
+    return {
+      success: false,
+      response: ResponseUtil.notFoundError(null, 'Invalid or inactive unique code')
     };
-    if (userId) {
-      attendanceData.userId = userId;
-    }
-    if (userEmail) {
-      attendanceData.userEmail = userEmail; // Keep for compatibility
-    }
-    
-    const attendance = await Attendance.create(attendanceData, { transaction });
+  }
 
-    await transaction.commit();
+  // Check if code is expired
+  if (gymUniqueCode.expiresAt && new Date() > gymUniqueCode.expiresAt) {
+    return {
+      success: false,
+      response: ResponseUtil.validationError(null, {
+        uniqueCode: 'Unique code has expired'
+      })
+    };
+  }
 
-    return ResponseUtil.success(res, {
-      attendance,
-      gym: selectedGym.gym,
-      subscription: selectedGym.subscription,
-      distance: selectedGym.distanceText,
-      walkingTime: selectedGym.walkingDuration,
-      message: `Successfully checked in to ${selectedGym.gym.name}`
-    }, 'Quick check-in successful', 201);
+  // Update code usage
+  await gymUniqueCode.increment('usageCount', { transaction });
 
-  } catch (error) {
-    await transaction.rollback();
-    console.error('Error in quick check-in:', error);
-    return ResponseUtil.error(res, 'Failed to process quick check-in', 500);
+  return {
+    success: true,
+    gymId: gymUniqueCode.gymId
+  };
+};
+
+/**
+ * Handle different check-in methods and return target gym ID
+ * @param {string} method - Check-in method
+ * @param {Object} params - Method-specific parameters
+ * @param {number} userId - User ID
+ * @param {number} latitude - User latitude
+ * @param {number} longitude - User longitude
+ * @param {Object} transaction - Database transaction
+ * @returns {Promise<Object>} Result with success, gymId, and validation info
+ */
+const handleCheckInMethod = async (method, params, userId, latitude, longitude, transaction) => {
+  const { gymId, qrCode, uniqueCode, userQRCode, nearbyGyms } = params;
+
+  switch (method) {
+    case 'quick_checkin':
+      // For quick check-in, use the closest nearby gym if available
+      if (nearbyGyms && nearbyGyms.length > 0) {
+        return {
+          success: true,
+          gymId: nearbyGyms[0].gym.id,
+          validation: { distance: nearbyGyms[0].distance }
+        };
+      }
+      // Fall back to the original quick check-in logic
+      return await handleQuickCheckIn(userId, latitude, longitude, transaction);
+
+    case 'gym_qr_scan':
+      if (!qrCode) {
+        return {
+          success: false,
+          response: { qrCode: 'QR code is required' }
+        };
+      }
+      return await handleQRCheckIn(qrCode, latitude, longitude, transaction);
+
+    case 'gym_code':
+      if (!uniqueCode) {
+        return {
+          success: false,
+          response: { uniqueCode: 'Unique code is required' }
+        };
+      }
+      return await handleUniqueCodeCheckIn(uniqueCode, latitude, longitude, transaction);
+
+    case 'owner_scan_user':
+      if (!userQRCode || !gymId) {
+        return {
+          success: false,
+          response: {
+            userQRCode: 'User QR code is required',
+            gymId: 'Gym ID is required'
+          }
+        };
+      }
+      const ownerResult = await handleOwnerScanCheckIn(userQRCode, gymId, userId, transaction);
+      if (ownerResult.success) {
+        return {
+          success: true,
+          gymId: gymId,
+          targetUserId: ownerResult.targetUserId
+        };
+      }
+      return ownerResult;
+
+    case 'nearby_gym':
+      // New method for nearby gym check-in
+      if (nearbyGyms && nearbyGyms.length > 0) {
+        return {
+          success: true,
+          gymId: nearbyGyms[0].gym.id,
+          validation: { distance: nearbyGyms[0].distance },
+          selectedGym: nearbyGyms[0]
+        };
+      }
+      return {
+        success: false,
+        response: { gym: 'No nearby subscribed gyms found' }
+      };
+
+    default:
+      return {
+        success: false,
+        response: { method: 'Unsupported check-in method' }
+      };
   }
 };
 
 /**
- * Check-in using gym QR code
- * Validates QR code and location if required
+ * Fetch nearby subscribed gyms within a specified range
+ * @param {number} latitude - User's latitude
+ * @param {number} longitude - User's longitude  
+ * @param {Array} subscriptions - User's active subscriptions
+ * @param {number} rangeMeters - Range in meters to search within
+ * @returns {Promise<Array>} Array of nearby gyms within range
+ */
+const fetchNeabySubscribedGymsInRange = async (latitude, longitude, subscriptions, rangeMeters) => {
+  const nearbyGyms = [];
+
+  const userLatitude = parseFloat(latitude);
+  const userLongitude = parseFloat(longitude);
+  const searchRange = parseInt(rangeMeters) || 1000; // Default to 1000m if not provided
+
+  // Validate coordinates
+  if (!locationService.validateCoordinates(userLatitude, userLongitude)) {
+    return nearbyGyms;
+  }
+
+  // Process subscriptions sequentially to avoid overwhelming the Google API
+  for (const sub of subscriptions) {
+    const gym = sub.subscription.gym;
+
+    // Check if gym has valid coordinates
+    if (gym.latitude && gym.longitude) {
+      const gymLatitude = parseFloat(gym.latitude);
+      const gymLongitude = parseFloat(gym.longitude);
+
+      // Validate gym coordinates
+      if (locationService.validateCoordinates(gymLatitude, gymLongitude)) {
+        try {
+          // Calculate distance using Google Distance Matrix API
+          const distanceInfo = await locationService.getGoogleDistance(
+            { latitude: userLatitude, longitude: userLongitude },
+            { latitude: gymLatitude, longitude: gymLongitude },
+            'walking'
+          );
+
+          const distance = distanceInfo.distance.value;
+
+          // Check if gym is within the specified range
+          if (distance <= searchRange) {
+            nearbyGyms.push({
+              gym: gym,
+              subscription: sub.subscription,
+              userSubscription: sub,
+              distance: distance,
+              distanceText: distanceInfo.distance.text,
+              walkingDuration: distanceInfo.duration.text,
+              distanceMethod: distanceInfo.method,
+              isInRange: true
+            });
+          }
+        } catch (error) {
+          console.error(`fetchNeabySubscribedGymsInRange: Error calculating distance for gym ID ${gym.id}:`, error.message);
+
+          // Fallback to Haversine calculation if Google API fails
+          const fallbackDistance = locationService.calculateHaversineDistance(
+            userLatitude,
+            userLongitude,
+            gymLatitude,
+            gymLongitude
+          );
+
+          if (fallbackDistance <= searchRange) {
+            nearbyGyms.push({
+              gym: gym,
+              subscription: sub.subscription,
+              userSubscription: sub,
+              distance: fallbackDistance,
+              distanceText: `${fallbackDistance}m`,
+              walkingDuration: `${Math.round(fallbackDistance / 84)} min`, // ~5 km/h walking speed
+              distanceMethod: 'haversine_fallback',
+              isInRange: true,
+              fallbackUsed: true
+            });
+          }
+        }
+      } else {
+        console.warn(`fetchNeabySubscribedGymsInRange: Invalid gym coordinates for gym ID ${gym.id}`);
+      }
+    } else {
+      console.warn(`fetchNeabySubscribedGymsInRange: Missing coordinates for gym ID ${gym.id}`);
+    }
+  }
+
+  // Sort by distance (closest first)
+  nearbyGyms.sort((a, b) => a.distance - b.distance);
+
+  return nearbyGyms;
+};
+
+/**
+ * Handle owner scan check-in logic
+ */
+const handleOwnerScanCheckIn = async (userQRCode, gymId, ownerId, transaction) => {
+  // Verify owner owns the gym
+  const gym = await Gym.findOne({
+    where: {
+      id: gymId,
+      owner_id: ownerId
+    }
+  });
+
+  if (!gym) {
+    return {
+      success: false,
+      response: ResponseUtil.forbiddenError(null, 'Not authorized to check in users to this gym')
+    };
+  }
+
+  // Extract user from QR code (assuming QR code contains user email or ID)
+  let targetUser;
+  try {
+    // If QR code is email format
+    if (userQRCode.includes('@')) {
+      targetUser = await User.findOne({ where: { email: userQRCode } });
+    } else {
+      // If QR code is user ID
+      targetUser = await User.findByPk(userQRCode);
+    }
+
+    if (!targetUser) {
+      return {
+        success: false,
+        response: ResponseUtil.notFoundError(null, 'User not found')
+      };
+    }
+  } catch (error) {
+    return {
+      success: false,
+      response: ResponseUtil.validationError(null, {
+        userQRCode: 'Invalid user QR code format'
+      })
+    };
+  }
+
+  // Check if target user already has active check-in
+  const userActiveCheckIn = await hasActiveCheckIn(targetUser.id);
+  if (userActiveCheckIn) {
+    return {
+      success: false,
+      response: ResponseUtil.conflictError(null, 'User is already checked in somewhere')
+    };
+  }
+
+  return {
+    success: true,
+    gymId,
+    targetUserId: targetUser.id
+  };
+};
+
+/**
+ * Legacy endpoint - redirects to new unified endpoint
+ */
+const quickCheckIn = async (req, res) => {
+  req.body.method = 'quick_checkin';
+  return checkIn(req, res);
+};
+
+/**
+ * Legacy endpoint - redirects to new unified endpoint
  */
 const qrCodeCheckIn = async (req, res) => {
-  const transaction = await sequelize.transaction();
-
-  try {
-    const { qrCode, latitude, longitude, accuracy } = req.body;
-    const userId = req.user.id; // Updated to use user ID
-    const userEmail = req.user.email; // Keep for backward compatibility
-
-    // Validate required fields
-    if (!qrCode) {
-      await transaction.rollback();
-      return ResponseUtil.validationError(res, {
-        qrCode: 'QR code is required'
-      });
-    }
-
-    // Check if user has an active check-in - support both user ID and email
-    const activeCheckInWhere = {
-      checkOutTime: null,
-      isActive: true
-    };
-    if (userId) {
-      activeCheckInWhere.userId = userId;
-    } else {
-      activeCheckInWhere.userEmail = userEmail;
-    }
-    
-    const activeCheckIn = await Attendance.findOne({
-      where: activeCheckInWhere
-    });
-
-    if (activeCheckIn) {
-      await transaction.rollback();
-      return ResponseUtil.conflictError(res, 'You are already checked in. Please check out first.');
-    }
-
-    // Find and validate QR code
-    const gymQRCode = await GymQRCodes.findOne({
-      where: {
-        qrCode,
-        isActive: true
-      },
-      include: [{
-        model: Gym,
-        as: 'gym',
-        required: true
-      }]
-    });
-
-    if (!gymQRCode) {
-      await transaction.rollback();
-      return ResponseUtil.notFoundError(res, 'Invalid or expired QR code');
-    }
-
-    // Check if QR code is expired
-    if (gymQRCode.expiresAt && new Date() > gymQRCode.expiresAt) {
-      await transaction.rollback();
-      return ResponseUtil.validationError(res, {
-        qrCode: 'QR code has expired'
-      });
-    }
-
-    // Validate location if required by gym settings
-    const checkInMethods = await GymCheckInMethods.findOne({
-      where: { gymId: gymQRCode.gymId }
-    });
-
-    let locationValidation = { isValid: true, distance: null };
-    if (checkInMethods && checkInMethods.qrCodeLocationRequired && latitude && longitude) {
-      if (!locationService.isValidCoordinate(latitude, longitude)) {
-        await transaction.rollback();
-        return ResponseUtil.validationError(res, {
-          location: 'Invalid latitude or longitude coordinates'
-        });
-      }
-
-      locationValidation = await locationService.validateLocationForGym(
-        latitude,
-        longitude,
-        gymQRCode.gymId
-      );
-
-      if (!locationValidation.isValid) {
-        await transaction.rollback();
-        return ResponseUtil.validationError(res, {
-          location: `You must be within ${checkInMethods.checkInRadius || 100}m of the gym to check in`
-        });
-      }
-    }
-
-    // Create attendance record
-    const attendanceData = {
-      gymId: gymQRCode.gymId,
-      checkInTime: new Date(),
-      checkInMethod: 'gym_qr_scan',
-      userLocationLat: latitude,
-      userLocationLng: longitude,
-      qrCodeUsed: qrCode,
-      isActive: true,
-      createdBy: userId || userEmail,
-      updatedBy: userId || userEmail
-    };
-    if (userId) {
-      attendanceData.userId = userId;
-    }
-    if (userEmail) {
-      attendanceData.userEmail = userEmail; // Keep for compatibility
-    }
-    
-    const attendance = await Attendance.create(attendanceData, { transaction });
-
-    // Update QR code usage
-    await gymQRCode.increment('usageCount', { transaction });
-
-    await transaction.commit();
-
-    return ResponseUtil.success(res, {
-      attendance,
-      gym: gymQRCode.gym,
-      message: `Successfully checked in to ${gymQRCode.gym.name} using QR code`
-    }, 'QR code check-in successful', 201);
-
-  } catch (error) {
-    await transaction.rollback();
-    console.error('Error in QR code check-in:', error);
-    return ResponseUtil.error(res, 'Failed to process QR code check-in', 500);
-  }
+  req.body.method = 'gym_qr_scan';
+  return checkIn(req, res);
 };
 
 /**
- * Check-in using gym unique code
- * Validates unique code and location if required
+ * Legacy endpoint - redirects to new unified endpoint
  */
 const uniqueCodeCheckIn = async (req, res) => {
-  const transaction = await sequelize.transaction();
-
-  try {
-    const { uniqueCode, latitude, longitude, accuracy } = req.body;
-    const userId = req.user.id; // Updated to use user ID
-    const userEmail = req.user.email; // Keep for backward compatibility
-
-    // Validate required fields
-    if (!uniqueCode) {
-      await transaction.rollback();
-      return ResponseUtil.validationError(res, {
-        uniqueCode: 'Unique code is required'
-      });
-    }
-
-    // Check if user has an active check-in - support both user ID and email
-    const activeCheckInWhere = {
-      checkOutTime: null,
-      isActive: true
-    };
-    if (userId) {
-      activeCheckInWhere.userId = userId;
-    } else {
-      activeCheckInWhere.userEmail = userEmail;
-    }
-    
-    const activeCheckIn = await Attendance.findOne({
-      where: activeCheckInWhere
-    });
-
-    if (activeCheckIn) {
-      await transaction.rollback();
-      return ResponseUtil.conflictError(res, 'You are already checked in. Please check out first.');
-    }
-
-    // Find and validate unique code
-    const gymUniqueCode = await GymUniqueCodes.findOne({
-      where: {
-        uniqueCode: uniqueCode.toUpperCase(),
-        isActive: true
-      },
-      include: [{
-        model: Gym,
-        as: 'gym',
-        required: true
-      }]
-    });
-
-    if (!gymUniqueCode) {
-      await transaction.rollback();
-      return ResponseUtil.notFoundError(res, 'Invalid or inactive unique code');
-    }
-
-    // Check if unique code is expired
-    if (gymUniqueCode.expiresAt && new Date() > gymUniqueCode.expiresAt) {
-      await transaction.rollback();
-      return ResponseUtil.validationError(res, {
-        uniqueCode: 'Unique code has expired'
-      });
-    }
-
-    // Validate location if required by gym settings
-    const checkInMethods = await GymCheckInMethods.findOne({
-      where: { gymId: gymUniqueCode.gymId }
-    });
-
-    let locationValidation = { isValid: true, distance: null };
-    if (checkInMethods && checkInMethods.uniqueCodeLocationRequired && latitude && longitude) {
-      if (!locationService.isValidCoordinate(latitude, longitude)) {
-        await transaction.rollback();
-        return ResponseUtil.validationError(res, {
-          location: 'Invalid latitude or longitude coordinates'
-        });
-      }
-
-      locationValidation = await locationService.validateLocationForGym(
-        latitude,
-        longitude,
-        gymUniqueCode.gymId
-      );
-
-      if (!locationValidation.isValid) {
-        await transaction.rollback();
-        return ResponseUtil.validationError(res, {
-          location: `You must be within ${checkInMethods.checkInRadius || 100}m of the gym to check in`
-        });
-      }
-    }
-
-    // Create attendance record
-    const attendanceData = {
-      gymId: gymUniqueCode.gymId,
-      checkInTime: new Date(),
-      checkInMethod: 'gym_code',
-      userLocationLat: latitude,
-      userLocationLng: longitude,
-      isActive: true,
-      createdBy: userId || userEmail,
-      updatedBy: userId || userEmail
-    };
-    if (userId) {
-      attendanceData.userId = userId;
-    }
-    if (userEmail) {
-      attendanceData.userEmail = userEmail; // Keep for compatibility
-    }
-    
-    const attendance = await Attendance.create(attendanceData, { transaction });
-
-    // Update unique code usage
-    await gymUniqueCode.increment('usageCount', { transaction });
-
-    await transaction.commit();
-
-    return ResponseUtil.success(res, {
-      attendance,
-      gym: gymUniqueCode.gym,
-      message: `Successfully checked in to ${gymUniqueCode.gym.name} using unique code`
-    }, 'Unique code check-in successful', 201);
-
-  } catch (error) {
-    await transaction.rollback();
-    console.error('Error in unique code check-in:', error);
-    return ResponseUtil.error(res, 'Failed to process unique code check-in', 500);
-  }
+  req.body.method = 'gym_code';
+  return checkIn(req, res);
 };
 
 /**
- * Owner scan user QR (for gym owners to check in users)
- * No location validation required
+ * Legacy endpoint - redirects to new unified endpoint
  */
 const ownerScanCheckIn = async (req, res) => {
-  const transaction = await sequelize.transaction();
-
-  try {
-    const { userQRCode, gymId } = req.body;
-    const ownerEmail = req.user.email;
-
-    // Validate required fields
-    if (!userQRCode || !gymId) {
-      await transaction.rollback();
-      return ResponseUtil.validationError(res, {
-        userQRCode: 'User QR code is required',
-        gymId: 'Gym ID is required'
-      });
-    }
-
-    // Verify owner owns the gym
-    const gym = await Gym.findOne({
-      where: {
-        id: gymId,
-        owner_id: req.user.id // Updated to use owner_id field and user ID
-      }
-    });
-
-    if (!gym) {
-      await transaction.rollback();
-      return ResponseUtil.forbiddenError(res, 'You are not authorized to check in users to this gym');
-    }
-
-    // Extract user email from QR code (assuming QR code contains user email)
-    // This might need adjustment based on QR code format
-    let userEmail;
-    try {
-      // If QR code is just the email
-      userEmail = userQRCode;
-
-      // Verify user exists
-      const user = await User.findOne({
-        where: { email: userEmail }
-      });
-
-      if (!user) {
-        await transaction.rollback();
-        return ResponseUtil.notFoundError(res, 'User not found');
-      }
-    } catch (error) {
-      await transaction.rollback();
-      return ResponseUtil.validationError(res, {
-        userQRCode: 'Invalid user QR code format'
-      });
-    }
-
-    // Check if user has an active check-in
-    const activeCheckIn = await Attendance.findOne({
-      where: {
-        userEmail,
-        checkOutTime: null,
-        isActive: true
-      }
-    });
-
-    if (activeCheckIn) {
-      await transaction.rollback();
-      return ResponseUtil.conflictError(res, 'User is already checked in somewhere. Please check them out first.');
-    }
-
-    // Create attendance record
-    const attendance = await Attendance.create({
-      userEmail,
-      gymId,
-      checkInTime: new Date(),
-      checkInMethod: 'owner_scan_user',
-      isActive: true,
-      createdBy: ownerEmail,
-      updatedBy: ownerEmail
-    }, { transaction });
-
-    await transaction.commit();
-
-    const user = await User.findOne({
-      where: { email: userEmail },
-      attributes: ['firstName', 'lastName', 'email']
-    });
-
-    return ResponseUtil.success(res, {
-      attendance,
-      user,
-      gym,
-      message: `Successfully checked in ${user.firstName} ${user.lastName} to ${gym.name}`
-    }, 'Owner scan check-in successful', 201);
-
-  } catch (error) {
-    await transaction.rollback();
-    console.error('Error in owner scan check-in:', error);
-    return ResponseUtil.error(res, 'Failed to process owner scan check-in', 500);
-  }
+  req.body.method = 'owner_scan_user';
+  return checkIn(req, res);
 };
 
 /**
@@ -730,36 +917,15 @@ const validateLocation = async (req, res) => {
 const getUserAttendance = async (req, res) => {
   try {
     const { userId } = req.params;
-    const userEmail = req.user.email;
-    const userType = req.user.type;
-
-    // Determine if request is authorized
-    let targetUserEmail = userId;
-
-    // If userId looks like an email, use it directly
-    // Otherwise, try to find user by ID
-    if (!userId.includes('@')) {
-      const user = await User.findByPk(userId);
-      if (!user) {
-        return ResponseUtil.notFoundError(res, 'User not found');
-      }
-      targetUserEmail = user.email;
-    }
-
-    // Authorization: users can only see their own data unless they're admin/owner
-    if (userType === '1' && targetUserEmail !== userEmail) {
-      return ResponseUtil.forbiddenError(res, 'Not authorized to view this user\'s attendance');
-    }
 
     // Get attendance history
     const attendance = await Attendance.findAll({
       where: {
-        userEmail: targetUserEmail
+        userId: userId
       },
       include: [{
         model: Gym,
-        as: 'gym',
-        attributes: ['id', 'name', 'address', 'latitude', 'longitude']
+        as: 'gym'
       }],
       order: [['checkInTime', 'DESC']],
       limit: 50 // Limit to last 50 records
@@ -840,13 +1006,17 @@ const getActiveSession = async (req, res) => {
 };
 
 module.exports = {
-  quickCheckIn,
-  qrCodeCheckIn,
-  uniqueCodeCheckIn,
-  ownerScanCheckIn,
+  // New unified endpoints
+  checkIn,
   checkOut,
   getCheckInStatus,
   validateLocation,
   getUserAttendance,
-  getActiveSession
+  getActiveSession,
+
+  // Legacy endpoints for backward compatibility
+  quickCheckIn,
+  qrCodeCheckIn,
+  uniqueCodeCheckIn,
+  ownerScanCheckIn
 };

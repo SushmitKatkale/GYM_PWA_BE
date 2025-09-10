@@ -1,17 +1,137 @@
 const express = require('express');
 const router = express.Router();
 const {
-  quickCheckIn,
-  qrCodeCheckIn,
-  uniqueCodeCheckIn,
-  ownerScanCheckIn,
+  // New unified endpoints
+  checkIn,
   checkOut,
   getCheckInStatus,
   validateLocation,
   getUserAttendance,
-  getActiveSession
+  getActiveSession,
+  
+  // Legacy endpoints for backward compatibility
+  quickCheckIn,
+  qrCodeCheckIn,
+  uniqueCodeCheckIn,
+  ownerScanCheckIn
 } = require('../controllers/attendanceController');
 const { authenticate, authorize } = require('../middleware/auth');
+
+/**
+ * @swagger
+ * /api/attendance/checkin:
+ *   post:
+ *     tags: [Attendance]
+ *     summary: Unified check-in endpoint
+ *     description: Universal check-in endpoint that handles all check-in methods based on the method parameter
+ *     security:
+ *       - bearerAuth: []
+ *     requestBody:
+ *       required: true
+ *       content:
+ *         application/json:
+ *           schema:
+ *             type: object
+ *             required:
+ *               - method
+ *             properties:
+ *               method:
+ *                 type: string
+ *                 enum: [quick_checkin, gym_qr_scan, gym_code, owner_scan_user]
+ *                 description: The check-in method to use
+ *                 example: "quick_checkin"
+ *               gymId:
+ *                 type: integer
+ *                 description: Gym ID (required for owner_scan_user)
+ *                 example: 1
+ *               qrCode:
+ *                 type: string
+ *                 description: QR code (required for gym_qr_scan)
+ *                 example: "550e8400-e29b-41d4-a716-446655440000"
+ *               uniqueCode:
+ *                 type: string
+ *                 description: Unique access code (required for gym_code)
+ *                 example: "ABC123"
+ *               userQRCode:
+ *                 type: string
+ *                 description: User QR code (required for owner_scan_user)
+ *                 example: "user@example.com"
+ *               latitude:
+ *                 type: number
+ *                 description: User's current latitude (required for quick_checkin, optional for others)
+ *                 example: 40.7128
+ *               longitude:
+ *                 type: number
+ *                 description: User's current longitude (required for quick_checkin, optional for others)
+ *                 example: -74.0060
+ *               attendanceType:
+ *                 type: string
+ *                 enum: [normal, trial, guest]
+ *                 description: Type of attendance
+ *                 default: normal
+ *                 example: "normal"
+ *     responses:
+ *       201:
+ *         description: Successfully checked in
+ *         content:
+ *           application/json:
+ *             schema:
+ *               type: object
+ *               properties:
+ *                 success:
+ *                   type: boolean
+ *                   example: true
+ *                 data:
+ *                   type: object
+ *                   properties:
+ *                     attendance:
+ *                       type: object
+ *                       properties:
+ *                         id:
+ *                           type: integer
+ *                         gymId:
+ *                           type: integer
+ *                         userId:
+ *                           type: integer
+ *                         attendanceType:
+ *                           type: string
+ *                         checkInTime:
+ *                           type: string
+ *                           format: date-time
+ *                         method:
+ *                           type: string
+ *                     gym:
+ *                       type: object
+ *                       properties:
+ *                         id:
+ *                           type: integer
+ *                         name:
+ *                           type: string
+ *                         address:
+ *                           type: string
+ *                     user:
+ *                       type: object
+ *                       properties:
+ *                         id:
+ *                           type: integer
+ *                         firstName:
+ *                           type: string
+ *                         lastName:
+ *                           type: string
+ *                         email:
+ *                           type: string
+ *                     message:
+ *                       type: string
+ *       400:
+ *         description: Invalid input or validation error
+ *       404:
+ *         description: Resource not found (gym, QR code, etc.)
+ *       409:
+ *         description: Already checked in somewhere
+ *       500:
+ *         description: Server error
+ */
+router.post('/checkin', authenticate, authorize('1'), checkIn);
 
 /**
  * @swagger
@@ -363,7 +483,7 @@ router.post('/validate-location', authenticate, validateLocation);
  *       500:
  *         description: Server error
  */
-router.get('/user/:userId', authenticate, authorize('1', '2', '3'), getUserAttendance);
+router.get('/user/:userId', authenticate, authorize('1'), getUserAttendance);
 
 /**
  * @swagger
@@ -389,6 +509,6 @@ router.get('/user/:userId', authenticate, authorize('1', '2', '3'), getUserAtten
  *       500:
  *         description: Server error
  */
-router.get('/active-session/:userId', authenticate, authorize('1', '2', '3'), getActiveSession);
+router.get('/active-session/:userId', authenticate, authorize('1'), getActiveSession);
 
 module.exports = router;
