@@ -50,10 +50,11 @@ const checkIn = async (req, res) => {
       qrCode,
       uniqueCode,
       userQRCode,
-      latitude,
-      longitude,
+      location,
       attendanceType = 'normal'
     } = req.body;
+    let latitude = location.latitude || null;
+    let longitude = location.longitude || null;
 
     const userId = req.user.id;
 
@@ -151,70 +152,6 @@ const checkIn = async (req, res) => {
       return ResponseUtil.forbiddenError(res, 'The selected gym does not support any check-in methods.');
     }
     
-
-    let validationResult = { isValid: true };
-
-    // Handle different check-in methods
-    switch (method) {
-      case 'quick_checkin':
-        const result = await handleQuickCheckIn(userId, latitude, longitude, transaction);
-        if (!result.success) {
-          await transaction.rollback();
-          return result.response;
-        }
-        targetGymId = result.gymId;
-        validationResult = result.validation;
-        break;
-
-      case 'gym_qr_scan':
-        if (!qrCode) {
-          await transaction.rollback();
-          return ResponseUtil.validationError(res, { qrCode: 'QR code is required' });
-        }
-        const qrResult = await handleQRCheckIn(qrCode, latitude, longitude, transaction);
-        if (!qrResult.success) {
-          await transaction.rollback();
-          return qrResult.response;
-        }
-        targetGymId = qrResult.gymId;
-        break;
-
-      case 'gym_code':
-        if (!uniqueCode) {
-          await transaction.rollback();
-          return ResponseUtil.validationError(res, { uniqueCode: 'Unique code is required' });
-        }
-        const codeResult = await handleUniqueCodeCheckIn(uniqueCode, latitude, longitude, transaction);
-        if (!codeResult.success) {
-          await transaction.rollback();
-          return codeResult.response;
-        }
-        targetGymId = codeResult.gymId;
-        break;
-
-      case 'owner_scan_user':
-        if (!userQRCode || !gymId) {
-          await transaction.rollback();
-          return ResponseUtil.validationError(res, {
-            userQRCode: 'User QR code is required',
-            gymId: 'Gym ID is required'
-          });
-        }
-        const ownerResult = await handleOwnerScanCheckIn(userQRCode, gymId, req.user.id, transaction);
-        if (!ownerResult.success) {
-          await transaction.rollback();
-          return ownerResult.response;
-        }
-        targetGymId = gymId;
-        break;
-
-      default:
-        await transaction.rollback();
-        return ResponseUtil.validationError(res, {
-          method: 'Unsupported check-in method'
-        });
-    }
-
     // Create attendance record
     const attendanceData = {
       userId,
