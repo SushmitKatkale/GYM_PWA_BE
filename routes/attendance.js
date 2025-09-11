@@ -319,7 +319,7 @@ router.post('/owner-scan', authenticate, authorize('2', '3'), ownerScanCheckIn);
 
 /**
  * @swagger
- * /api/attendance/checkout:
+ * /api/attendance/checkout/:attendenceId:
  *   post:
  *     tags: [Attendance]
  *     summary: Check out from gym
@@ -358,7 +358,7 @@ router.post('/owner-scan', authenticate, authorize('2', '3'), ownerScanCheckIn);
  *       500:
  *         description: Server error
  */
-router.post('/checkout', authenticate, authorize('1', '2', '3'), checkOut);
+router.post('/checkout/:attendenceId', authenticate, authorize('1'), checkOut);
 
 /**
  * @swagger

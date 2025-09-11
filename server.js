@@ -28,6 +28,7 @@ const { errorHandler, notFoundHandler } = require('./middleware/errorHandler');
 const { specs, swaggerUi, swaggerOptions } = require('./config/swagger');
 const { testConnection, syncDatabase } = require('./models');
 const AdvertisementScheduler = require('./middleware/advertisementScheduler');
+const autoCheckoutScheduler = require('./services/autoCheckoutScheduler');
 
 // Load environment variables
 dotenv.config();
@@ -155,6 +156,9 @@ syncDatabase();
 
 // Initialize advertisement scheduler
 AdvertisementScheduler.init();
+
+// Initialize auto-logout scheduler
+autoCheckoutScheduler.initializeAutoLogout();
 
 app.listen(PORT, () => {
   console.log(`🚀 Server running on port ${PORT}`);

@@ -13,6 +13,7 @@ const {
 } = require('../models');
 const ResponseUtil = require('../utils/response');
 const locationService = require('../services/locationService');
+const autoCheckoutScheduler = require('../services/autoCheckoutScheduler');
 const { Op } = require('sequelize');
 
 /**
@@ -133,7 +134,7 @@ const checkIn = async (req, res) => {
       targetGymId = neabySubscribedGyms[0].gym.id; // Closest gym
     }
 
-    if(targetGymId === null) {
+    if (targetGymId === null) {
       await transaction.rollback();
       return ResponseUtil.validationError(res, {
         gym: 'Unable to determine target gym for check-in'
@@ -151,7 +152,7 @@ const checkIn = async (req, res) => {
       await transaction.rollback();
       return ResponseUtil.forbiddenError(res, 'The selected gym does not support any check-in methods.');
     }
-    
+
     // Create attendance record
     const attendanceData = {
       userId,
@@ -181,6 +182,9 @@ const checkIn = async (req, res) => {
 
     await transaction.commit();
 
+    // Schedule auto-checkout after 120 minutes
+    autoCheckoutScheduler.scheduleCheckout(attendance.id, attendance.checkInTime);
+
     return ResponseUtil.success(res, {
       attendance: {
         id: attendance.id,
@@ -192,7 +196,7 @@ const checkIn = async (req, res) => {
       },
       gym,
       user,
-      message: `Successfully checked in to ${gym.name}`
+      message: `Successfully checked in to ${gym.name}.`
     }, 'Check-in successful', 201);
 
   } catch (error) {
@@ -681,26 +685,18 @@ const ownerScanCheckIn = async (req, res) => {
  */
 const checkOut = async (req, res) => {
   const transaction = await sequelize.transaction();
+  let attendenceId = req.params.attendenceId;
 
   try {
-    const { attendanceId, latitude, longitude, accuracy } = req.body;
-    const userEmail = req.user.email;
-    const userType = req.user.type;
-
-    let whereClause = {
-      checkOutTime: null,
-      isActive: true
-    };
-
-    if (attendanceId) {
-      whereClause.id = attendanceId;
-    } else {
-      whereClause.userEmail = userEmail;
-    }
+    const userId = req.user.id;
 
     // Find active attendance
     const attendance = await Attendance.findOne({
-      where: whereClause,
+      where: {
+        id: attendenceId,
+        userId: userId,
+        checkOutTime: null,
+      },
       include: [{
         model: Gym,
         as: 'gym',
@@ -708,7 +704,6 @@ const checkOut = async (req, res) => {
       }, {
         model: User,
         as: 'user',
-        attributes: ['firstName', 'lastName', 'email'],
         required: true
       }]
     });
@@ -718,26 +713,23 @@ const checkOut = async (req, res) => {
       return ResponseUtil.notFoundError(res, 'No active check-in found');
     }
 
-    // Authorization check - updated to use role field and user ID
-    const isOwner = req.user.role === 2 && attendance.gym.owner_id === req.user.id;
-    const isUser = attendance.userEmail === userEmail || attendance.userId === req.user.id;
-    const isAdmin = req.user.role === 4; // Updated role value
-
-    if (!isOwner && !isUser && !isAdmin) {
-      await transaction.rollback();
-      return ResponseUtil.forbiddenError(res, 'Not authorized to check out this attendance');
-    }
-
     // Update attendance record
     const checkOutTime = new Date();
     const duration = Math.floor((checkOutTime - attendance.checkInTime) / 1000 / 60); // Duration in minutes
 
+    if (duration == 0) {
+      await transaction.rollback();
+      return ResponseUtil.notFoundError(res, 'Minimum check-in duration is 1 minute');
+    }
+
     await attendance.update({
       checkOutTime,
       durationMinutes: duration,
-      isActive: false,
-      updatedBy: userEmail
+      updatedBy: userId
     }, { transaction });
+
+    // Cancel scheduled auto-checkout since user manually checked out
+    autoCheckoutScheduler.cancelScheduledCheckout(attendance.id);
 
     await transaction.commit();
 
