@@ -24,6 +24,7 @@ const attendanceRoutes = require('./routes/attendance');
 const qrCodeRoutes = require('./routes/qrCodes');
 const checkInMethodsRoutes = require('./routes/checkInMethods');
 const attendanceAnalyticsRoutes = require('./routes/attendanceAnalytics');
+const faqRoutes = require('./routes/faqs');
 const { errorHandler, notFoundHandler } = require('./middleware/errorHandler');
 const { specs, swaggerUi, swaggerOptions } = require('./config/swagger');
 const { testConnection, syncDatabase } = require('./models');
@@ -138,6 +139,7 @@ app.use('/api/attendance', attendanceRoutes);
 app.use('/api/qr-codes', qrCodeRoutes);
 app.use('/api/checkin-methods', checkInMethodsRoutes);
 app.use('/api/attendance-analytics', attendanceAnalyticsRoutes);
+app.use('/api/faqs', faqRoutes);
 
 // Gateway status route for frontend payment redirect (no authentication required)
 app.use('/gateway', paymentRoutes);
