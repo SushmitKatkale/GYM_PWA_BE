@@ -64,6 +64,9 @@ const VendorPaymentConfig = require('./VendorPaymentConfig');
 // Media
 const Media = require('./Media');
 
+// Exercise
+const Exercise = require('./Exercise');
+
 // Authentication
 const RefreshToken = require('./RefreshToken');
 
@@ -606,6 +609,42 @@ RefreshToken.belongsTo(User, {
   as: 'user'
 });
 
+// Exercise associations
+// Gym can have many exercises
+Gym.hasMany(Exercise, {
+  foreignKey: 'gymId',
+  as: 'exercises',
+  onDelete: 'CASCADE'
+});
+
+Exercise.belongsTo(Gym, {
+  foreignKey: 'gymId',
+  as: 'gym'
+});
+
+// User (creator/updater) associations for exercises
+User.hasMany(Exercise, {
+  foreignKey: 'createdBy',
+  as: 'createdExercises',
+  onDelete: 'SET NULL'
+});
+
+Exercise.belongsTo(User, {
+  foreignKey: 'createdBy',
+  as: 'creator'
+});
+
+User.hasMany(Exercise, {
+  foreignKey: 'updatedBy',
+  as: 'updatedExercises',
+  onDelete: 'SET NULL'
+});
+
+Exercise.belongsTo(User, {
+  foreignKey: 'updatedBy',
+  as: 'updater'
+});
+
 // Media associations (polymorphic)
 // Note: Media table uses entity_type and entity_id for polymorphic associations
 // These would need to be handled programmatically rather than through Sequelize associations
@@ -714,6 +753,7 @@ module.exports = {
   SlotChangeHistory,
   VendorPaymentConfig,
   Media,
+  Exercise,
   RefreshToken,
   syncDatabase,
   testConnection
