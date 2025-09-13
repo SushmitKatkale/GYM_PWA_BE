@@ -17,11 +17,12 @@ const DietChangeRequest = sequelize.define('DietChangeRequest', {
   },
   trainer_id: {
     type: DataTypes.BIGINT,
-    allowNull: false,
+    allowNull: true,
     references: {
       model: 'users',
       key: 'id'
-    }
+    },
+    onDelete: 'SET NULL'
   },
   plan_id: {
     type: DataTypes.BIGINT,
@@ -31,12 +32,26 @@ const DietChangeRequest = sequelize.define('DietChangeRequest', {
       key: 'id'
     }
   },
-  request_text: {
+  request_type: {
+    type: DataTypes.ENUM('general', 'meal_change', 'allergy', 'preference', 'nutrition_adjustment'),
+    allowNull: false,
+    defaultValue: 'general'
+  },
+  description: {
     type: DataTypes.TEXT,
     allowNull: false
   },
+  urgency: {
+    type: DataTypes.ENUM('low', 'medium', 'high'),
+    allowNull: false,
+    defaultValue: 'medium'
+  },
+  request_text: {
+    type: DataTypes.TEXT,
+    allowNull: true
+  },
   status: {
-    type: DataTypes.ENUM('pending', 'approved', 'rejected', 'fulfilled'),
+    type: DataTypes.ENUM('pending', 'in_progress', 'approved', 'rejected', 'fulfilled'),
     defaultValue: 'pending'
   },
   trainer_response: {
@@ -109,6 +124,16 @@ DietChangeRequest.prototype.reject = async function (trainerResponse) {
   return this;
 };
 
+DietChangeRequest.prototype.setInProgress = async function (trainerResponse = null) {
+  this.status = 'in_progress';
+  if (trainerResponse) {
+    this.trainer_response = trainerResponse;
+  }
+  this.responded_at = new Date();
+  await this.save();
+  return this;
+};
+
 DietChangeRequest.prototype.fulfill = async function (trainerResponse = null) {
   this.status = 'fulfilled';
   if (trainerResponse) {
@@ -132,6 +157,8 @@ DietChangeRequest.prototype.getUserDetails = async function () {
 };
 
 DietChangeRequest.prototype.getTrainerDetails = async function () {
+  if (!this.trainer_id) return null;
+  
   const User = require('./User');
   return await User.findByPk(this.trainer_id, {
     attributes: ['id', 'email', 'username', 'phone'],
@@ -222,19 +249,20 @@ DietChangeRequest.findPendingRequests = async function (trainerId = null) {
 };
 
 DietChangeRequest.createRequest = async function (requestData) {
-  // Validate that the trainer and user exist and have proper roles
+  // Validate that user exists and has proper role
   const User = require('./User');
-  const [user, trainer] = await Promise.all([
-    User.findByPk(requestData.user_id),
-    User.findByPk(requestData.trainer_id)
-  ]);
+  const user = await User.findByPk(requestData.user_id);
 
   if (!user || user.role !== 1) {
     throw new Error('Invalid user or user is not a member');
   }
 
-  if (!trainer || trainer.role !== 3) {
-    throw new Error('Invalid trainer or user is not a trainer');
+  // Validate trainer if provided
+  if (requestData.trainer_id) {
+    const trainer = await User.findByPk(requestData.trainer_id);
+    if (!trainer || trainer.role !== 3) {
+      throw new Error('Invalid trainer or user is not a trainer');
+    }
   }
 
   // Validate diet plan if provided
@@ -242,17 +270,31 @@ DietChangeRequest.createRequest = async function (requestData) {
     const DietPlan = require('./DietPlan');
     const plan = await DietPlan.findByPk(requestData.plan_id);
 
-    if (!plan || plan.trainer_id !== requestData.trainer_id || plan.user_id !== requestData.user_id) {
-      throw new Error('Invalid diet plan or plan does not belong to user/trainer');
+    if (!plan || plan.user_id !== requestData.user_id) {
+      throw new Error('Invalid diet plan or plan does not belong to user');
+    }
+    
+    // If trainer is specified, ensure it matches the plan's trainer
+    if (requestData.trainer_id && plan.trainer_id !== requestData.trainer_id) {
+      throw new Error('Diet plan does not belong to specified trainer');
     }
   }
 
-  return await this.create({
+  const requestObj = {
     user_id: requestData.user_id,
-    trainer_id: requestData.trainer_id,
-    plan_id: requestData.plan_id,
-    request_text: requestData.request_text
-  });
+    trainer_id: requestData.trainer_id || null,
+    plan_id: requestData.plan_id || null,
+    request_type: requestData.request_type || 'general',
+    description: requestData.description,
+    urgency: requestData.urgency || 'medium'
+  };
+  
+  // Add backward compatibility field
+  if (requestData.request_text) {
+    requestObj.request_text = requestData.request_text;
+  }
+
+  return await this.create(requestObj);
 };
 
 DietChangeRequest.getTrainerRequestStats = async function (trainerId, options = {}) {

@@ -19,9 +19,69 @@ const DietPlanMeal = sequelize.define('DietPlanMeal', {
     type: DataTypes.ENUM('breakfast', 'lunch', 'snack', 'dinner', 'other'),
     allowNull: false
   },
+  food_item: {
+    type: DataTypes.STRING(200),
+    allowNull: true
+  },
+  description: {
+    type: DataTypes.TEXT,
+    allowNull: true
+  },
+  instructions: {
+    type: DataTypes.TEXT,
+    allowNull: true
+  },
+  quantity: {
+    type: DataTypes.STRING(50),
+    allowNull: true
+  },
+  calories: {
+    type: DataTypes.INTEGER,
+    allowNull: true
+  },
+  protein: {
+    type: DataTypes.DECIMAL(8, 2),
+    allowNull: true
+  },
+  carbs: {
+    type: DataTypes.DECIMAL(8, 2),
+    allowNull: true
+  },
+  fat: {
+    type: DataTypes.DECIMAL(8, 2),
+    allowNull: true
+  },
+  fiber: {
+    type: DataTypes.DECIMAL(8, 2),
+    allowNull: true
+  },
+  sugar: {
+    type: DataTypes.DECIMAL(8, 2),
+    allowNull: true
+  },
+  sodium: {
+    type: DataTypes.DECIMAL(8, 2),
+    allowNull: true
+  },
+  image_url: {
+    type: DataTypes.STRING(500),
+    allowNull: true
+  },
+  preferred_time: {
+    type: DataTypes.TIME,
+    allowNull: true
+  },
+  is_mandatory: {
+    type: DataTypes.BOOLEAN,
+    defaultValue: true
+  },
+  alternatives: {
+    type: DataTypes.TEXT,
+    allowNull: true
+  },
   meal_description: {
     type: DataTypes.TEXT,
-    allowNull: false
+    allowNull: true
   },
   record_status: {
     type: DataTypes.TINYINT,
@@ -64,8 +124,25 @@ DietPlanMeal.prototype.getDietPlan = async function() {
   return await DietPlan.findByPk(this.plan_id);
 };
 
-DietPlanMeal.prototype.updateMeal = async function(newDescription) {
-  this.meal_description = newDescription;
+DietPlanMeal.prototype.updateMeal = async function(mealData) {
+  // Update only provided fields
+  if (mealData.meal_description !== undefined) this.meal_description = mealData.meal_description;
+  if (mealData.food_item !== undefined) this.food_item = mealData.food_item;
+  if (mealData.description !== undefined) this.description = mealData.description;
+  if (mealData.instructions !== undefined) this.instructions = mealData.instructions;
+  if (mealData.quantity !== undefined) this.quantity = mealData.quantity;
+  if (mealData.calories !== undefined) this.calories = mealData.calories;
+  if (mealData.protein !== undefined) this.protein = mealData.protein;
+  if (mealData.carbs !== undefined) this.carbs = mealData.carbs;
+  if (mealData.fat !== undefined) this.fat = mealData.fat;
+  if (mealData.fiber !== undefined) this.fiber = mealData.fiber;
+  if (mealData.sugar !== undefined) this.sugar = mealData.sugar;
+  if (mealData.sodium !== undefined) this.sodium = mealData.sodium;
+  if (mealData.image_url !== undefined) this.image_url = mealData.image_url;
+  if (mealData.preferred_time !== undefined) this.preferred_time = mealData.preferred_time;
+  if (mealData.is_mandatory !== undefined) this.is_mandatory = mealData.is_mandatory;
+  if (mealData.alternatives !== undefined) this.alternatives = mealData.alternatives;
+  
   await this.save();
   return this;
 };
@@ -135,12 +212,30 @@ DietPlanMeal.createMeals = async function(planId, mealsData) {
   const meals = [];
   
   for (const mealData of mealsData) {
-    const meal = await this.create({
+    const mealObj = {
       plan_id: planId,
-      meal_type: mealData.meal_type,
-      meal_description: mealData.meal_description
-    });
+      meal_type: mealData.meal_type
+    };
     
+    // Add all optional fields if provided
+    if (mealData.meal_description !== undefined) mealObj.meal_description = mealData.meal_description;
+    if (mealData.food_item !== undefined) mealObj.food_item = mealData.food_item;
+    if (mealData.description !== undefined) mealObj.description = mealData.description;
+    if (mealData.instructions !== undefined) mealObj.instructions = mealData.instructions;
+    if (mealData.quantity !== undefined) mealObj.quantity = mealData.quantity;
+    if (mealData.calories !== undefined) mealObj.calories = mealData.calories;
+    if (mealData.protein !== undefined) mealObj.protein = mealData.protein;
+    if (mealData.carbs !== undefined) mealObj.carbs = mealData.carbs;
+    if (mealData.fat !== undefined) mealObj.fat = mealData.fat;
+    if (mealData.fiber !== undefined) mealObj.fiber = mealData.fiber;
+    if (mealData.sugar !== undefined) mealObj.sugar = mealData.sugar;
+    if (mealData.sodium !== undefined) mealObj.sodium = mealData.sodium;
+    if (mealData.image_url !== undefined) mealObj.image_url = mealData.image_url;
+    if (mealData.preferred_time !== undefined) mealObj.preferred_time = mealData.preferred_time;
+    if (mealData.is_mandatory !== undefined) mealObj.is_mandatory = mealData.is_mandatory;
+    if (mealData.alternatives !== undefined) mealObj.alternatives = mealData.alternatives;
+    
+    const meal = await this.create(mealObj);
     meals.push(meal);
   }
 

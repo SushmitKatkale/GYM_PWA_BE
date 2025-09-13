@@ -362,7 +362,7 @@ CREATE TABLE gym_trainers (
 -- DIET PLANS
 CREATE TABLE diet_plans (
     id BIGINT AUTO_INCREMENT PRIMARY KEY,
-    trainer_id BIGINT NOT NULL,
+    trainer_id BIGINT NULL COMMENT 'Optional - can be created by user themselves',
     user_id BIGINT NOT NULL,
     title VARCHAR(150) NOT NULL,
     description TEXT,
@@ -374,8 +374,8 @@ CREATE TABLE diet_plans (
     record_status TINYINT(1) DEFAULT 1,
     created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
     updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
-    FOREIGN KEY (trainer_id) REFERENCES users(id),
-    FOREIGN KEY (user_id) REFERENCES users(id)
+    FOREIGN KEY (trainer_id) REFERENCES users(id) ON DELETE SET NULL,
+    FOREIGN KEY (user_id) REFERENCES users(id) ON DELETE CASCADE
 );
 
 -- DIET PLAN MEALS
@@ -383,9 +383,24 @@ CREATE TABLE diet_plan_meals (
     id BIGINT AUTO_INCREMENT PRIMARY KEY,
     plan_id BIGINT NOT NULL,
     meal_type ENUM('breakfast','lunch','snack','dinner','other') NOT NULL,
-    meal_description TEXT NOT NULL,
+    food_item VARCHAR(200) NOT NULL,
+    description TEXT,
+    instructions TEXT COMMENT 'Preparation or consumption instructions',
+    quantity VARCHAR(100) COMMENT 'e.g., 1 cup, 100g, 2 pieces',
+    calories INT,
+    protein DECIMAL(8,2) COMMENT 'Protein in grams',
+    carbs DECIMAL(8,2) COMMENT 'Carbohydrates in grams', 
+    fat DECIMAL(8,2) COMMENT 'Fat in grams',
+    fiber DECIMAL(8,2) COMMENT 'Fiber in grams',
+    sugar DECIMAL(8,2) COMMENT 'Sugar in grams',
+    sodium DECIMAL(8,2) COMMENT 'Sodium in mg',
+    image_url VARCHAR(500) COMMENT 'URL or path to meal image',
+    preferred_time TIME COMMENT 'Suggested meal time',
+    is_mandatory TINYINT(1) DEFAULT 1 COMMENT '1=must eat, 0=optional',
+    alternatives TEXT COMMENT 'Alternative food items (JSON or comma-separated)',
     record_status TINYINT(1) DEFAULT 1,
     created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+    updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
     FOREIGN KEY (plan_id) REFERENCES diet_plans(id) ON DELETE CASCADE
 );
 
@@ -393,16 +408,18 @@ CREATE TABLE diet_plan_meals (
 CREATE TABLE diet_change_requests (
     id BIGINT AUTO_INCREMENT PRIMARY KEY,
     user_id BIGINT NOT NULL,
-    trainer_id BIGINT NOT NULL,
+    trainer_id BIGINT NULL COMMENT 'Can be null if no trainer assigned',
     plan_id BIGINT,
-    request_text TEXT NOT NULL,
-    status ENUM('pending','approved','rejected','fulfilled') DEFAULT 'pending',
+    request_type ENUM('general','meal_change','portion_adjustment','allergy_accommodation') DEFAULT 'general',
+    description TEXT NOT NULL COMMENT 'User request description',
+    urgency ENUM('low','medium','high') DEFAULT 'medium',
+    status ENUM('pending','approved','rejected','implemented') DEFAULT 'pending',
     trainer_response TEXT,
     record_status TINYINT(1) DEFAULT 1,
     created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
-    responded_at TIMESTAMP NULL,
+    updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
     FOREIGN KEY (user_id) REFERENCES users(id),
-    FOREIGN KEY (trainer_id) REFERENCES users(id),
+    FOREIGN KEY (trainer_id) REFERENCES users(id) ON DELETE SET NULL,
     FOREIGN KEY (plan_id) REFERENCES diet_plans(id)
 );
 
@@ -463,9 +480,7 @@ CREATE TABLE plans (
 );
 
 -- Optional: Add back-link to diet_plans for future migration
-ALTER TABLE diet_plans
-ADD COLUMN plan_id BIGINT NULL AFTER id,
-ADD CONSTRAINT fk_diet_plan_plan FOREIGN KEY (plan_id) REFERENCES plans(id) ON DELETE SET NULL;
+-- REMOVED: plan_id reference as per requirements
 
 -- =========================================
 -- 6. ATTENDANCE - ATTENDANCE TYPE

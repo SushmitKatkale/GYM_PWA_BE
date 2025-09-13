@@ -25,6 +25,7 @@ const qrCodeRoutes = require('./routes/qrCodes');
 const checkInMethodsRoutes = require('./routes/checkInMethods');
 const attendanceAnalyticsRoutes = require('./routes/attendanceAnalytics');
 const faqRoutes = require('./routes/faqs');
+const dietPlanRoutes = require('./routes/dietPlans');
 const { errorHandler, notFoundHandler } = require('./middleware/errorHandler');
 const { specs, swaggerUi, swaggerOptions } = require('./config/swagger');
 const { testConnection, syncDatabase } = require('./models');
@@ -140,6 +141,7 @@ app.use('/api/qr-codes', qrCodeRoutes);
 app.use('/api/checkin-methods', checkInMethodsRoutes);
 app.use('/api/attendance-analytics', attendanceAnalyticsRoutes);
 app.use('/api/faqs', faqRoutes);
+app.use('/api/diet-plans', dietPlanRoutes);
 
 // Gateway status route for frontend payment redirect (no authentication required)
 app.use('/gateway', paymentRoutes);

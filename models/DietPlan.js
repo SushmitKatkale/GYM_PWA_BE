@@ -7,24 +7,15 @@ const DietPlan = sequelize.define('DietPlan', {
     primaryKey: true,
     autoIncrement: true
   },
-  planId: {
-    type: DataTypes.BIGINT,
-    allowNull: true,
-    field: 'plan_id',
-    references: {
-      model: 'plans',
-      key: 'id'
-    },
-    onDelete: 'SET NULL'
-  },
   trainerId: {
     type: DataTypes.BIGINT,
-    allowNull: false,
+    allowNull: true,
     field: 'trainer_id',
     references: {
       model: 'users',
       key: 'id'
-    }
+    },
+    onDelete: 'SET NULL'
   },
   userId: {
     type: DataTypes.BIGINT,
@@ -143,6 +134,8 @@ DietPlan.prototype.addMeal = async function(mealData) {
 };
 
 DietPlan.prototype.getTrainerDetails = async function() {
+  if (!this.trainer_id) return null;
+  
   const User = require('./User');
   return await User.findByPk(this.trainer_id, {
     attributes: ['id', 'email', 'username', 'phone'],
@@ -245,12 +238,14 @@ DietPlan.createPlan = async function(planData, mealsData = []) {
   const transaction = await sequelize.transaction();
   
   try {
-    // Validate trainer role
-    const User = require('./User');
-    const trainer = await User.findByPk(planData.trainer_id);
-    
-    if (!trainer || trainer.role !== 3) {
-      throw new Error('User is not a trainer');
+    // Validate trainer role if trainer is provided
+    if (planData.trainer_id) {
+      const User = require('./User');
+      const trainer = await User.findByPk(planData.trainer_id);
+      
+      if (!trainer || trainer.role !== 3) {
+        throw new Error('User is not a trainer');
+      }
     }
 
     // Create diet plan
