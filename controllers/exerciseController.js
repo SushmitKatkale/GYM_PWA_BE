@@ -1,4 +1,4 @@
-const { Exercise, User, Gym } = require('../models');
+const { Exercise, User, Gym, Media } = require('../models');
 const { Op } = require('sequelize');
 
 /**
@@ -9,6 +9,61 @@ const { Op } = require('sequelize');
  * - Private exercises: Only subscribed gym users can view
  * - Add/Update/Delete: Only admins can perform these operations
  */
+
+// Helper function to fetch media for exercises
+const getExerciseMediaData = async (exerciseIds, req) => {
+  try {
+    const media = await Media.findAll({
+      where: {
+        entity_type: 'exercise',
+        entity_id: { [Op.in]: exerciseIds },
+        record_status: 1
+      },
+      order: [['created_at', 'DESC']]
+    });
+
+    // Get base URL from request
+    const protocol = req.protocol;
+    const host = req.get('host');
+    const baseUrl = `${protocol}://${host}`;
+
+    // Group media by exercise ID and type
+    const mediaByExercise = {};
+    media.forEach(mediaItem => {
+      const exerciseId = mediaItem.entity_id;
+      if (!mediaByExercise[exerciseId]) {
+        mediaByExercise[exerciseId] = {
+          videos: [],
+          thumbnails: []
+        };
+      }
+
+      const mediaData = {
+        id: mediaItem.id,
+        url: mediaItem.url, // Relative URL
+        fullUrl: `${baseUrl}${mediaItem.url}`, // Full URL for images
+        mimeType: mediaItem.mime_type,
+        altText: mediaItem.alt_text,
+        createdAt: mediaItem.created_at
+      };
+
+      if (mediaItem.media_type === 'video') {
+        // For videos, provide both direct URL and streaming URL
+        const filename = mediaItem.url.split('/').pop(); // Extract filename from path
+        mediaData.streamUrl = `${baseUrl}/api/video-stream/stream/${filename}`;
+        mediaData.fullUrl = `${baseUrl}/api/video-stream/stream/${filename}`; // Use streaming URL as primary
+        mediaByExercise[exerciseId].videos.push(mediaData);
+      } else if (mediaItem.media_type === 'image') {
+        mediaByExercise[exerciseId].thumbnails.push(mediaData);
+      }
+    });
+
+    return mediaByExercise;
+  } catch (error) {
+    console.error('Error fetching exercise media:', error);
+    return {};
+  }
+};
 
 // Get all exercises with filtering and pagination
 const getAllExercises = async (req, res) => {
@@ -113,14 +168,28 @@ const getAllExercises = async (req, res) => {
       ]
     });
 
+    // Fetch media for all exercises
+    const exerciseIds = exercises.rows.map(ex => ex.id);
+    const exerciseMedia = await getExerciseMediaData(exerciseIds, req);
+
     // Add formatted data to each exercise
     const formattedExercises = exercises.rows.map(exercise => {
       const exerciseData = exercise.toJSON();
+      const exerciseId = exercise.id;
+      const media = exerciseMedia[exerciseId] || { videos: [], thumbnails: [] };
+      
       return {
         ...exerciseData,
         formattedDuration: exercise.getFormattedDuration(),
         youtubeThumbnail: exercise.getYouTubeThumbnail(),
-        youtubeVideoId: exercise.getYouTubeVideoId()
+        youtubeVideoId: exercise.getYouTubeVideoId(),
+        media: {
+          videos: media.videos,
+          thumbnails: media.thumbnails,
+          // Provide primary video and thumbnail for easier access
+          primaryVideo: media.videos[0] || null,
+          primaryThumbnail: media.thumbnails[0] || null
+        }
       };
     });
 
@@ -197,12 +266,23 @@ const getExerciseById = async (req, res) => {
       // For now, allow authenticated users to view private exercises
     }
 
+    // Fetch media for this exercise
+    const exerciseMedia = await getExerciseMediaData([id], req);
+    const media = exerciseMedia[id] || { videos: [], thumbnails: [] };
+
     const exerciseData = exercise.toJSON();
     const formattedExercise = {
       ...exerciseData,
       formattedDuration: exercise.getFormattedDuration(),
       youtubeThumbnail: exercise.getYouTubeThumbnail(),
-      youtubeVideoId: exercise.getYouTubeVideoId()
+      youtubeVideoId: exercise.getYouTubeVideoId(),
+      media: {
+        videos: media.videos,
+        thumbnails: media.thumbnails,
+        // Provide primary video and thumbnail for easier access
+        primaryVideo: media.videos[0] || null,
+        primaryThumbnail: media.thumbnails[0] || null
+      }
     };
 
     res.status(200).json({

@@ -8,11 +8,11 @@ const Media = sequelize.define('Media', {
     autoIncrement: true
   },
   entity_type: {
-    type: DataTypes.ENUM('user_profile', 'gym', 'advertisement', 'diet_plan', 'meal', 'other'),
+    type: DataTypes.ENUM('user_profile', 'gym', 'advertisement', 'diet_plan', 'meal', 'exercise', 'other'),
     allowNull: false,
     validate: {
       notEmpty: true,
-      isIn: [['user_profile', 'gym', 'advertisement', 'diet_plan', 'meal', 'other']]
+      isIn: [['user_profile', 'gym', 'advertisement', 'diet_plan', 'meal', 'exercise', 'other']]
     }
   },
   entity_id: {
@@ -154,7 +154,7 @@ Media.findFilesByEntity = async function (entityType, entityId, options = {}) {
 
 Media.createMedia = async function (mediaData) {
   // Validate entity type and ID combination
-  const validEntityTypes = ['user_profile', 'gym', 'advertisement', 'diet_plan', 'meal', 'other'];
+  const validEntityTypes = ['user_profile', 'gym', 'advertisement', 'diet_plan', 'meal', 'exercise', 'other'];
   if (!validEntityTypes.includes(mediaData.entityType)) {
     throw new Error(`Invalid entity type: ${mediaData.entityType}`);
   }
