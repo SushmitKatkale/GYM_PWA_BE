@@ -303,7 +303,7 @@ const getExerciseById = async (req, res) => {
 const createExercise = async (req, res) => {
   try {
     // Check if user is admin
-    if (!req.user || req.user.role !== 4) {
+    if (!req.user || req.user.role !== 3) {
       return res.status(403).json({
         success: false,
         message: 'Access denied. Only admins can create exercises.'
@@ -365,7 +365,7 @@ const createExercise = async (req, res) => {
 const updateExercise = async (req, res) => {
   try {
     // Check if user is admin
-    if (!req.user || req.user.role !== 4) {
+    if (!req.user || req.user.role !== 3) {
       return res.status(403).json({
         success: false,
         message: 'Access denied. Only admins can update exercises.'
@@ -446,7 +446,7 @@ const updateExercise = async (req, res) => {
 const deleteExercise = async (req, res) => {
   try {
     // Check if user is admin
-    if (!req.user || req.user.role !== 4) {
+    if (!req.user || req.user.role !== 3) {
       return res.status(403).json({
         success: false,
         message: 'Access denied. Only admins can delete exercises.'
@@ -673,7 +673,7 @@ const getPopularExercises = async (req, res) => {
 const toggleExerciseVisibility = async (req, res) => {
   try {
     // Check if user is admin
-    if (!req.user || req.user.role !== 4) {
+    if (!req.user || req.user.role !== 3) {
       return res.status(403).json({
         success: false,
         message: 'Access denied. Only admins can change exercise visibility.'
