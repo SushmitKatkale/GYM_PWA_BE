@@ -361,9 +361,10 @@ Exercise.findByDifficulty = async function(difficulty, options = {}) {
 };
 
 Exercise.findByMuscleGroup = async function(muscleGroup, options = {}) {
+  const { Op } = sequelize.Sequelize;
   const where = {
     muscle_groups: {
-      [sequelize.Sequelize.Op.contains]: muscleGroup
+      [Op.like]: `%"${muscleGroup}"%`
     },
     record_status: 1
   };
@@ -388,9 +389,10 @@ Exercise.findByMuscleGroup = async function(muscleGroup, options = {}) {
 };
 
 Exercise.findByEquipment = async function(equipment, options = {}) {
+  const { Op } = sequelize.Sequelize;
   const where = {
     equipment_needed: {
-      [sequelize.Sequelize.Op.contains]: equipment
+      [Op.like]: `%"${equipment}"%`
     },
     record_status: 1
   };

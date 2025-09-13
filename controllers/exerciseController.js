@@ -119,15 +119,27 @@ const getAllExercises = async (req, res) => {
     }
 
     if (muscleGroup) {
-      where.muscle_groups = {
-        [Op.contains]: muscleGroup
-      };
+      // MySQL JSON query: Check if the JSON array contains the muscle group
+      where[Op.and] = [
+        ...(where[Op.and] || []),
+        {
+          muscle_groups: {
+            [Op.like]: `%"${muscleGroup}"%`
+          }
+        }
+      ];
     }
 
     if (equipment) {
-      where.equipment_needed = {
-        [Op.contains]: equipment
-      };
+      // MySQL JSON query: Check if the JSON array contains the equipment
+      where[Op.and] = [
+        ...(where[Op.and] || []),
+        {
+          equipment_needed: {
+            [Op.like]: `%"${equipment}"%`
+          }
+        }
+      ];
     }
 
     if (gymId) {
