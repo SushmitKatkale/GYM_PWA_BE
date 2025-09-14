@@ -453,9 +453,9 @@ class UserController {
   // Get complete user profile with all settings
   static async getCompleteProfile(req, res) {
     try {
-      const userEmail = req.user.email;
+      const userId = req.user.id;
 
-      const user = await User.findByPk(userEmail, {
+      const user = await User.findByPk(userId, {
         attributes: { exclude: ['password'] },
         include: [
           {
@@ -493,11 +493,11 @@ class UserController {
   // Update user profile extended data
   static async updateUserProfile(req, res) {
     try {
-      const userEmail = req.user.email;
+      const userId = req.user.id;
       const { firstName, lastName, phoneNumber, dateOfBirth, gender, height, weight, ...extendedProfileData } = req.body;
 
       // Update basic user information in User table
-      const user = await User.findByPk(userEmail);
+      const user = await User.findByPk(userId);
       if (!user) {
         return ResponseUtil.notFoundError(res, 'User not found');
       }
@@ -506,7 +506,7 @@ class UserController {
       const userUpdateData = {};
       if (firstName !== undefined) userUpdateData.firstName = firstName;
       if (lastName !== undefined) userUpdateData.lastName = lastName;
-      if (phoneNumber !== undefined) userUpdateData.phoneNumber = phoneNumber;
+      if (phoneNumber !== undefined) userUpdateData.phone = phoneNumber;
 
       if (Object.keys(userUpdateData).length > 0) {
         await user.update(userUpdateData);
@@ -518,28 +518,28 @@ class UserController {
       // Validate and sanitize dateOfBirth
       if (dateOfBirth !== undefined) {
         if (dateOfBirth == '' || dateOfBirth == null) {
-          profileData.dateOfBirth = null;
+          profileData.dob = null;
         } else {
           const parsedDate = new Date(dateOfBirth);
           if (!isNaN(parsedDate.getTime()) && dateOfBirth !== 'Invalid date') {
-            profileData.dateOfBirth = dateOfBirth;
+            profileData.dob = dateOfBirth;
           } else {
-            profileData.dateOfBirth = null;
+            profileData.dob = null;
           }
         }
       }
 
       if (gender !== undefined) profileData.gender = gender || null;
-      if (height !== undefined) profileData.height = height || null;
-      if (weight !== undefined) profileData.weight = weight || null;
+      if (height !== undefined) profileData.heightCm = height || null;
+      if (weight !== undefined) profileData.weightKg = weight || null;
 
       // Add any other extended profile fields
       Object.assign(profileData, extendedProfileData);
 
       if (Object.keys(profileData).length > 0) {
         const [profile, created] = await UserProfile.findOrCreate({
-          where: { userEmail },
-          defaults: { ...profileData, userEmail }
+          where: { userId },
+          defaults: { ...profileData, userId }
         });
 
         if (!created) {
@@ -548,7 +548,7 @@ class UserController {
       }
 
       // Return updated user with profile
-      const updatedUser = await User.findByPk(userEmail, {
+      const updatedUser = await User.findByPk(userId, {
         attributes: { exclude: ['password'] },
         include: [
           {
@@ -613,18 +613,18 @@ class UserController {
   // Update user fitness goals
   static async updateUserFitnessGoals(req, res) {
     try {
-      const userEmail = req.user.email;
+      const userId = req.user.id;
       const { goalIds } = req.body; // Array of { goalId, priority, targetDate }
 
       // Remove existing goals
       await UserFitnessGoal.destroy({
-        where: { userEmail }
+        where: { userId }
       });
 
       // Add new goals
       if (goalIds && goalIds.length > 0) {
         const userGoals = goalIds.map(goal => ({
-          userEmail,
+          userId,
           goalId: goal.goalId,
           priority: goal.priority || 1,
           targetDate: goal.targetDate || null
@@ -634,7 +634,7 @@ class UserController {
       }
 
       // Fetch updated goals
-      const updatedGoals = await User.findByPk(userEmail, {
+      const updatedGoals = await User.findByPk(userId, {
         include: [
           {
             model: FitnessGoal,
@@ -654,10 +654,15 @@ class UserController {
   // Emergency contacts CRUD
   static async addEmergencyContact(req, res) {
     try {
-      const userEmail = req.user.email;
-      const contactData = { ...req.body, userEmail };
+      const userId = req.user.id;
+      const contactData = { ...req.body, userId };
 
-      const contact = await EmergencyContact.create(contactData);
+      const contact = await EmergencyContact.create({
+        name: contactData.name,
+        phone: contactData.phoneNumber,
+        relation: contactData.relationship,
+        userId: userId
+      });
       return ResponseUtil.success(res, contact.toJSON(), 'Emergency contact added successfully', 201);
     } catch (error) {
       console.error('Add emergency contact error:', error);
@@ -667,19 +672,22 @@ class UserController {
 
   static async updateEmergencyContact(req, res) {
     try {
-      const userEmail = req.user.email;
+      const userId = req.user.id;
       const { contactId } = req.params;
       const updateData = req.body;
 
       const contact = await EmergencyContact.findOne({
-        where: { id: contactId, userEmail }
+        where: { id: contactId, userId }
       });
 
       if (!contact) {
         return ResponseUtil.notFoundError(res, 'Emergency contact not found');
       }
 
-      await contact.update(updateData);
+      await contact.update({
+        phone: updateData.phoneNumber,
+        relation: updateData.relationship,
+      });
       return ResponseUtil.success(res, contact.toJSON(), 'Emergency contact updated successfully');
     } catch (error) {
       console.error('Update emergency contact error:', error);
@@ -689,11 +697,11 @@ class UserController {
 
   static async deleteEmergencyContact(req, res) {
     try {
-      const userEmail = req.user.email;
+      const userId = req.user.id;
       const { contactId } = req.params;
 
       const contact = await EmergencyContact.findOne({
-        where: { id: contactId, userEmail }
+        where: { id: contactId, userId }
       });
 
       if (!contact) {
