@@ -277,6 +277,7 @@ DietPlanHistory.getTrainerChangeStats = async function(trainerId, options = {}) 
 };
 
 DietPlanHistory.getChangeTimeline = async function(planId, limit = 20) {
+  const User = require('./User');
   return await this.findAll({
     where: {
       plan_id: planId
@@ -284,9 +285,9 @@ DietPlanHistory.getChangeTimeline = async function(planId, limit = 20) {
     order: [['changed_at', 'DESC']],
     limit,
     include: [{
-      model: require('./User'),
+      model: User,
       as: 'changer',
-      attributes: ['id', 'username', 'email', 'role']
+      attributes: ['id', 'username', 'email', 'role', 'firstName', 'lastName']
     }]
   });
 };
@@ -300,6 +301,7 @@ DietPlanHistory.getMostActiveEditors = async function(options = {}) {
     };
   }
 
+  const User = require('./User');
   const activeEditors = await this.findAll({
     attributes: [
       'changed_by',
@@ -311,9 +313,9 @@ DietPlanHistory.getMostActiveEditors = async function(options = {}) {
     order: [[sequelize.literal('total_changes'), 'DESC']],
     limit: options.limit || 10,
     include: [{
-      model: require('./User'),
+      model: User,
       as: 'changer',
-      attributes: ['id', 'username', 'email', 'role']
+      attributes: ['id', 'username', 'email', 'role', 'firstName', 'lastName']
     }],
     raw: false
   });

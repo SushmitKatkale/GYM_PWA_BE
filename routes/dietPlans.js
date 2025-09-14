@@ -344,7 +344,7 @@ dietPlanRouter.get('/user', authenticate, DietPlanController.getUserDietPlans);
  *       403:
  *         description: Only trainers can access this endpoint
  */
-dietPlanRouter.get('/change-requests', authenticate, authorize('3', '4'), DietPlanController.getTrainerChangeRequests);
+dietPlanRouter.get('/change-requests', authenticate, authorize('1', '3', '4'), DietPlanController.getEnhancedChangeRequests);
 
 /**
  * @swagger

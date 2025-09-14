@@ -1,10 +1,10 @@
-const { 
-  DietPlan, 
-  DietPlanMeal, 
-  DietChangeRequest, 
+const {
+  DietPlan,
+  DietPlanMeal,
+  DietChangeRequest,
   DietPlanHistory,
-  User, 
-  UserProfile 
+  User,
+  UserProfile
 } = require('../models');
 const ResponseUtil = require('../utils/response');
 const { Op } = require('sequelize');
@@ -15,7 +15,7 @@ class DietPlanController {
     try {
       const currentUserId = req.user.id;
       const currentUserRole = req.user.role;
-      
+
       const { user_id, trainer_id, title, description, calories, protein_g, carbs_g, fats_g, meals = [] } = req.body;
 
       // Validate required fields
@@ -77,29 +77,54 @@ class DietPlanController {
       const trainerId = req.user.id;
       const { page = 1, limit = 10, status, user_id } = req.query;
 
-      if (req.user.role !== 3) {
+      if (req.user.role !== 3 && req.user.role !== 4) {
         return ResponseUtil.forbiddenError(res, 'Only trainers can access this endpoint');
       }
+
+      let dietPlans;
 
       const options = { status };
       if (user_id) options.userId = user_id;
 
-      const dietPlans = await DietPlan.findByTrainer(trainerId, {
-        ...options,
-        include: [
-          {
-            model: User,
-            as: 'user',
-            attributes: ['id', 'firstName', 'lastName', 'email'],
-            include: [{
-              model: UserProfile,
-              as: 'profile',
-              attributes: ['height_cm', 'weight_kg', 'gender'],
-              required: false
-            }]
-          }
-        ]
-      });
+      if (req.user.role === 3) {
+        // Admin can view any trainer's plans
+
+        dietPlans = await DietPlan.findAll({
+          ...options,
+          include: [
+            {
+              model: User,
+              as: 'user',
+              attributes: ['id', 'firstName', 'lastName', 'email'],
+              include: [{
+                model: UserProfile,
+                as: 'profile',
+                attributes: ['height_cm', 'weight_kg', 'gender'],
+                required: false
+              }]
+            }
+          ]
+        })
+
+      } else {
+        dietPlans = await DietPlan.findAllByTrainer(trainerId, {
+          ...options,
+          include: [
+            {
+              model: User,
+              as: 'user',
+              attributes: ['id', 'firstName', 'lastName', 'email'],
+              include: [{
+                model: UserProfile,
+                as: 'profile',
+                attributes: ['height_cm', 'weight_kg', 'gender'],
+                required: false
+              }]
+            }
+          ]
+        });
+
+      }
 
       const startIndex = (page - 1) * limit;
       const paginatedPlans = dietPlans.slice(startIndex, startIndex + parseInt(limit));
@@ -138,15 +163,30 @@ class DietPlanController {
               attributes: ['bio'],
               required: false
             }]
+          },
+          {
+            model: DietPlanMeal,
+            as: 'meals',
           }
         ]
+      });
+
+      const plansWithFullUrls = dietPlans.map(plan => {
+        const planData = plan.toJSON();
+        planData.meals = planData.meals.map(meal => {
+          if (meal.image_url) {
+            meal.fullUrl = `${req.protocol}://${req.get('host')}${meal.image_url}`;
+          }
+          return meal;
+        });
+        return planData;
       });
 
       const startIndex = (page - 1) * limit;
       const paginatedPlans = dietPlans.slice(startIndex, startIndex + parseInt(limit));
 
       return ResponseUtil.success(res, {
-        dietPlans: paginatedPlans,
+        dietPlans: plansWithFullUrls,
         pagination: {
           currentPage: parseInt(page),
           totalPages: Math.ceil(dietPlans.length / limit),
@@ -192,7 +232,7 @@ class DietPlanController {
       }
 
       // Check access permissions
-      if (dietPlan.user_id !== userId && dietPlan.trainer_id !== userId && req.user.role !== 4) {
+      if (dietPlan.userId !== userId && dietPlan.trainer_id !== userId && req.user.role !== 3) {
         return ResponseUtil.forbiddenError(res, 'Access denied');
       }
 
@@ -224,10 +264,10 @@ class DietPlanController {
       }
 
       // Check permissions: trainer who created it, user who owns it, or admin
-      const canUpdate = 
+      const canUpdate =
         (dietPlan.trainer_id === currentUserId) || // Trainer who created it
         (dietPlan.user_id === currentUserId) || // User who owns it
-        (currentUserRole === 4); // Admin
+        (currentUserRole === 3); // Admin
 
       if (!canUpdate) {
         return ResponseUtil.forbiddenError(res, 'Access denied: insufficient permissions to update this plan');
@@ -306,10 +346,10 @@ class DietPlanController {
       }
 
       // Check permissions: trainer who created it, user who owns it, or admin
-      const canAddMeal = 
+      const canAddMeal =
         (dietPlan.trainer_id === currentUserId) || // Trainer who created it
         (dietPlan.user_id === currentUserId) || // User who owns it
-        (currentUserRole === 4); // Admin
+        (currentUserRole === 3); // Admin
 
       if (!canAddMeal) {
         return ResponseUtil.forbiddenError(res, 'Access denied: insufficient permissions to add meals to this plan');
@@ -466,9 +506,9 @@ class DietPlanController {
       }
 
       // Check permissions: assigned trainer or admin
-      const canRespond = 
+      const canRespond =
         (changeRequest.trainer_id === currentUserId) || // Assigned trainer
-        (currentUserRole === 4); // Admin
+        (currentUserRole === 3); // Admin
 
       if (!canRespond) {
         return ResponseUtil.forbiddenError(res, 'Access denied: insufficient permissions to respond to this request');
@@ -536,7 +576,7 @@ class DietPlanController {
       }
 
       // Check access permissions
-      if (dietPlan.user_id !== userId && dietPlan.trainer_id !== userId && req.user.role !== 4) {
+      if (dietPlan.userId !== userId && dietPlan.trainerId !== userId && req.user.role !== 4) {
         return ResponseUtil.forbiddenError(res, 'Access denied');
       }
 
@@ -575,10 +615,10 @@ class DietPlanController {
       }
 
       // Check permissions
-      const canView = 
+      const canView =
         (dietPlan.trainer_id === currentUserId) || // Trainer who created it
         (dietPlan.user_id === currentUserId) || // User who owns it
-        (currentUserRole === 4); // Admin
+        (currentUserRole === 3); // Admin
 
       if (!canView) {
         return ResponseUtil.forbiddenError(res, 'Access denied');
@@ -610,10 +650,10 @@ class DietPlanController {
       }
 
       // Check permissions
-      const canUpdate = 
+      const canUpdate =
         (dietPlan.trainer_id === currentUserId) || // Trainer who created it
         (dietPlan.user_id === currentUserId) || // User who owns it
-        (currentUserRole === 4); // Admin
+        (currentUserRole === 3); // Admin
 
       if (!canUpdate) {
         return ResponseUtil.forbiddenError(res, 'Access denied');
@@ -646,10 +686,10 @@ class DietPlanController {
       }
 
       // Check permissions
-      const canDelete = 
+      const canDelete =
         (dietPlan.trainer_id === currentUserId) || // Trainer who created it
         (dietPlan.user_id === currentUserId) || // User who owns it
-        (currentUserRole === 4); // Admin
+        (currentUserRole === 3); // Admin
 
       if (!canDelete) {
         return ResponseUtil.forbiddenError(res, 'Access denied');
@@ -680,10 +720,10 @@ class DietPlanController {
       }
 
       // Check permissions
-      const canView = 
+      const canView =
         (dietPlan.trainer_id === currentUserId) || // Trainer who created it
         (dietPlan.user_id === currentUserId) || // User who owns it
-        (currentUserRole === 4); // Admin
+        (currentUserRole === 3); // Admin
 
       if (!canView) {
         return ResponseUtil.forbiddenError(res, 'Access denied');
@@ -698,8 +738,17 @@ class DietPlanController {
         order: [['created_at', 'ASC']]
       });
 
+      // Add fullUrl for meal images
+      const mealsWithFullUrl = meals.map(meal => {
+        const mealData = meal.toJSON();
+        if (mealData.image_url) {
+          mealData.fullUrl = `${req.protocol}://${req.get('host')}${mealData.image_url}`;
+        }
+        return mealData;
+      });
+
       const startIndex = (page - 1) * limit;
-      const paginatedMeals = meals.slice(startIndex, startIndex + parseInt(limit));
+      const paginatedMeals = mealsWithFullUrl.slice(startIndex, startIndex + parseInt(limit));
 
       return ResponseUtil.success(res, {
         meals: paginatedMeals,
@@ -735,10 +784,10 @@ class DietPlanController {
       }
 
       // Check permissions
-      const canCreateMeal = 
+      const canCreateMeal =
         (dietPlan.trainer_id === currentUserId) || // Trainer who created it
         (dietPlan.user_id === currentUserId) || // User who owns it
-        (currentUserRole === 4); // Admin
+        (currentUserRole === 3); // Admin
 
       if (!canCreateMeal) {
         return ResponseUtil.forbiddenError(res, 'Access denied: insufficient permissions to create meals for this plan');
@@ -766,10 +815,10 @@ class DietPlanController {
       }
 
       // Check permissions
-      const canView = 
+      const canView =
         (dietPlan.trainer_id === currentUserId) || // Trainer who created it
         (dietPlan.user_id === currentUserId) || // User who owns it
-        (currentUserRole === 4); // Admin
+        (currentUserRole === 3); // Admin
 
       if (!canView) {
         return ResponseUtil.forbiddenError(res, 'Access denied');
@@ -886,7 +935,7 @@ class DietPlanController {
       if (currentUserRole === 1) {
         // Users can only see their own requests
         whereClause.user_id = currentUserId;
-      } else if (currentUserRole === 3) {
+      } else if (currentUserRole === 4) {
         // Trainers can see requests assigned to them or general requests
         whereClause[Op.or] = [
           { trainer_id: currentUserId },
@@ -909,20 +958,24 @@ class DietPlanController {
           {
             model: User,
             as: 'user',
-            attributes: ['id', 'firstName', 'lastName', 'email'],
             required: true
           },
           {
             model: User,
             as: 'trainer',
-            attributes: ['id', 'firstName', 'lastName', 'email'],
             required: false
           },
           {
             model: DietPlan,
             as: 'plan',
-            attributes: ['id', 'title'],
-            required: false
+            required: false,
+            include: [
+              {
+                model: DietPlanMeal,
+                as: 'meals',
+                required: false
+              }
+            ]
           }
         ],
         order: [

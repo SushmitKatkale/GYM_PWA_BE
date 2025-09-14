@@ -38,7 +38,7 @@ class DashboardService {
           UserSubscription ? UserSubscription.count({ 
             where: { 
               record_status: 1, // Updated field name
-              validTo: { [Op.gte]: new Date() } 
+              endDate: { [Op.gte]: new Date() } 
             } 
           }) : 0
         ]),
@@ -51,7 +51,7 @@ class DashboardService {
             where: { 
               created_at: { [Op.gte]: firstDayOfMonth }, // Updated field name
               record_status: 1, // Updated field name
-              validTo: { [Op.gte]: new Date() }
+              endDate: { [Op.gte]: new Date() }
             } 
           }) : 0
         ]),
@@ -338,7 +338,7 @@ class DashboardService {
               { userEmail: userEmail }
             ],
             record_status: 1, // Updated field name
-            validTo: { [Op.gte]: new Date() }
+            endDate: { [Op.gte]: new Date() }
           }
         }) : [],
         

@@ -250,8 +250,8 @@ DietPlan.createPlan = async function(planData, mealsData = []) {
 
     // Create diet plan
     const dietPlan = await this.create({
-      trainer_id: planData.trainer_id,
-      user_id: planData.user_id,
+      trainerId: planData.trainer_id,
+      userId: planData.user_id,
       title: planData.title,
       description: planData.description,
       calories: planData.calories,

@@ -444,6 +444,68 @@ DietPlanMeal.belongsTo(DietPlan, {
   as: 'plan'
 });
 
+// Diet Change Requests
+// User as requester (user_id)
+User.hasMany(DietChangeRequest, {
+  foreignKey: 'user_id',
+  as: 'dietChangeRequests',
+  onDelete: 'CASCADE'
+});
+
+DietChangeRequest.belongsTo(User, {
+  foreignKey: 'user_id',
+  as: 'user'
+});
+
+// User as trainer (trainer_id)
+User.hasMany(DietChangeRequest, {
+  foreignKey: 'trainer_id',
+  as: 'assignedDietChangeRequests',
+  onDelete: 'SET NULL'
+});
+
+DietChangeRequest.belongsTo(User, {
+  foreignKey: 'trainer_id',
+  as: 'trainer'
+});
+
+// Diet Plan association
+DietPlan.hasMany(DietChangeRequest, {
+  foreignKey: 'plan_id',
+  as: 'changeRequests',
+  onDelete: 'CASCADE'
+});
+
+DietChangeRequest.belongsTo(DietPlan, {
+  foreignKey: 'plan_id',
+  as: 'plan'
+});
+
+// Diet Plan History associations
+// User as changer (changed_by)
+User.hasMany(DietPlanHistory, {
+  foreignKey: 'changed_by',
+  as: 'dietPlanChanges',
+  onDelete: 'SET NULL'
+});
+
+DietPlanHistory.belongsTo(User, {
+  foreignKey: 'changed_by',
+  as: 'changer'
+});
+
+// Diet Plan association
+DietPlan.hasMany(DietPlanHistory, {
+  foreignKey: 'plan_id',
+  as: 'history',
+  onDelete: 'CASCADE'
+});
+
+DietPlanHistory.belongsTo(DietPlan, {
+  foreignKey: 'plan_id',
+  as: 'plan'
+});
+
 // Wallet
 User.hasOne(Wallet, {
   foreignKey: 'ownerId',
