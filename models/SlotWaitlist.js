@@ -1,4 +1,4 @@
-const { DataTypes } = require('sequelize');
+const { DataTypes, Op } = require('sequelize');
 const { sequelize } = require('../config/database');
 
 const SlotWaitlist = sequelize.define('SlotWaitlist', {
@@ -29,6 +29,12 @@ const SlotWaitlist = sequelize.define('SlotWaitlist', {
     type: DataTypes.INTEGER,
     allowNull: false,
     field: 'waitlist_position'
+  },
+  requestedDate: {
+    type: DataTypes.DATEONLY,
+    allowNull: false,
+    field: 'requested_date',
+    comment: 'The date for which the user is requesting the slot'
   },
   status: {
     type: DataTypes.ENUM('waiting', 'cleared'),
@@ -63,10 +69,16 @@ const SlotWaitlist = sequelize.define('SlotWaitlist', {
       fields: ['user_id']
     },
     {
-      fields: ['slot_id', 'waitlist_position']
+      fields: ['slot_id', 'requested_date', 'waitlist_position']
     },
     {
       fields: ['status']
+    },
+    {
+      fields: ['slot_id', 'requested_date', 'status', 'record_status']
+    },
+    {
+      fields: ['requested_date']
     }
   ]
 });
@@ -78,18 +90,18 @@ SlotWaitlist.prototype.isWaiting = function() {
 
 SlotWaitlist.prototype.clearFromWaitlist = async function() {
   const UserSlotBooking = require('./UserSlotBooking');
-  
-  // Create a booking for this user
   const GymSlot = require('./GymSlot');
-  const slot = await GymSlot.findByPk(this.slot_id);
+  
+  // Use the requestedDate from the waitlist entry for booking
+  const slot = await GymSlot.findByPk(this.slotId);
   
   if (slot) {
     try {
       await UserSlotBooking.create({
-        user_id: this.user_id,
-        slot_id: this.slot_id,
+        user_id: this.userId,
+        slot_id: this.slotId,
         booking_status: 1,
-        booking_date: slot.slot_date
+        booking_date: this.requestedDate // Use requestedDate instead of slot.slot_date
       });
 
       // Mark waitlist entry as cleared
@@ -112,11 +124,12 @@ SlotWaitlist.prototype.clearFromWaitlist = async function() {
 SlotWaitlist.prototype.reorderWaitlist = async function() {
   const waitlistEntries = await SlotWaitlist.findAll({
     where: {
-      slot_id: this.slot_id,
+      slot_id: this.slotId,
+      requested_date: this.requestedDate, // Include requestedDate to keep within same date
       status: 'waiting',
       record_status: 1,
       waitlist_position: {
-        [sequelize.Sequelize.Op.gt]: this.waitlist_position
+        [Op.gt]: this.waitlistPosition
       }
     },
     order: [['waitlist_position', 'ASC']]
@@ -124,19 +137,19 @@ SlotWaitlist.prototype.reorderWaitlist = async function() {
 
   // Update positions
   for (const entry of waitlistEntries) {
-    entry.waitlist_position -= 1;
+    entry.waitlistPosition -= 1;
     await entry.save();
   }
 };
 
 SlotWaitlist.prototype.getSlotDetails = async function() {
   const GymSlot = require('./GymSlot');
-  return await GymSlot.findByPk(this.slot_id);
+  return await GymSlot.findByPk(this.slotId);
 };
 
 SlotWaitlist.prototype.getUserDetails = async function() {
   const User = require('./User');
-  return await User.findByPk(this.user_id, {
+  return await User.findByPk(this.userId, {
     attributes: ['id', 'email', 'username', 'phone']
   });
 };
@@ -147,6 +160,10 @@ SlotWaitlist.findSlotWaitlist = async function(slotId, options = {}) {
     slot_id: slotId,
     record_status: 1
   };
+
+  if (options.requestedDate) {
+    where.requested_date = options.requestedDate;
+  }
 
   if (options.status) {
     where.status = options.status;
@@ -165,6 +182,10 @@ SlotWaitlist.findUserWaitlist = async function(userId, options = {}) {
     record_status: 1
   };
 
+  if (options.requestedDate) {
+    where.requested_date = options.requestedDate;
+  }
+
   if (options.status) {
     where.status = options.status;
   }
@@ -176,25 +197,31 @@ SlotWaitlist.findUserWaitlist = async function(userId, options = {}) {
   });
 };
 
-SlotWaitlist.addToWaitlist = async function(userId, slotId) {
-  // Check if user is already on waitlist for this slot
+SlotWaitlist.addToWaitlist = async function(userId, slotId, requestedDate) {
+  if (!requestedDate) {
+    throw new Error('requestedDate is required for waitlist entries');
+  }
+
+  // Check if user is already on waitlist for this slot and date
   const existingEntry = await this.findOne({
     where: {
       user_id: userId,
       slot_id: slotId,
+      requested_date: requestedDate,
       status: 'waiting',
       record_status: 1
     }
   });
 
   if (existingEntry) {
-    throw new Error('User is already on the waitlist for this slot');
+    throw new Error('User is already on the waitlist for this slot and date');
   }
 
-  // Get next position
+  // Get next position for this slot and date
   const nextPosition = await this.count({
     where: {
       slot_id: slotId,
+      requested_date: requestedDate,
       status: 'waiting',
       record_status: 1
     }
@@ -204,23 +231,28 @@ SlotWaitlist.addToWaitlist = async function(userId, slotId) {
   return await this.create({
     slot_id: slotId,
     user_id: userId,
+    requested_date: requestedDate,
     waitlist_position: nextPosition,
     status: 'waiting'
   });
 };
 
-SlotWaitlist.removeFromWaitlist = async function(userId, slotId) {
-  const entry = await this.findOne({
-    where: {
-      user_id: userId,
-      slot_id: slotId,
-      status: 'waiting',
-      record_status: 1
-    }
-  });
+SlotWaitlist.removeFromWaitlist = async function(userId, slotId, requestedDate) {
+  const where = {
+    user_id: userId,
+    slot_id: slotId,
+    status: 'waiting',
+    record_status: 1
+  };
+
+  if (requestedDate) {
+    where.requested_date = requestedDate;
+  }
+
+  const entry = await this.findOne({ where });
 
   if (!entry) {
-    throw new Error('User not found on waitlist');
+    throw new Error('User not found on waitlist for this slot' + (requestedDate ? ' and date' : ''));
   }
 
   // Mark as removed
@@ -263,13 +295,19 @@ SlotWaitlist.getWaitlistStats = async function(gymId, startDate, endDate) {
   return stats;
 };
 
-SlotWaitlist.processNextInQueue = async function(slotId) {
+SlotWaitlist.processNextInQueue = async function(slotId, requestedDate) {
+  const where = {
+    slot_id: slotId,
+    status: 'waiting',
+    record_status: 1
+  };
+
+  if (requestedDate) {
+    where.requested_date = requestedDate;
+  }
+
   const nextEntry = await this.findOne({
-    where: {
-      slot_id: slotId,
-      status: 'waiting',
-      record_status: 1
-    },
+    where,
     order: [['waitlist_position', 'ASC']]
   });
 

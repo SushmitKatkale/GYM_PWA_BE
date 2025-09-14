@@ -62,13 +62,16 @@ const UserSlotBooking = sequelize.define('UserSlotBooking', {
   createdAt: 'created_at',
   updatedAt: 'updated_at',
   underscored: true,
-  indexes: [
-    {
-      unique: true,
-      fields: ['user_id', 'slot_id', 'booking_date'],
-      name: 'unique_user_slot_booking_date'
-    }
-  ]
+  // indexes: [
+  //   {
+  //     unique: true,
+  //     fields: ['user_id', 'slot_id', 'booking_date', 'booking_status'],
+  //     name: 'unique_user_slot_booking_date_active',
+  //     where: {
+  //       booking_status: 1
+  //     }
+  //   }
+  // ]
 });
 
 // Instance methods

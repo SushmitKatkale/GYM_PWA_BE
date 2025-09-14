@@ -376,21 +376,20 @@ router.get('/user/:userEmail', authenticate, async (req, res) => {
 
 router.get('/', authenticate, async (req, res) => {
   try {
-    const userEmail = req.user.email;
+    const userId = req.user.id;
     const { status = 'all', limit = 10, offset = 0 } = req.query;
 
     // Build where conditions
     const whereConditions = {
-      userEmail,
-      activeStatus: true
+      userId
     };
 
     // Add status filter
     const now = new Date();
     if (status === 'active') {
-      whereConditions.validTo = { [Op.gte]: now };
+      whereConditions.startDate = { [Op.gte]: now };
     } else if (status === 'expired') {
-      whereConditions.validTo = { [Op.lt]: now };
+      whereConditions.endDate = { [Op.lt]: now };
     }
 
     // Get total count
@@ -408,18 +407,16 @@ router.get('/', authenticate, async (req, res) => {
           include: [
             {
               model: Gym,
-              as: 'gym',
-              attributes: ['id', 'name', 'address', 'city']
+              as: 'gym'
             }
           ]
         },
         {
           model: Payment,
-          as: 'payment',
-          attributes: ['id', 'paymentAmount', 'status', 'gateway', 'completedAt']
+          as: 'payment'
         }
       ],
-      order: [['createTimestamp', 'DESC']],
+      order: [['created_at', 'DESC']],
       limit: parseInt(limit),
       offset: parseInt(offset)
     });

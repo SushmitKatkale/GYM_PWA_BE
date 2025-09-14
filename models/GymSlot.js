@@ -36,6 +36,15 @@ const GymSlot = sequelize.define('GymSlot', {
     type: DataTypes.TINYINT,
     defaultValue: 1
   },
+  status: {
+    type: DataTypes.VIRTUAL,
+    get() {
+      return this.record_status === 1 ? 'active' : 'inactive';
+    },
+    set(value) {
+      this.record_status = value === 'active' ? 1 : 0;
+    }
+  },
   createdBy: {
     type: DataTypes.BIGINT,
     allowNull: true,
