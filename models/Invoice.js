@@ -115,16 +115,14 @@ Invoice.prototype.getUserDetails = async function() {
     include: [{
       model: require('./UserProfile'),
       as: 'profile',
-      attributes: ['dob', 'gender']
-    }]
+          }]
   });
 };
 
 Invoice.prototype.getGymDetails = async function() {
   const Gym = require('./Gym');
   return await Gym.findByPk(this.gym_id, {
-    attributes: ['id', 'name', 'address']
-  });
+      });
 };
 
 // Static methods

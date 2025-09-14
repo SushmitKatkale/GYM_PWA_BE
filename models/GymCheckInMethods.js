@@ -76,8 +76,7 @@ GymCheckInMethods.getGymMethods = async function(gymId) {
     where: { gymId },
     include: [{
       association: 'method',
-      attributes: ['id', 'name', 'description']
-    }]
+          }]
   });
 };
 

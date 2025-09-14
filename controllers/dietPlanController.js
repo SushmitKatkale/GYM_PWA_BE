@@ -211,8 +211,7 @@ class DietPlanController {
           {
             model: User,
             as: 'trainer',
-            attributes: ['id', 'firstName', 'lastName', 'email']
-          },
+                      },
           {
             model: User,
             as: 'user',
@@ -298,8 +297,7 @@ class DietPlanController {
           {
             model: User,
             as: 'user',
-            attributes: ['id', 'firstName', 'lastName', 'email']
-          }
+                      }
         ]
       });
 
@@ -459,8 +457,7 @@ class DietPlanController {
           {
             model: User,
             as: 'user',
-            attributes: ['id', 'firstName', 'lastName', 'email']
-          },
+                      },
           {
             model: DietPlan,
             as: 'plan',
@@ -584,8 +581,7 @@ class DietPlanController {
         include: [{
           model: User,
           as: 'changer',
-          attributes: ['id', 'firstName', 'lastName', 'email']
-        }]
+                  }]
       });
 
       return ResponseUtil.success(res, history, 'Diet plan history retrieved successfully');

@@ -70,8 +70,7 @@ DietPlanHistory.prototype.getDietPlan = async function() {
 DietPlanHistory.prototype.getChangedByUser = async function() {
   const User = require('./User');
   return await User.findByPk(this.changed_by, {
-    attributes: ['id', 'email', 'username', 'role']
-  });
+      });
 };
 
 DietPlanHistory.prototype.getChangesSummary = function() {
@@ -287,8 +286,7 @@ DietPlanHistory.getChangeTimeline = async function(planId, limit = 20) {
     include: [{
       model: User,
       as: 'changer',
-      attributes: ['id', 'username', 'email', 'role', 'firstName', 'lastName']
-    }]
+          }]
   });
 };
 
@@ -315,8 +313,7 @@ DietPlanHistory.getMostActiveEditors = async function(options = {}) {
     include: [{
       model: User,
       as: 'changer',
-      attributes: ['id', 'username', 'email', 'role', 'firstName', 'lastName']
-    }],
+          }],
     raw: false
   });
 

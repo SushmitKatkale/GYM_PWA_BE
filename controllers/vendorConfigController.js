@@ -182,8 +182,7 @@ async function getVendorConfig(req, res) {
         {
           model: Gym,
           as: 'gym',
-          attributes: ['id', 'name', 'address', 'city']
-        }
+                  }
       ]
     });
 
@@ -397,8 +396,7 @@ async function updateVendorConfigComplete(req, res) {
         {
           model: Gym,
           as: 'gym',
-          attributes: ['id', 'name', 'address', 'city']
-        }
+                  }
       ]
     });
 

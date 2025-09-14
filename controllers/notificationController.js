@@ -489,8 +489,7 @@ class NotificationController {
       } else if (role) {
         const users = await User.findAll({
           where: { role: role }, // Updated field name to use role
-          attributes: ['email']
-        });
+                  });
         targetUsers = users.map(u => u.email);
       }
 
@@ -594,8 +593,7 @@ class NotificationController {
   static async sendNotificationToRole(notification, role) {
     const users = await User.findAll({
       where: { role: role }, // Updated field name to use role
-      attributes: ['email']
-    });
+          });
 
     const results = [];
     for (const user of users) {

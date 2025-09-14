@@ -277,8 +277,7 @@ class WalletController {
         include: [{
           model: User,
           as: 'user',
-          attributes: ['id', 'firstName', 'lastName', 'email']
-        }]
+                  }]
       });
 
       if (!withdrawRequest) {
@@ -333,8 +332,7 @@ class WalletController {
         include: [{
           model: User,
           as: 'user',
-          attributes: ['id', 'firstName', 'lastName', 'email']
-        }]
+                  }]
       });
 
       return ResponseUtil.success(res, updatedRequest, `Withdraw request ${status} successfully`);
@@ -376,8 +374,7 @@ class WalletController {
           include: [{
             model: User,
             as: 'user',
-            attributes: ['firstName', 'lastName', 'email']
-          }],
+                      }],
           limit: 10,
           order: [['created_at', 'DESC']]
         }),
@@ -400,8 +397,7 @@ class WalletController {
           include: [{
             model: User,
             as: 'user',
-            attributes: ['firstName', 'lastName', 'email']
-          }]
+                      }]
         })
       ]);
 

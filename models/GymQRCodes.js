@@ -233,8 +233,7 @@ GymQRCodes.validateQRCode = async function(qrCode) {
     include: [
       {
         association: 'gym',
-        attributes: ['id', 'name', 'address', 'latitude', 'longitude']
-      }
+              }
     ]
   });
 

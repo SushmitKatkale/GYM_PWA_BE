@@ -151,8 +151,7 @@ DietChangeRequest.prototype.getUserDetails = async function () {
     include: [{
       model: require('./UserProfile'),
       as: 'profile',
-      attributes: ['dob', 'gender', 'height_cm', 'weight_kg']
-    }]
+          }]
   });
 };
 
@@ -165,8 +164,7 @@ DietChangeRequest.prototype.getTrainerDetails = async function () {
     include: [{
       model: require('./UserProfile'),
       as: 'profile',
-      attributes: ['bio']
-    }]
+          }]
   });
 };
 
@@ -243,8 +241,7 @@ DietChangeRequest.findPendingRequests = async function (trainerId = null) {
     include: [{
       model: require('./User'),
       as: 'user',
-      attributes: ['id', 'username', 'email']
-    }]
+          }]
   });
 };
 
@@ -344,13 +341,11 @@ DietChangeRequest.getUserRequestHistory = async function (userId, options = {}) 
       {
         model: require('./User'),
         as: 'trainer',
-        attributes: ['id', 'username', 'email']
-      },
+              },
       {
         model: require('./DietPlan'),
         as: 'plan',
-        attributes: ['id', 'title', 'status']
-      }
+              }
     ]
   });
 };

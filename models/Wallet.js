@@ -177,8 +177,7 @@ Wallet.getAllWallets = async function(options = {}) {
     where,
     include: [{
       association: 'owner',
-      attributes: ['id', 'username', 'email', 'role']
-    }],
+          }],
     order: [['balance', 'DESC']],
     limit: options.limit || 50,
     offset: options.offset || 0

@@ -174,8 +174,7 @@ WalletTransaction.getTransactionsByReference = async function(referenceType, ref
       association: 'wallet',
       include: [{
         association: 'owner',
-        attributes: ['id', 'username', 'email', 'role']
-      }]
+              }]
     }],
     order: [['createdAt', 'DESC']]
   });

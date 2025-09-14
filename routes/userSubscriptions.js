@@ -164,8 +164,7 @@ router.get('/active', authenticate, async (req, res) => {
             {
               model: Gym,
               as: 'gym',
-              attributes: ['id', 'name', 'address', 'city']
-            }
+                          }
           ]
         }
       ],
@@ -274,15 +273,13 @@ router.get('/history', authenticate, async (req, res) => {
             {
               model: Gym,
               as: 'gym',
-              attributes: ['id', 'name', 'address', 'city']
-            }
+                          }
           ]
         },
         {
           model: Payment,
           as: 'payment',
-          attributes: ['id', 'paymentAmount', 'status', 'gateway', 'completedAt']
-        }
+                  }
       ],
       order: [['createTimestamp', 'DESC']],
       limit: parseInt(limit),
@@ -340,18 +337,13 @@ router.get('/user/:userEmail', authenticate, async (req, res) => {
             {
               model: Gym,
               as: 'gym',
-              attributes: ['id', 'name', 'address', 'city', 'rating']
-            }
+                          }
           ]
         },
         {
           model: Payment,
           as: 'payment',
-          attributes: [
-            'id', 'paymentAmount', 'status', 'gateway', 
-            'paidVia', 'completedAt', 'transactionId'
-          ]
-        }
+                  }
       ],
       order: [['createTimestamp', 'DESC']]
     });

@@ -44,8 +44,7 @@ async function searchOwners(req, res) {
         ]
       },
       limit: 10,
-      attributes: ['id', 'email', 'firstName', 'lastName']
-    });
+          });
 
     const formattedOwners = owners.map(owner => ({
       id: owner.id,
@@ -86,8 +85,7 @@ async function searchGyms(req, res) {
         attributes: ['id', 'email'] // Include ID for new schema
       }],
       limit: 10,
-      attributes: ['id', 'name', 'address', 'city']
-    });
+          });
 
     const formattedGyms = gyms.map(gym => ({
       id: gym.id,
@@ -122,11 +120,9 @@ async function searchSubscriptions(req, res) {
       include: [{
         model: Gym,
         as: 'gym',
-        attributes: ['name']
-      }],
+              }],
       limit: 10,
-      attributes: ['id', 'title', 'price', 'discountedPrice']
-    });
+          });
 
     const formattedSubscriptions = subscriptions.map(subscription => ({
       id: subscription.id,
@@ -185,8 +181,7 @@ async function getAllPayments(req, res) {
           attributes: ['id', 'name', 'address', 'city'],
           where: gymName ? { name: { [Op.like]: `%${gymName}%` } } : undefined
         }],
-        attributes: ['id', 'title', 'price', 'validityDays']
-      }
+              }
     ];
 
     const { count, rows: payments } = await Payment.findAndCountAll({
@@ -230,10 +225,8 @@ async function getPaymentById(req, res) {
           include: [{
             model: Gym,
             as: 'gym',
-            attributes: ['id', 'name', 'address', 'city']
-          }],
-          attributes: ['id', 'title', 'price', 'validityDays']
-        }
+                      }],
+                  }
       ]
     });
 
@@ -336,13 +329,11 @@ async function getAllUserSubscriptions(req, res) {
           attributes: ['id', 'name', 'address', 'city'],
           where: gymName ? { name: { [Op.like]: `%${gymName}%` } } : undefined
         }],
-        attributes: ['id', 'title', 'price', 'validityDays']
-      },
+              },
       {
         model: Payment,
         as: 'payment',
-        attributes: ['id', 'paymentAmount', 'status', 'gateway', 'completedAt', 'transactionId']
-      }
+              }
     ];
 
     const { count, rows: subscriptions } = await UserSubscription.findAndCountAll({
@@ -415,15 +406,12 @@ async function getUserSubscriptionById(req, res) {
           include: [{
             model: Gym,
             as: 'gym',
-            attributes: ['id', 'name', 'address', 'city']
-          }],
-          attributes: ['id', 'title', 'price', 'validityDays']
-        },
+                      }],
+                  },
         {
           model: Payment,
           as: 'payment',
-          attributes: ['id', 'paymentAmount', 'status', 'gateway', 'completedAt', 'transactionId']
-        }
+                  }
       ]
     });
 
@@ -596,8 +584,7 @@ async function getAllRefunds(req, res) {
         {
           model: Payment,
           as: 'payment',
-          attributes: ['id', 'paymentAmount', 'status', 'gateway', 'transactionId', 'userEmail']
-        },
+                  },
         {
           model: UserSubscription,
           as: 'subscription',
@@ -607,17 +594,13 @@ async function getAllRefunds(req, res) {
             include: [{
               model: Gym,
               as: 'gym',
-              attributes: ['id', 'name', 'city']
-            }],
-            attributes: ['id', 'title', 'validityDays']
-          }],
-          attributes: ['id']
-        },
+                          }],
+                      }],
+                  },
         {
           model: User,
           as: 'user',
-          attributes: ['firstName', 'lastName', 'email', 'phoneNumber']
-        }
+                  }
       ],
       limit: parseInt(limit),
       offset,
@@ -670,12 +653,9 @@ async function getRefundById(req, res) {
             include: [{
               model: Gym,
               as: 'gym',
-              attributes: ['id', 'name', 'address', 'city']
-            }],
-            attributes: ['id', 'title', 'price', 'validityDays']
-          }],
-          attributes: ['id', 'paymentAmount', 'status', 'gateway', 'transactionId', 'completedAt']
-        },
+                          }],
+                      }],
+                  },
         {
           model: UserSubscription,
           as: 'subscription',
@@ -685,16 +665,13 @@ async function getRefundById(req, res) {
             include: [{
               model: Gym,
               as: 'gym',
-              attributes: ['id', 'name', 'address', 'city']
-            }],
-            attributes: ['id', 'title', 'validityDays']
-          }]
+                          }],
+                      }]
         },
         {
           model: User,
           as: 'user',
-          attributes: ['firstName', 'lastName', 'email', 'phoneNumber']
-        }
+                  }
       ]
     });
 
@@ -844,12 +821,9 @@ async function updateRefundStatus(req, res) {
                 include: [{
                   model: Gym,
                   as: 'gym',
-                  attributes: ['name']
-                }],
-                attributes: ['title']
-              }],
-              attributes: ['userEmail', 'gateway']
-            }
+                                  }],
+                              }],
+                          }
           ]
         });
         
@@ -1079,10 +1053,8 @@ async function initiateRefundWithGateway(req, res) {
             include: [{
               model: Gym,
               as: 'gym',
-              attributes: ['name']
-            }],
-            attributes: ['title']
-          }
+                          }],
+                      }
         ]
       });
       

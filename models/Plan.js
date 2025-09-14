@@ -148,8 +148,7 @@ Plan.prototype.getTrainerDetails = async function() {
     include: [{
       model: require('./UserProfile'),
       as: 'profile',
-      attributes: ['bio']
-    }]
+          }]
   });
 };
 
@@ -160,8 +159,7 @@ Plan.prototype.getUserDetails = async function() {
     include: [{
       model: require('./UserProfile'),
       as: 'profile',
-      attributes: ['dob', 'gender', 'height_cm', 'weight_kg']
-    }]
+          }]
   });
 };
 

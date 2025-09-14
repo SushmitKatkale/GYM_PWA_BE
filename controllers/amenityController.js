@@ -50,8 +50,7 @@ const getAmenitiesByGym = async (req, res) => {
         {
           model: Gym,
           as: 'gym',
-          attributes: ['id', 'name']
-        }
+                  }
       ],
       order: [['createdAt', 'DESC']]
     });
@@ -117,8 +116,7 @@ const getAmenityById = async (req, res) => {
         {
           model: Gym,
           as: 'gym',
-          attributes: ['id', 'name']
-        }
+                  }
       ]
     });
 
@@ -160,8 +158,7 @@ const updateAmenity = async (req, res) => {
         {
           model: Gym,
           as: 'gym',
-          attributes: ['id', 'name']
-        }
+                  }
       ]
     });
 

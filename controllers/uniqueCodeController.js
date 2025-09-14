@@ -123,12 +123,10 @@ const generateUniqueCode = async (req, res) => {
         include: [{
           model: Gym,
           as: 'gym',
-          attributes: ['id', 'name', 'address']
-        }, {
+                  }, {
           model: User,
           as: 'creator',
-          attributes: ['firstName', 'lastName', 'email']
-        }]
+                  }]
       })
     }, 'Unique code generated successfully', 201);
 
@@ -173,8 +171,7 @@ const getGymUniqueCodes = async (req, res) => {
       include: [{
         model: User,
         as: 'creator',
-        attributes: ['firstName', 'lastName', 'email']
-      }, {
+              }, {
         model: User,
         as: 'updater',
         attributes: ['firstName', 'lastName', 'email'],
@@ -206,12 +203,10 @@ const getUniqueCodeDetails = async (req, res) => {
       include: [{
         model: Gym,
         as: 'gym',
-        attributes: ['id', 'name', 'address', 'latitude', 'longitude']
-      }, {
+              }, {
         model: User,
         as: 'creator',
-        attributes: ['firstName', 'lastName', 'email']
-      }]
+              }]
     });
 
     if (!gymUniqueCode) {
@@ -297,16 +292,13 @@ const updateUniqueCode = async (req, res) => {
         include: [{
           model: Gym,
           as: 'gym',
-          attributes: ['id', 'name', 'address']
-        }, {
+                  }, {
           model: User,
           as: 'creator',
-          attributes: ['firstName', 'lastName', 'email']
-        }, {
+                  }, {
           model: User,
           as: 'updater',
-          attributes: ['firstName', 'lastName', 'email']
-        }]
+                  }]
       })
     }, 'Unique code updated successfully');
 

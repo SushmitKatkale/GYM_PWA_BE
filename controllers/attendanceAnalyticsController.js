@@ -41,8 +41,7 @@ const getUserAttendanceHistory = async (req, res) => {
         if (userRole === 2) { // Updated role value
           const ownerGyms = await Gym.findAll({
             where: { owner_id: req.user.id }, // Updated to use owner_id field and user ID
-            attributes: ['id']
-          });
+                      });
           const gymIds = ownerGyms.map(gym => gym.id);
 
           const hasAttendance = await Attendance.findOne({
@@ -87,8 +86,7 @@ const getUserAttendanceHistory = async (req, res) => {
     if (userRole === 2 && targetUserEmail !== userEmail) { // Updated role value
       const ownerGyms = await Gym.findAll({
         where: { owner_id: req.user.id }, // Updated to use owner_id field and user ID
-        attributes: ['id']
-      });
+              });
       whereClause.gymId = { [Op.in]: ownerGyms.map(gym => gym.id) };
     }
 
@@ -97,12 +95,10 @@ const getUserAttendanceHistory = async (req, res) => {
       include: [{
         model: Gym,
         as: 'gym',
-        attributes: ['id', 'name', 'address', 'latitude', 'longitude']
-      }, {
+              }, {
         model: User,
         as: 'user',
-        attributes: ['firstName', 'lastName', 'email']
-      }],
+              }],
       order: [['checkInTime', 'DESC']],
       offset,
       limit: parseInt(limit)
@@ -199,8 +195,7 @@ const getGymAttendanceAnalytics = async (req, res) => {
       include: [{
         model: User,
         as: 'user',
-        attributes: ['firstName', 'lastName', 'email']
-      }],
+              }],
       order: [['checkInTime', 'ASC']]
     });
 
@@ -316,8 +311,7 @@ const getGymOccupancy = async (req, res) => {
 
     // Verify gym exists
     const gym = await Gym.findByPk(gymId, {
-      attributes: ['id', 'name', 'capacity', 'currentOccupancy']
-    });
+          });
 
     if (!gym) {
       return ResponseUtil.notFoundError(res, 'Gym not found');
@@ -333,8 +327,7 @@ const getGymOccupancy = async (req, res) => {
       include: [{
         model: User,
         as: 'user',
-        attributes: ['firstName', 'lastName']
-      }],
+              }],
       order: [['checkInTime', 'DESC']]
     });
 
@@ -434,8 +427,7 @@ const getMultiGymAttendanceSummary = async (req, res) => {
       include: [{
         model: User,
         as: 'owner',
-        attributes: ['firstName', 'lastName', 'email']
-      }]
+              }]
     });
 
     const gymSummaries = await Promise.all(
@@ -546,8 +538,7 @@ const exportAttendanceData = async (req, res) => {
       include: [{
         model: User,
         as: 'user',
-        attributes: ['firstName', 'lastName', 'email']
-      }],
+              }],
       order: [['checkInTime', 'DESC']]
     });
 

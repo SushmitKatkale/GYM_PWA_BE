@@ -347,8 +347,7 @@ const createExercise = async (req, res) => {
         {
           model: User,
           as: 'creator',
-          attributes: ['id', 'firstName', 'lastName', 'email']
-        },
+                  },
         {
           model: Gym,
           as: 'gym',
@@ -423,13 +422,11 @@ const updateExercise = async (req, res) => {
         {
           model: User,
           as: 'creator',
-          attributes: ['id', 'firstName', 'lastName', 'email']
-        },
+                  },
         {
           model: User,
           as: 'updater',
-          attributes: ['id', 'firstName', 'lastName', 'email']
-        },
+                  },
         {
           model: Gym,
           as: 'gym',

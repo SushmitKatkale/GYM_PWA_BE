@@ -70,8 +70,7 @@ GymTrainer.prototype.isActive = function() {
 GymTrainer.prototype.getGymDetails = async function() {
   const Gym = require('./Gym');
   return await Gym.findByPk(this.gym_id, {
-    attributes: ['id', 'name', 'address', 'owner_id']
-  });
+      });
 };
 
 GymTrainer.prototype.getTrainerDetails = async function() {
@@ -81,8 +80,7 @@ GymTrainer.prototype.getTrainerDetails = async function() {
     include: [{
       model: require('./UserProfile'),
       as: 'profile',
-      attributes: ['dob', 'gender', 'bio']
-    }]
+          }]
   });
 };
 

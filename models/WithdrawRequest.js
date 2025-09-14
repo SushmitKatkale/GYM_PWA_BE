@@ -211,12 +211,10 @@ WithdrawRequest.getPendingRequests = async function(options = {}) {
     include: [
       {
         association: 'owner',
-        attributes: ['id', 'username', 'email', 'role']
-      },
+              },
       {
         association: 'wallet',
-        attributes: ['id', 'balance', 'ownerType']
-      }
+              }
     ],
     order: [['requestedAt', 'ASC']],
     limit: options.limit || 50,
@@ -241,8 +239,7 @@ WithdrawRequest.getRequestHistory = async function(ownerId, options = {}) {
     where,
     include: [{
       association: 'wallet',
-      attributes: ['id', 'balance', 'ownerType']
-    }],
+          }],
     order: [['requestedAt', 'DESC']],
     limit: options.limit || 20,
     offset: options.offset || 0

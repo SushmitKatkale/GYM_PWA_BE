@@ -33,8 +33,7 @@ const getGymCheckInMethods = async (req, res) => {
       include: [{
         model: Gym,
         as: 'gym',
-        attributes: ['id', 'name', 'address']
-      }]
+              }]
     });
 
     // If no configuration exists, create default one
@@ -64,8 +63,7 @@ const getGymCheckInMethods = async (req, res) => {
         include: [{
           model: Gym,
           as: 'gym',
-          attributes: ['id', 'name', 'address']
-        }]
+                  }]
       });
     }
 
@@ -200,8 +198,7 @@ const updateGymCheckInMethods = async (req, res) => {
       include: [{
         model: Gym,
         as: 'gym',
-        attributes: ['id', 'name', 'address']
-      }]
+              }]
     });
 
     return ResponseUtil.success(res, updatedCheckInMethods, 'Check-in methods configuration updated successfully');
@@ -223,8 +220,7 @@ const getAvailableCheckInMethods = async (req, res) => {
 
     // Verify gym exists
     const gym = await Gym.findByPk(gymId, {
-      attributes: ['id', 'name', 'address', 'latitude', 'longitude']
-    });
+          });
 
     if (!gym) {
       return ResponseUtil.notFoundError(res, 'Gym not found');
@@ -233,19 +229,7 @@ const getAvailableCheckInMethods = async (req, res) => {
     // Get check-in methods configuration
     const checkInMethods = await GymCheckInMethods.findOne({
       where: { gymId },
-      attributes: [
-        'quickCheckInEnabled',
-        'qrCodeEnabled', 
-        'uniqueCodeEnabled',
-        'ownerScanEnabled',
-        'biometricEnabled',
-        'checkInRadius',
-        'qrCodeLocationRequired',
-        'uniqueCodeLocationRequired',
-        'allowSimultaneousCheckIns',
-        'locationAccuracyRequired'
-      ]
-    });
+          });
 
     // Return default configuration if none exists
     const availableMethods = checkInMethods || {
@@ -343,8 +327,7 @@ const resetGymCheckInMethods = async (req, res) => {
       include: [{
         model: Gym,
         as: 'gym',
-        attributes: ['id', 'name', 'address']
-      }]
+              }]
     });
 
     return ResponseUtil.success(res, resetCheckInMethods, 'Check-in methods configuration reset to defaults successfully');

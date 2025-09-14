@@ -72,8 +72,7 @@ class ReviewService {
           {
             model: Gym,
             as: 'gym',
-            attributes: ['id', 'name', 'address']
-          }
+                      }
         ],
         order: [['createTimestamp', 'DESC']],
         limit: parseInt(limit),
@@ -162,8 +161,7 @@ class ReviewService {
           gymId, 
           activeStatus: true 
         },
-        attributes: ['rating']
-      });
+              });
       
       if (reviews.length === 0) {
         return {

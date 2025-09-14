@@ -275,8 +275,7 @@ GymUniqueCodes.validateUniqueCode = async function(code) {
     include: [
       {
         association: 'gym',
-        attributes: ['id', 'name', 'address', 'latitude', 'longitude']
-      }
+              }
     ]
   });
 

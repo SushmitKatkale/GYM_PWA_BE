@@ -273,8 +273,7 @@ async function getUserPayments(req, res) {
             {
               model: Gym,
               as: 'gym',
-              attributes: ['id', 'name']
-            }
+                          }
           ]
         }
       ],

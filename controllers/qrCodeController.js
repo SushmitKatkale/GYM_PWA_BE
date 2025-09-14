@@ -71,12 +71,10 @@ const generateQRCode = async (req, res) => {
         include: [{
           model: Gym,
           as: 'gym',
-          attributes: ['id', 'name', 'address']
-        }, {
+                  }, {
           model: User,
           as: 'creator',
-          attributes: ['firstName', 'lastName', 'email']
-        }]
+                  }]
       })
     }, 'QR code generated successfully', 201);
 
@@ -121,8 +119,7 @@ const getGymQRCodes = async (req, res) => {
       include: [{
         model: User,
         as: 'creator',
-        attributes: ['firstName', 'lastName', 'email']
-      }, {
+              }, {
         model: User,
         as: 'updater',
         attributes: ['firstName', 'lastName', 'email'],
@@ -154,12 +151,10 @@ const getQRCodeDetails = async (req, res) => {
       include: [{
         model: Gym,
         as: 'gym',
-        attributes: ['id', 'name', 'address', 'latitude', 'longitude']
-      }, {
+              }, {
         model: User,
         as: 'creator',
-        attributes: ['firstName', 'lastName', 'email']
-      }]
+              }]
     });
 
     if (!gymQRCode) {
@@ -246,16 +241,13 @@ const updateQRCode = async (req, res) => {
         include: [{
           model: Gym,
           as: 'gym',
-          attributes: ['id', 'name', 'address']
-        }, {
+                  }, {
           model: User,
           as: 'creator',
-          attributes: ['firstName', 'lastName', 'email']
-        }, {
+                  }, {
           model: User,
           as: 'updater',
-          attributes: ['firstName', 'lastName', 'email']
-        }]
+                  }]
       })
     }, 'QR code updated successfully');
 

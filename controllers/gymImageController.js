@@ -76,8 +76,7 @@ const getImagesByGym = async (req, res) => {
 
     // Get gym details for response
     const gym = await Gym.findByPk(gymId, {
-      attributes: ['id', 'name']
-    });
+          });
 
     // Add full URL to each image and gym details
     const imagesWithUrl = images.map(image => ({
@@ -122,8 +121,7 @@ const getAllGymImages = async (req, res) => {
     const gymIds = [...new Set(rows.map(image => image.entity_id))];
     const gyms = await Gym.findAll({
       where: { id: gymIds },
-      attributes: ['id', 'name']
-    });
+          });
     const gymMap = Object.fromEntries(gyms.map(gym => [gym.id, gym]));
 
     // Add full URL to each image and gym details
@@ -161,8 +159,7 @@ const getGymImageById = async (req, res) => {
 
     // Get gym details
     const gym = await Gym.findByPk(image.entity_id, {
-      attributes: ['id', 'name']
-    });
+          });
 
     const imageWithUrl = {
       ...image.toJSON(),
@@ -196,8 +193,7 @@ const updateGymImage = async (req, res) => {
 
     // Get gym details
     const gym = await Gym.findByPk(image.entity_id, {
-      attributes: ['id', 'name']
-    });
+          });
 
     const imageWithUrl = {
       ...image.toJSON(),

@@ -108,8 +108,7 @@ RefreshToken.findValidToken = async function(token) {
     include: [{
       model: sequelize.models.User,
       as: 'user',
-      attributes: ['id', 'email', 'role', 'recordStatus']
-    }]
+          }]
   });
 
   if (!refreshToken || refreshToken.isExpired()) {

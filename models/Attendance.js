@@ -210,8 +210,7 @@ Attendance.getUserAttendanceHistory = async function(userId, options = {}) {
     include: [
       {
         association: 'gym',
-        attributes: ['id', 'name', 'address']
-      }
+              }
     ]
   });
 };

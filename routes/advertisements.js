@@ -663,16 +663,7 @@ router.get('/:id/media', authenticate, authorize('3'), async (req, res) => {
         record_status: 1
       },
       order: [['created_at', 'DESC']],
-      attributes: [
-        'id',
-        'entity_id',
-        'media_type',
-        'url',
-        'alt_text',
-        'mime_type',
-        'created_at'
-      ]
-    });
+          });
 
     // Transform response to match expected format
     const transformedMedia = media.map(item => ({

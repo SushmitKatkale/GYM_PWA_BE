@@ -58,8 +58,7 @@ const checkAmenityOwnership = async (req, res, next) => {
         include: [{
           model: Gym,
           as: 'gym',
-          attributes: ['ownerId']
-        }]
+                  }]
       });
 
       if (!amenity) {
@@ -113,8 +112,7 @@ const checkImageOwnership = async (req, res, next) => {
           include: [{
             model: Gym,
             as: 'gym',
-            attributes: ['ownerId']
-          }]
+                      }]
         });
 
         if (!image) {
@@ -156,8 +154,7 @@ const checkSubscriptionOwnership = async (req, res, next) => {
         include: [{
           model: Gym,
           as: 'gym',
-          attributes: ['ownerId']
-        }]
+                  }]
       });
 
       if (!subscription) {
@@ -201,8 +198,7 @@ const checkSubscriptionFeatureOwnership = async (req, res, next) => {
           include: [{
             model: Gym,
             as: 'gym',
-            attributes: ['ownerId']
-          }]
+                      }]
         }]
       });
 
@@ -285,8 +281,7 @@ const checkSlotOwnership = async (req, res, next) => {
         include: [{
           model: Gym,
           as: 'gym',
-          attributes: ['ownerId']
-        }]
+                  }]
       });
 
       if (!slot) {

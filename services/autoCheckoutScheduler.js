@@ -58,13 +58,11 @@ class AutoCheckoutScheduler {
           {
             model: Gym,
             as: 'gym',
-            attributes: ['id', 'name']
-          },
+                      },
           {
             model: User,
             as: 'user',
-            attributes: ['id', 'firstName', 'lastName', 'email']
-          }
+                      }
         ]
       });
 
@@ -137,13 +135,11 @@ class AutoCheckoutScheduler {
           {
             model: User,
             as: 'user',
-            attributes: ['firstName', 'lastName', 'email']
-          },
+                      },
           {
             model: Gym,
             as: 'gym',
-            attributes: ['name']
-          }
+                      }
         ]
       });
 

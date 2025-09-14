@@ -125,8 +125,7 @@ const getGymSlots = async (req, res) => {
         {
           model: Gym,
           as: 'gym',
-          attributes: ['id', 'name', 'address']
-        }
+                  }
       ],
       limit,
       offset,

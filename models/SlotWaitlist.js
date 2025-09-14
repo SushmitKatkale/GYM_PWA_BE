@@ -150,8 +150,7 @@ SlotWaitlist.prototype.getSlotDetails = async function() {
 SlotWaitlist.prototype.getUserDetails = async function() {
   const User = require('./User');
   return await User.findByPk(this.userId, {
-    attributes: ['id', 'email', 'username', 'phone']
-  });
+      });
 };
 
 // Static methods

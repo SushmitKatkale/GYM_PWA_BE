@@ -17,8 +17,7 @@ async function checkAndAddDefaultCheckInMethods() {
 
     // Check which gyms already have check-in methods
     const existingMethods = await GymCheckInMethods.findAll({
-      attributes: ['gymId']
-    });
+          });
 
     const gymsWithMethods = new Set(existingMethods.map(method => method.gymId));
     console.log(`✅ ${gymsWithMethods.size} gyms already have check-in methods configured`);

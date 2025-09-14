@@ -50,8 +50,7 @@ class AdvertisementController {
           {
             model: User,
             as: 'creator',
-            attributes: ['id', 'firstName', 'lastName', 'username']
-          }
+                      }
         ]
       });
 
@@ -243,13 +242,11 @@ class AdvertisementController {
           {
             model: User,
             as: 'creator',
-            attributes: ['id', 'firstName', 'lastName', 'username']
-          },
+                      },
           {
             model: User,
             as: 'updater',
-            attributes: ['id', 'firstName', 'lastName', 'username']
-          }
+                      }
         ]
       });
 
@@ -339,13 +336,11 @@ class AdvertisementController {
           {
             model: User,
             as: 'creator',
-            attributes: ['id', 'firstName', 'lastName', 'username']
-          },
+                      },
           {
             model: User,
             as: 'updater',
-            attributes: ['id', 'firstName', 'lastName', 'username']
-          }
+                      }
         ]
       });
 
@@ -593,8 +588,7 @@ class AdvertisementController {
             [sequelize.literal('(clicks + impressions)'), 'DESC'],
             ['clicks', 'DESC']
           ],
-          attributes: ['id', 'title', 'clicks', 'impressions']
-        })
+                  })
       ]);
 
       const averageCTR = totalImpressions > 0 ? totalClicks / totalImpressions : 0;

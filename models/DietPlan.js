@@ -142,8 +142,7 @@ DietPlan.prototype.getTrainerDetails = async function() {
     include: [{
       model: require('./UserProfile'),
       as: 'profile',
-      attributes: ['dob', 'gender', 'bio']
-    }]
+          }]
   });
 };
 
@@ -154,8 +153,7 @@ DietPlan.prototype.getUserDetails = async function() {
     include: [{
       model: require('./UserProfile'),
       as: 'profile',
-      attributes: ['dob', 'gender', 'height_cm', 'weight_kg']
-    }]
+          }]
   });
 };
 
@@ -329,8 +327,7 @@ DietPlan.getUserPlanHistory = async function(userId, options = {}) {
       {
         model: require('./User'),
         as: 'trainer',
-        attributes: ['id', 'username', 'email']
-      }
+              }
     ]
   });
 };

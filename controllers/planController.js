@@ -171,8 +171,7 @@ class PlanController {
           {
             model: User,
             as: 'trainer',
-            attributes: ['id', 'firstName', 'lastName', 'email']
-          },
+                      },
           {
             model: User,
             as: 'user',
@@ -246,13 +245,11 @@ class PlanController {
           {
             model: User,
             as: 'trainer',
-            attributes: ['id', 'firstName', 'lastName', 'email']
-          },
+                      },
           {
             model: User,
             as: 'user',
-            attributes: ['id', 'firstName', 'lastName', 'email']
-          }
+                      }
         ]
       });
 
@@ -307,13 +304,11 @@ class PlanController {
           {
             model: User,
             as: 'trainer',
-            attributes: ['id', 'firstName', 'lastName', 'email']
-          },
+                      },
           {
             model: User,
             as: 'user',
-            attributes: ['id', 'firstName', 'lastName', 'email']
-          }
+                      }
         ]
       });
 

@@ -70,8 +70,7 @@ const getAllSubscriptionFeatures = async (req, res) => {
             {
               model: Gym,
               as: 'gym',
-              attributes: ['id', 'name']
-            }
+                          }
           ]
         }
       ],
@@ -117,8 +116,7 @@ const getFeaturesBySubscription = async (req, res) => {
             {
               model: Gym,
               as: 'gym',
-              attributes: ['id', 'name']
-            }
+                          }
           ]
         }
       ],
@@ -147,8 +145,7 @@ const getSubscriptionFeatureById = async (req, res) => {
             {
               model: Gym,
               as: 'gym',
-              attributes: ['id', 'name']
-            }
+                          }
           ]
         }
       ]
@@ -197,8 +194,7 @@ const updateSubscriptionFeature = async (req, res) => {
             {
               model: Gym,
               as: 'gym',
-              attributes: ['id', 'name']
-            }
+                          }
           ]
         }
       ]

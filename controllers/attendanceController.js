@@ -171,12 +171,10 @@ const checkIn = async (req, res) => {
 
     // Get gym and user information for response
     const gym = await Gym.findByPk(targetGymId, {
-      attributes: ['id', 'name', 'address', 'latitude', 'longitude']
-    });
+          });
 
     const user = await User.findByPk(userId, {
-      attributes: ['id', 'firstName', 'lastName', 'email']
-    });
+          });
 
     const checkInMethodInfo = await CheckInMethod.findByPk(methodId);
 
@@ -741,8 +739,7 @@ const checkOut = async (req, res) => {
         }, {
           model: User,
           as: 'user',
-          attributes: ['firstName', 'lastName', 'email']
-        }]
+                  }]
       }),
       duration: `${Math.floor(duration / 60)}h ${duration % 60}m`,
       message: `Successfully checked out from ${attendance.gym.name}`
@@ -779,8 +776,7 @@ const getCheckInStatus = async (req, res) => {
       include: [{
         model: Gym,
         as: 'gym',
-        attributes: ['id', 'name', 'address', 'latitude', 'longitude']
-      }],
+              }],
       order: [['checkInTime', 'DESC']]
     });
 
