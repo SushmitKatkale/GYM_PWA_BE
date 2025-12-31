@@ -169,8 +169,8 @@ class DashboardService {
           type: sequelize.QueryTypes.SELECT
         }),
         
-        // Revenue trends (mock for now - would need payments table)
-        this.getMockRevenueTrends(startDate, endDate),
+        // Revenue trends from actual payments data
+        this.getRealRevenueTrends(startDate, endDate),
         
         // User role breakdown - updated to use role field
         User.findAll({
@@ -211,39 +211,40 @@ class DashboardService {
     }
   }
 
-  // Owner Dashboard Analytics
-  static async getOwnerDashboardData(ownerEmail) {
+  // Owner Dashboard Analytics - Single Gym Model
+  static async getOwnerDashboardData(ownerId) {
     try {
       const currentDate = new Date();
       const firstDayOfMonth = new Date(currentDate.getFullYear(), currentDate.getMonth(), 1);
       const yesterday = new Date();
       yesterday.setDate(yesterday.getDate() - 1);
 
-      // Get owner's gyms (owner_id field stores user ID, fallback to ownerId with email)
-      const ownerGyms = await Gym.findAll({
+      // Get owner's single gym (owner_id field stores user ID)
+      const ownerGym = await Gym.findOne({
         where: { 
-          [Op.or]: [
-            { owner_id: ownerEmail }, // If ownerEmail is actually user ID
-            { ownerId: ownerEmail }    // Fallback for old schema
-          ],
-          record_status: 1 // Updated field name
+          ownerId: ownerId, // This maps to owner_id field
+          recordStatus: 1   // Updated field name
         }
       });
 
-      const gymIds = ownerGyms.map(gym => gym.id);
-
-      if (gymIds.length === 0) {
+      // If no gym found, return empty data structure
+      if (!ownerGym) {
         return {
           success: true,
           data: {
-            overview: {
-              totalGyms: 0,
-              totalActiveMembers: 0,
-              totalMonthlyRevenue: 0,
-              averageOccupancyRate: 0
-            },
-            gyms: [],
-            recentActivities: []
+            totalActiveMembers: 0,
+            totalMonthlyRevenue: 0,
+            averageOccupancyRate: 0,
+            todayCheckIns: 0,
+            revenueGrowthRate: 0,
+            gym: null,
+            recentActivity: [],
+            last7DaysData: {
+              members: [0, 0, 0, 0, 0, 0, 0],
+              revenue: [0, 0, 0, 0, 0, 0, 0],
+              checkIns: [0, 0, 0, 0, 0, 0, 0],
+              occupancy: [0, 0, 0, 0, 0, 0, 0]
+            }
           }
         };
       }
@@ -252,56 +253,70 @@ class DashboardService {
         activeMembers,
         monthlyRevenue,
         todayCheckIns,
-        recentActivity
+        recentActivity,
+        last7DaysData
       ] = await Promise.all([
-        // Active members across owner's gyms (join through subscription->gym relationship)
-        UserSubscription && gymIds.length > 0 ? sequelize.query(`
-          SELECT COUNT(DISTINCT COALESCE(us.user_id, us.user_email)) as count
+        // Active members for this gym (join through subscription->gym relationship)
+        UserSubscription ? sequelize.query(`
+          SELECT COUNT(DISTINCT us.user_id) as count
           FROM user_subscriptions us
           JOIN subscriptions s ON us.subscription_id = s.id
-          WHERE s.gym_id IN (:gymIds)
+          WHERE s.gym_id = :gymId
             AND us.record_status = 1
-            AND us.valid_to >= NOW()
+            AND (
+              us.end_date >= CURDATE() 
+              OR (
+                us.buffer_applied = 1 
+                AND us.buffer_end_date >= CURDATE()
+              )
+            )
         `, {
-          replacements: { gymIds },
+          replacements: { gymId: ownerGym.id },
           type: sequelize.QueryTypes.SELECT
         }).then(result => parseInt(result[0]?.count) || 0) : 0,
         
-        // Monthly revenue (mock calculation)
-        this.calculateOwnerMonthlyRevenue(gymIds, firstDayOfMonth),
+        // Monthly revenue (mock calculation for single gym)
+        this.calculateOwnerMonthlyRevenue([ownerGym.id], firstDayOfMonth),
         
-        // Today's check-ins (mock for now)
-        Math.floor(Math.random() * 100) + 50,
+        // Today's check-ins (real data from attendance)
+        this.getTodayCheckIns(ownerGym.id),
         
-        // Recent activity
-        this.getRecentOwnerActivity(gymIds)
+        // Recent activity for this gym
+        this.getRecentOwnerActivity([ownerGym.id]),
+        
+        // Last 7 days historical data for charts
+        this.getLast7DaysData(ownerGym.id)
       ]);
 
-      // Calculate average occupancy
-      const totalCapacity = ownerGyms.reduce((sum, gym) => sum + gym.capacity, 0);
-      const totalOccupancy = ownerGyms.reduce((sum, gym) => sum + (gym.currentOccupancy || 0), 0);
-      const averageOccupancy = totalCapacity > 0 ? Math.round((totalOccupancy / totalCapacity) * 100) : 0;
+      // Calculate real occupancy rate based on today's attendance
+      const occupancyRate = await this.calculateCurrentOccupancyRate(ownerGym.id, ownerGym.capacity);
+      
+      // Calculate real revenue growth rate
+      const revenueGrowthRate = await this.calculateRevenueGrowthRate(ownerGym.id, firstDayOfMonth);
 
       return {
         success: true,
         data: {
-          overview: {
-            totalGyms: ownerGyms.length,
+          // Single gym owner dashboard data structure
+          totalActiveMembers: activeMembers,
+          totalMonthlyRevenue: monthlyRevenue,
+          averageOccupancyRate: occupancyRate,
+          todayCheckIns,
+          revenueGrowthRate,
+          gym: {
+            id: ownerGym.id,
+            name: ownerGym.name,
+            address: ownerGym.address,
+            capacity: ownerGym.capacity,
             activeMembers,
+            occupancyRate,
             monthlyRevenue,
-            todayCheckIns,
-            averageOccupancy
+            status: ownerGym.record_status === 1 ? 'active' : 'inactive',
+            city: ownerGym.city || 'Unknown',
+            state: ownerGym.state || 'Unknown'
           },
-          gyms: ownerGyms.map(gym => ({
-            id: gym.id,
-            name: gym.name,
-            capacity: gym.capacity,
-            currentOccupancy: gym.currentOccupancy || 0,
-            occupancyRate: gym.capacity > 0 ? Math.round((gym.currentOccupancy || 0) / gym.capacity * 100) : 0,
-            activeMembers: gym.subscriptions ? gym.subscriptions.length : 0,
-            rating: parseFloat(gym.rating || 0)
-          })),
-          recentActivity
+          recentActivity,
+          last7DaysData // Real historical data for charts
         }
       };
     } catch (error) {
@@ -342,17 +357,17 @@ class DashboardService {
           }
         }) : [],
         
-        // Weekly workouts (mock for now)
-        Math.floor(Math.random() * 7) + 3,
+        // Weekly workouts from attendance data
+        this.getWeeklyWorkouts(userId, weekAgo),
         
-        // Monthly workouts (mock for now)
-        Math.floor(Math.random() * 20) + 10,
+        // Monthly workouts from attendance data
+        this.getMonthlyWorkouts(userId, monthAgo),
         
         // Favorite gym (most visited)
         this.getUserFavoriteGym(userId),
         
-        // Upcoming bookings (mock for now)
-        this.getMockUpcomingBookings(userId),
+        // Upcoming bookings from database
+        this.getUpcomingBookings(userId),
         
         // Recent activity
         this.getRecentUserActivity(userId)
@@ -370,7 +385,7 @@ class DashboardService {
           subscriptions: activeSubscriptions.map(sub => ({
             id: sub.id,
             gymName: sub.gym ? sub.gym.name : 'Unknown Gym',
-            planName: sub.subscription ? sub.subscription.title : 'Unknown Plan',
+            planName: sub.subscription ? sub.subscription.name : 'Unknown Plan',
             status: sub.status,
             startDate: sub.startDate,
             endDate: sub.endDate,
@@ -444,132 +459,648 @@ class DashboardService {
 
   static async getSystemHealth() {
     try {
-      // Mock system health - in real implementation, you'd check actual services
+      // Test database connection
+      const dbStart = Date.now();
+      await sequelize.query('SELECT 1', { type: sequelize.QueryTypes.SELECT });
+      const dbTime = Date.now() - dbStart;
+
+      // Get database connection info
+      const connectionCount = await sequelize.query(
+        'SHOW STATUS WHERE Variable_name = "Threads_connected"',
+        { type: sequelize.QueryTypes.SELECT }
+      ).catch(() => [{ Value: '0' }]);
+
+      // Check recent payment success rate
+      const paymentStats = await sequelize.query(`
+        SELECT 
+          COUNT(*) as total_payments,
+          SUM(CASE WHEN status = 'completed' THEN 1 ELSE 0 END) as successful_payments
+        FROM payments 
+        WHERE created_at >= DATE_SUB(NOW(), INTERVAL 24 HOUR)
+      `, { type: sequelize.QueryTypes.SELECT }).catch(() => [{ total_payments: 0, successful_payments: 0 }]);
+
+      const totalPayments = parseInt(paymentStats[0]?.total_payments || 0);
+      const successfulPayments = parseInt(paymentStats[0]?.successful_payments || 0);
+      const successRate = totalPayments > 0 ? ((successfulPayments / totalPayments) * 100).toFixed(1) : '100.0';
+
       return {
         server: {
           status: 'healthy',
-          uptime: '99.9%',
-          responseTime: '45ms'
+          uptime: process.uptime ? `${Math.floor(process.uptime() / 3600)}h ${Math.floor((process.uptime() % 3600) / 60)}m` : 'Unknown',
+          responseTime: `${dbTime}ms`
         },
         database: {
-          status: 'healthy',
-          connections: '23/100',
-          queryTime: '12ms'
+          status: dbTime < 100 ? 'healthy' : 'slow',
+          connections: `${connectionCount[0]?.Value || 0}/100`,
+          queryTime: `${dbTime}ms`
         },
         paymentGateway: {
-          status: 'healthy',
-          successRate: '98.7%',
-          avgProcessTime: '1.2s'
+          status: parseFloat(successRate) > 95 ? 'healthy' : 'warning',
+          successRate: `${successRate}%`,
+          avgProcessTime: '~1.2s'
         }
       };
     } catch (error) {
+      console.error('Error checking system health:', error);
       return {
-        server: { status: 'error' },
-        database: { status: 'error' },
-        paymentGateway: { status: 'error' }
+        server: { status: 'error', uptime: 'Unknown', responseTime: 'Error' },
+        database: { status: 'error', connections: 'Error', queryTime: 'Error' },
+        paymentGateway: { status: 'error', successRate: 'Error', avgProcessTime: 'Error' }
       };
     }
   }
 
-  static getMockRevenueTrends(startDate, endDate) {
-    const trends = [];
-    const current = new Date(startDate);
-    
-    while (current <= endDate) {
-      trends.push({
-        date: current.toISOString().split('T')[0],
-        revenue: Math.floor(Math.random() * 5000) + 2000
+  static async getRealRevenueTrends(startDate, endDate) {
+    try {
+      const revenueTrends = await sequelize.query(`
+        SELECT DATE(p.created_at) as date,
+               COALESCE(SUM(p.amount), 0) as revenue
+        FROM payments p
+        WHERE p.status = 'completed'
+          AND p.record_status = 1
+          AND DATE(p.created_at) >= ?
+          AND DATE(p.created_at) <= ?
+        GROUP BY DATE(p.created_at)
+        ORDER BY date ASC
+      `, {
+        replacements: [startDate, endDate],
+        type: sequelize.QueryTypes.SELECT
       });
-      current.setDate(current.getDate() + 1);
+
+      return revenueTrends.map(item => ({
+        date: item.date,
+        revenue: parseFloat(item.revenue)
+      }));
+    } catch (error) {
+      console.error('Error getting revenue trends:', error);
+      return [];
     }
-    
-    return trends;
+  }
+
+  static async getTodayCheckIns(gymId) {
+    try {
+      const { Attendance } = require('../models');
+      if (!Attendance) {
+        return 0;
+      }
+
+      const todayCount = await sequelize.query(`
+        SELECT COUNT(*) as count
+        FROM attendances
+        WHERE gym_id = :gymId
+          AND DATE(check_in_time) = CURDATE()
+          AND record_status = 1
+      `, {
+        replacements: { gymId },
+        type: sequelize.QueryTypes.SELECT
+      });
+
+      return parseInt(todayCount[0]?.count || 0);
+    } catch (error) {
+      console.error('Error getting today check-ins:', error);
+      return 0;
+    }
+  }
+
+  static async getLast7DaysData(gymId) {
+    try {
+      const { Attendance, Payment } = require('../models');
+      
+      // Generate last 7 days dates
+      const last7Days = [];
+      for (let i = 6; i >= 0; i--) {
+        const date = new Date();
+        date.setDate(date.getDate() - i);
+        last7Days.push(date.toISOString().split('T')[0]); // YYYY-MM-DD format
+      }
+      
+      const [
+        checkInsData,
+        revenueData,
+        membersData,
+        occupancyData
+      ] = await Promise.all([
+        // Daily check-ins for last 7 days
+        this.getDailyCheckIns(gymId, last7Days),
+        
+        // Daily revenue for last 7 days
+        this.getDailyRevenue(gymId, last7Days),
+        
+        // Daily active members for last 7 days
+        this.getDailyActiveMembers(gymId, last7Days),
+        
+        // Daily occupancy rate for last 7 days
+        this.getDailyOccupancy(gymId, last7Days)
+      ]);
+      
+      return {
+        members: membersData,
+        revenue: revenueData,
+        checkIns: checkInsData,
+        occupancy: occupancyData,
+        dates: last7Days // For reference
+      };
+      
+    } catch (error) {
+      console.error('Error getting last 7 days data:', error);
+      // Return empty data on error
+      return {
+        members: Array(7).fill(0),
+        revenue: Array(7).fill(0),
+        checkIns: Array(7).fill(0),
+        occupancy: Array(7).fill(0),
+        dates: []
+      };
+    }
+  }
+
+  static async getDailyCheckIns(gymId, dates) {
+    try {
+      const { Attendance } = require('../models');
+      if (!Attendance) {
+        return dates.map(() => 0);
+      }
+
+      const checkInsQuery = await sequelize.query(`
+        SELECT 
+          DATE(check_in_time) as date,
+          COUNT(*) as count
+        FROM attendances
+        WHERE gym_id = :gymId
+          AND DATE(check_in_time) IN (${dates.map(() => '?').join(',')})
+          AND record_status = 1
+        GROUP BY DATE(check_in_time)
+        ORDER BY date ASC
+      `, {
+        replacements: [gymId, ...dates],
+        type: sequelize.QueryTypes.SELECT
+      });
+
+      // Fill missing dates with 0
+      return dates.map(date => {
+        const dayData = checkInsQuery.find(row => row.date === date);
+        return parseInt(dayData?.count || 0);
+      });
+    } catch (error) {
+      console.error('Error getting daily check-ins:', error);
+      return dates.map(() => 0);
+    }
+  }
+
+  static async getDailyRevenue(gymId, dates) {
+    try {
+      const { Payment } = require('../models');
+      if (!Payment) {
+        return dates.map(() => 0);
+      }
+
+      const revenueQuery = await sequelize.query(`
+        SELECT 
+          DATE(p.created_at) as date,
+          COALESCE(SUM(p.amount), 0) as revenue
+        FROM payments p
+        JOIN user_subscriptions us ON p.id = us.payment_id
+        JOIN subscriptions s ON us.subscription_id = s.id
+        WHERE s.gym_id = :gymId
+          AND DATE(p.created_at) IN (${dates.map(() => '?').join(',')})
+          AND p.status = 'completed'
+          AND p.record_status = 1
+        GROUP BY DATE(p.created_at)
+        ORDER BY date ASC
+      `, {
+        replacements: [gymId, ...dates],
+        type: sequelize.QueryTypes.SELECT
+      });
+
+      // Fill missing dates with 0
+      return dates.map(date => {
+        const dayData = revenueQuery.find(row => row.date === date);
+        return parseFloat(dayData?.revenue || 0);
+      });
+    } catch (error) {
+      console.error('Error getting daily revenue:', error);
+      return dates.map(() => 0);
+    }
+  }
+
+  static async getDailyActiveMembers(gymId, dates) {
+    try {
+      // Query actual active members for each specific date
+      const membersQuery = await sequelize.query(`
+        SELECT 
+          :date as query_date,
+          COUNT(DISTINCT us.user_id) as count
+        FROM user_subscriptions us
+        JOIN subscriptions s ON us.subscription_id = s.id
+        WHERE s.gym_id = :gymId
+          AND us.record_status = 1
+          AND us.start_date <= :date
+          AND (
+            us.end_date >= :date
+            OR (
+              us.buffer_applied = 1 
+              AND us.buffer_end_date >= :date
+            )
+          )
+      `, {
+        replacements: { gymId, date: dates[0] }, // Get template query structure
+        type: sequelize.QueryTypes.SELECT
+      });
+
+      // Get actual count for each date
+      const memberCounts = await Promise.all(
+        dates.map(async (date) => {
+          const result = await sequelize.query(`
+            SELECT COUNT(DISTINCT us.user_id) as count
+            FROM user_subscriptions us
+            JOIN subscriptions s ON us.subscription_id = s.id
+            WHERE s.gym_id = :gymId
+              AND us.record_status = 1
+              AND us.start_date <= :date
+              AND (
+                us.end_date >= :date
+                OR (
+                  us.buffer_applied = 1 
+                  AND us.buffer_end_date >= :date
+                )
+              )
+          `, {
+            replacements: { gymId, date },
+            type: sequelize.QueryTypes.SELECT
+          });
+          
+          return parseInt(result[0]?.count || 0);
+        })
+      );
+      
+      return memberCounts;
+    } catch (error) {
+      console.error('Error getting daily active members:', error);
+      return dates.map(() => 0);
+    }
+  }
+
+  static async getDailyOccupancy(gymId, dates) {
+    try {
+      const { Attendance } = require('../models');
+      if (!Attendance) {
+        return dates.map(() => 0);
+      }
+
+      // Get gym capacity
+      const gym = await Gym.findByPk(gymId);
+      const capacity = gym?.capacity || 100;
+
+      const occupancyQuery = await sequelize.query(`
+        SELECT 
+          DATE(check_in_time) as date,
+          MAX(HOUR(check_in_time)) as peak_hour,
+          COUNT(*) as daily_visits
+        FROM attendances
+        WHERE gym_id = :gymId
+          AND DATE(check_in_time) IN (${dates.map(() => '?').join(',')})
+          AND record_status = 1
+        GROUP BY DATE(check_in_time)
+        ORDER BY date ASC
+      `, {
+        replacements: [gymId, ...dates],
+        type: sequelize.QueryTypes.SELECT
+      });
+
+      // Calculate occupancy rate as percentage of capacity
+      return dates.map(date => {
+        const dayData = occupancyQuery.find(row => row.date === date);
+        if (!dayData) return 0;
+        
+        // Estimate occupancy as percentage (daily visits / capacity * 100, capped at 100)
+        const occupancyRate = Math.min(100, Math.round((dayData.daily_visits / capacity) * 100));
+        return occupancyRate;
+      });
+    } catch (error) {
+      console.error('Error getting daily occupancy:', error);
+      return dates.map(() => 0);
+    }
   }
 
   static async calculateOwnerMonthlyRevenue(gymIds, startDate) {
     try {
-      // Mock calculation - in real implementation, sum actual payments
-      return Math.floor(Math.random() * 10000) + 5000;
+      if (!gymIds || gymIds.length === 0) {
+        return 0;
+      }
+
+      const { Payment } = require('../models');
+      if (!Payment) {
+        return 0;
+      }
+
+      const endDate = new Date();
+      const monthlyRevenue = await sequelize.query(`
+        SELECT COALESCE(SUM(p.amount), 0) as total_revenue
+        FROM payments p
+        JOIN user_subscriptions us ON p.id = us.payment_id
+        JOIN subscriptions s ON us.subscription_id = s.id
+        WHERE s.gym_id IN (${gymIds.map(() => '?').join(',')})
+          AND p.status = 'completed'
+          AND p.record_status = 1
+          AND p.created_at >= ?
+          AND p.created_at <= ?
+      `, {
+        replacements: [...gymIds, startDate, endDate],
+        type: sequelize.QueryTypes.SELECT
+      });
+
+      return parseFloat(monthlyRevenue[0]?.total_revenue || 0);
     } catch (error) {
+      console.error('Error calculating monthly revenue:', error);
       return 0;
     }
   }
 
   static async getRecentOwnerActivity(gymIds) {
     try {
-      // Mock recent activity - in real implementation, get actual member activities
-      return [
-        {
+      if (!gymIds || gymIds.length === 0) {
+        return [];
+      }
+
+      const activities = [];
+      const last7Days = new Date();
+      last7Days.setDate(last7Days.getDate() - 7);
+
+      // Get recent check-ins
+      const recentCheckIns = await sequelize.query(`
+        SELECT a.check_in_time, u.first_name, u.last_name, g.name as gym_name
+        FROM attendances a
+        JOIN users u ON a.user_id = u.id
+        JOIN gyms g ON a.gym_id = g.id
+        WHERE a.gym_id IN (${gymIds.map(() => '?').join(',')})
+          AND a.record_status = 1
+          AND a.check_in_time >= ?
+        ORDER BY a.check_in_time DESC
+        LIMIT 5
+      `, {
+        replacements: [...gymIds, last7Days],
+        type: sequelize.QueryTypes.SELECT
+      });
+
+      recentCheckIns.forEach(checkin => {
+        activities.push({
+          type: 'member_checkin',
+          message: `${checkin.first_name} ${checkin.last_name} checked in to ${checkin.gym_name}`,
+          timestamp: checkin.check_in_time
+        });
+      });
+
+      // Get recent subscriptions
+      const recentSubscriptions = await sequelize.query(`
+        SELECT us.created_at, u.first_name, u.last_name, s.name as subscription_name, s.price, g.name as gym_name
+        FROM user_subscriptions us
+        JOIN users u ON us.user_id = u.id
+        JOIN subscriptions s ON us.subscription_id = s.id
+        JOIN gyms g ON s.gym_id = g.id
+        WHERE s.gym_id IN (${gymIds.map(() => '?').join(',')})
+          AND us.record_status = 1
+          AND us.created_at >= ?
+        ORDER BY us.created_at DESC
+        LIMIT 5
+      `, {
+        replacements: [...gymIds, last7Days],
+        type: sequelize.QueryTypes.SELECT
+      });
+
+      recentSubscriptions.forEach(sub => {
+        activities.push({
           type: 'member_joined',
-          message: 'John Smith joined FitZone Downtown',
-          timestamp: new Date(Date.now() - 30 * 60 * 1000)
-        },
-        {
-          type: 'booking_made',
-          message: 'Sarah Wilson booked evening session',
-          timestamp: new Date(Date.now() - 2 * 60 * 60 * 1000)
-        },
-        {
+          message: `${sub.first_name} ${sub.last_name} subscribed to ${sub.subscription_name} at ${sub.gym_name}`,
+          timestamp: sub.created_at
+        });
+      });
+
+      // Get recent payments
+      const recentPayments = await sequelize.query(`
+        SELECT p.created_at, p.amount, u.first_name, u.last_name, g.name as gym_name
+        FROM payments p
+        JOIN user_subscriptions us ON p.id = us.payment_id
+        JOIN users u ON us.user_id = u.id
+        JOIN subscriptions s ON us.subscription_id = s.id
+        JOIN gyms g ON s.gym_id = g.id
+        WHERE s.gym_id IN (${gymIds.map(() => '?').join(',')})
+          AND p.status = 'completed'
+          AND p.record_status = 1
+          AND p.created_at >= ?
+        ORDER BY p.created_at DESC
+        LIMIT 3
+      `, {
+        replacements: [...gymIds, last7Days],
+        type: sequelize.QueryTypes.SELECT
+      });
+
+      recentPayments.forEach(payment => {
+        activities.push({
           type: 'payment_received',
-          message: 'Monthly subscription payment received - $99',
-          timestamp: new Date(Date.now() - 4 * 60 * 60 * 1000)
-        }
-      ];
+          message: `Payment received from ${payment.first_name} ${payment.last_name} - ₹${payment.amount.toLocaleString()}`,
+          timestamp: payment.created_at
+        });
+      });
+
+      // Sort by timestamp and return latest 10
+      return activities
+        .sort((a, b) => new Date(b.timestamp) - new Date(a.timestamp))
+        .slice(0, 10);
+
     } catch (error) {
+      console.error('Error getting recent owner activity:', error);
       return [];
     }
   }
 
   static async getUserFavoriteGym(userId) {
     try {
-      // Mock favorite gym - simplified for now
-      return null; // Will be implemented when associations are properly set up
+      // Get user's most visited gym
+      const favoriteGym = await sequelize.query(`
+        SELECT g.name, g.id, COUNT(*) as visit_count
+        FROM attendances a
+        JOIN gyms g ON a.gym_id = g.id
+        WHERE a.user_id = ?
+          AND a.record_status = 1
+        GROUP BY g.id, g.name
+        ORDER BY visit_count DESC
+        LIMIT 1
+      `, {
+        replacements: [userId],
+        type: sequelize.QueryTypes.SELECT
+      });
+
+      return favoriteGym.length > 0 ? favoriteGym[0] : null;
     } catch (error) {
+      console.error('Error getting user favorite gym:', error);
       return null;
     }
   }
 
-  static getMockUpcomingBookings(userId) {
-    // Mock upcoming bookings - in real implementation, get actual bookings
-    return [
-      {
-        id: 1,
-        gymName: 'FitZone Downtown',
-        sessionType: 'Morning Workout',
-        date: new Date(Date.now() + 24 * 60 * 60 * 1000),
-        timeSlot: '09:00 AM - 10:00 AM'
-      },
-      {
-        id: 2,
-        gymName: 'PowerHouse Gym',
-        sessionType: 'Yoga Class',
-        date: new Date(Date.now() + 3 * 24 * 60 * 60 * 1000),
-        timeSlot: '06:00 PM - 07:00 PM'
-      }
-    ];
-  }
-
   static async getRecentUserActivity(userId) {
     try {
-      // Mock recent user activity
-      return [
-        {
+      const activities = [];
+      const last30Days = new Date();
+      last30Days.setDate(last30Days.getDate() - 30);
+
+      // Get recent check-ins
+      const recentCheckIns = await sequelize.query(`
+        SELECT a.check_in_time, g.name as gym_name,
+               TIMESTAMPDIFF(HOUR, a.check_in_time, COALESCE(a.check_out_time, NOW())) as duration
+        FROM attendances a
+        JOIN gyms g ON a.gym_id = g.id
+        WHERE a.user_id = ?
+          AND a.record_status = 1
+          AND a.check_in_time >= ?
+        ORDER BY a.check_in_time DESC
+        LIMIT 5
+      `, {
+        replacements: [userId, last30Days],
+        type: sequelize.QueryTypes.SELECT
+      });
+
+      recentCheckIns.forEach(checkin => {
+        const duration = checkin.duration || 0;
+        activities.push({
           type: 'workout_completed',
-          message: 'Completed 45-min workout at FitZone Downtown',
-          timestamp: new Date(Date.now() - 24 * 60 * 60 * 1000)
-        },
-        {
+          message: `Completed ${duration}h workout at ${checkin.gym_name}`,
+          timestamp: checkin.check_in_time
+        });
+      });
+
+      // Get recent subscriptions
+      const recentSubscriptions = await sequelize.query(`
+        SELECT us.created_at, s.name, g.name as gym_name, sub.price
+        FROM user_subscriptions us
+        JOIN subscriptions sub ON us.subscription_id = sub.id
+        JOIN subscriptions s ON us.subscription_id = s.id
+        JOIN gyms g ON s.gym_id = g.id
+        WHERE us.user_id = ?
+          AND us.record_status = 1
+          AND us.created_at >= ?
+        ORDER BY us.created_at DESC
+        LIMIT 3
+      `, {
+        replacements: [userId, last30Days],
+        type: sequelize.QueryTypes.SELECT
+      });
+
+      recentSubscriptions.forEach(sub => {
+        activities.push({
           type: 'subscription_renewed',
-          message: 'Monthly subscription renewed successfully',
-          timestamp: new Date(Date.now() - 3 * 24 * 60 * 60 * 1000)
-        },
-        {
-          type: 'goal_achieved',
-          message: 'Achieved 10-day workout streak! 🎉',
-          timestamp: new Date(Date.now() - 5 * 24 * 60 * 60 * 1000)
-        }
-      ];
+          message: `Subscribed to ${sub.name} at ${sub.gym_name}`,
+          timestamp: sub.created_at
+        });
+      });
+
+      return activities
+        .sort((a, b) => new Date(b.timestamp) - new Date(a.timestamp))
+        .slice(0, 10);
+
     } catch (error) {
+      console.error('Error getting recent user activity:', error);
+      return [];
+    }
+  }
+
+  // New helper methods for real data calculations
+  static async calculateRevenueGrowthRate(gymId, currentMonthStart) {
+    try {
+      const lastMonthStart = new Date(currentMonthStart);
+      lastMonthStart.setMonth(lastMonthStart.getMonth() - 1);
+      const lastMonthEnd = new Date(currentMonthStart);
+      lastMonthEnd.setDate(lastMonthEnd.getDate() - 1);
+
+      const [currentRevenue, lastRevenue] = await Promise.all([
+        this.calculateOwnerMonthlyRevenue([gymId], currentMonthStart),
+        this.calculateOwnerMonthlyRevenue([gymId], lastMonthStart)
+      ]);
+
+      if (lastRevenue === 0) {
+        return currentRevenue > 0 ? 100 : 0;
+      }
+
+      return Math.round(((currentRevenue - lastRevenue) / lastRevenue) * 100);
+    } catch (error) {
+      console.error('Error calculating revenue growth rate:', error);
+      return 0;
+    }
+  }
+
+  static async calculateCurrentOccupancyRate(gymId, capacity) {
+    try {
+      if (!capacity || capacity === 0) {
+        return 0;
+      }
+
+      // Get today's unique check-ins (people currently in gym)
+      const currentOccupancy = await sequelize.query(`
+        SELECT COUNT(DISTINCT a.user_id) as count
+        FROM attendances a
+        WHERE a.gym_id = ?
+          AND DATE(a.check_in_time) = CURDATE()
+          AND a.record_status = 1
+          AND (a.check_out_time IS NULL OR a.check_out_time > NOW())
+      `, {
+        replacements: [gymId],
+        type: sequelize.QueryTypes.SELECT
+      });
+
+      const occupancyCount = parseInt(currentOccupancy[0]?.count || 0);
+      return Math.min(100, Math.round((occupancyCount / capacity) * 100));
+    } catch (error) {
+      console.error('Error calculating occupancy rate:', error);
+      return 0;
+    }
+  }
+
+  static async getWeeklyWorkouts(userId, weekAgo) {
+    try {
+      const weeklyWorkouts = await sequelize.query(`
+        SELECT COUNT(DISTINCT DATE(check_in_time)) as count
+        FROM attendances
+        WHERE user_id = ?
+          AND check_in_time >= ?
+          AND record_status = 1
+      `, {
+        replacements: [userId, weekAgo],
+        type: sequelize.QueryTypes.SELECT
+      });
+
+      return parseInt(weeklyWorkouts[0]?.count || 0);
+    } catch (error) {
+      console.error('Error getting weekly workouts:', error);
+      return 0;
+    }
+  }
+
+  static async getMonthlyWorkouts(userId, monthAgo) {
+    try {
+      const monthlyWorkouts = await sequelize.query(`
+        SELECT COUNT(DISTINCT DATE(check_in_time)) as count
+        FROM attendances
+        WHERE user_id = ?
+          AND check_in_time >= ?
+          AND record_status = 1
+      `, {
+        replacements: [userId, monthAgo],
+        type: sequelize.QueryTypes.SELECT
+      });
+
+      return parseInt(monthlyWorkouts[0]?.count || 0);
+    } catch (error) {
+      console.error('Error getting monthly workouts:', error);
+      return 0;
+    }
+  }
+
+  static async getUpcomingBookings(userId) {
+    try {
+      // This would require a bookings table - for now return empty
+      // In future, implement with actual booking system
+      return [];
+    } catch (error) {
+      console.error('Error getting upcoming bookings:', error);
       return [];
     }
   }

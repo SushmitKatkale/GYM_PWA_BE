@@ -30,20 +30,58 @@ const mealImageRoutes = require('./routes/mealImages');
 const exerciseRoutes = require('./routes/exercises');
 const exerciseMediaRoutes = require('./routes/exerciseMedia');
 const videoStreamRoutes = require('./routes/videoStream');
-const { errorHandler, notFoundHandler } = require('./middleware/errorHandler');
-const { specs, swaggerUi, swaggerOptions } = require('./config/swagger');
-const { testConnection, syncDatabase } = require('./models');
+const ownerApiRoutes = require('./routes/owner');
+
+// Middleware imports
+const { notFoundHandler, errorHandler } = require('./middleware/errorHandler');
 const AdvertisementScheduler = require('./middleware/advertisementScheduler');
 const autoCheckoutScheduler = require('./services/autoCheckoutScheduler');
 
+// Swagger imports
+const swaggerUi = require('swagger-ui-express');
+const swaggerJsdoc = require('swagger-jsdoc');
+
+// Database imports
+const { testConnection, syncDatabase } = require('./models');
+
 // Load environment variables
 dotenv.config();
+
+// Swagger configuration
+const swaggerOptions = {
+  definition: {
+    openapi: '3.0.0',
+    info: {
+      title: 'GYM PWA Backend API',
+      version: '1.0.0',
+      description: 'Backend API for Gym Management PWA',
+    },
+    servers: [
+      {
+        url: process.env.API_BASE_URL || 'http://localhost:3000',
+        description: 'Development server',
+      },
+    ],
+    components: {
+      securitySchemes: {
+        bearerAuth: {
+          type: 'http',
+          scheme: 'bearer',
+          bearerFormat: 'JWT',
+        },
+      },
+    },
+  },
+  apis: ['./routes/*.js', './controllers/*.js'],
+};
+
+const specs = swaggerJsdoc(swaggerOptions);
 
 const app = express();
 
 // CORS configuration
 const corsOptions = {
-  origin: ['http://localhost:3000', 'http://localhost:5173', 'http://localhost:4173', 'http://127.0.0.1:3000', 'http://127.0.0.1:5173', 'http://127.0.0.1:4173'],
+  origin: ['http://localhost:3000', 'http://localhost:3000', 'http://localhost:5173', 'http://localhost:4173', 'http://127.0.0.1:3000', 'http://127.0.0.1:3000', 'http://127.0.0.1:5173', 'http://127.0.0.1:4173'],
   credentials: true,
   methods: ['GET', 'POST', 'PUT', 'DELETE', 'OPTIONS'],
   allowedHeaders: ['Content-Type', 'Authorization', 'X-Requested-With']
@@ -150,6 +188,9 @@ app.use('/api/meal-images', mealImageRoutes);
 app.use('/api/exercises', exerciseRoutes);
 app.use('/api/exercise-media', exerciseMediaRoutes);
 app.use('/api/video-stream', videoStreamRoutes);
+app.use('/api/owner', ownerApiRoutes);
+app.use('/api/owner/trainers', require('./routes/ownerTrainer'));
+app.use('/api/trainers', require('./routes/trainer'));
 
 // Gateway status route for frontend payment redirect (no authentication required)
 app.use('/gateway', paymentRoutes);

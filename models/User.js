@@ -62,7 +62,7 @@ const User = sequelize.define('User', {
     type: DataTypes.TINYINT,
     allowNull: false,
     defaultValue: 1,
-    comment: '1=member,2=owner,3=trainer,4=admin',
+    comment: '1=member,2=owner,3=admin,4=trainer',
     validate: {
       isIn: [[1, 2, 3, 4]]
     }
@@ -131,11 +131,11 @@ User.prototype.isOwner = function() {
 };
 
 User.prototype.isTrainer = function() {
-  return this.role === 3;
+  return this.role === 4;
 };
 
 User.prototype.isAdmin = function() {
-  return this.role === 4;
+  return this.role === 3;
 };
 
 User.prototype.hasRole = function(roles) {

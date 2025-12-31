@@ -1,0 +1,175 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Trainer Invitation Declined</title>
+    <style>
+        body {
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            line-height: 1.6;
+            color: #333;
+            background-color: #f4f4f4;
+            margin: 0;
+            padding: 20px;
+        }
+        .container {
+            max-width: 600px;
+            margin: 0 auto;
+            background-color: #ffffff;
+            border-radius: 10px;
+            box-shadow: 0 4px 6px rgba(0, 0, 0, 0.1);
+            overflow: hidden;
+        }
+        .header {
+            background: linear-gradient(135deg, #dc3545 0%, #fd7e14 100%);
+            color: white;
+            padding: 30px;
+            text-align: center;
+        }
+        .header h1 {
+            margin: 0;
+            font-size: 28px;
+            font-weight: 600;
+        }
+        .content {
+            padding: 40px 30px;
+        }
+        .declined-message {
+            background-color: #f8d7da;
+            border: 2px solid #dc3545;
+            border-radius: 10px;
+            padding: 20px;
+            text-align: center;
+            margin: 20px 0;
+        }
+        .decline-info {
+            background-color: #f8f9fa;
+            border-left: 4px solid #dc3545;
+            padding: 20px;
+            margin: 20px 0;
+            border-radius: 5px;
+        }
+        .decline-info h3 {
+            margin: 0 0 10px 0;
+            color: #dc3545;
+            font-size: 18px;
+        }
+        .info-row {
+            display: flex;
+            justify-content: space-between;
+            margin-bottom: 8px;
+            padding: 5px 0;
+        }
+        .info-label {
+            font-weight: 600;
+            color: #666;
+        }
+        .info-value {
+            color: #333;
+        }
+        .next-steps {
+            background-color: #d1ecf1;
+            border: 1px solid #bee5eb;
+            border-radius: 5px;
+            padding: 20px;
+            margin: 20px 0;
+        }
+        .footer {
+            background-color: #f8f9fa;
+            padding: 20px 30px;
+            text-align: center;
+            color: #666;
+            font-size: 14px;
+        }
+        @media (max-width: 600px) {
+            .container {
+                margin: 10px;
+                border-radius: 5px;
+            }
+            .content {
+                padding: 20px 15px;
+            }
+            .header {
+                padding: 20px 15px;
+            }
+            .info-row {
+                flex-direction: column;
+            }
+            .info-label {
+                margin-bottom: 2px;
+            }
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <div class="header">
+            <h1>📋 Invitation Update</h1>
+            <p style="margin: 10px 0 0 0; opacity: 0.9;">
+                Your trainer invitation has been declined
+            </p>
+        </div>
+
+        <div class="content">
+            <p style="font-size: 16px; margin-bottom: 20px;">
+                Hi {{ownerName}},
+            </p>
+
+            <div class="declined-message">
+                <h3 style="color: #dc3545; margin: 0 0 10px 0;">❌ Invitation Declined</h3>
+                <p style="margin: 0; font-size: 16px;">
+                    The trainer invitation for <strong>{{gymName}}</strong> has been declined.
+                </p>
+            </div>
+
+            <div class="decline-info">
+                <h3>📝 Decline Details</h3>
+                <div class="info-row">
+                    <span class="info-label">Trainer Email:</span>
+                    <span class="info-value">{{trainerEmail}}</span>
+                </div>
+                <div class="info-row">
+                    <span class="info-label">Declined On:</span>
+                    <span class="info-value">{{formatDate declinedAt}}</span>
+                </div>
+                <div class="info-row">
+                    <span class="info-label">Reason:</span>
+                    <span class="info-value">{{reason}}</span>
+                </div>
+            </div>
+
+            <p>
+                Unfortunately, the trainer you invited has chosen to decline your invitation to join {{gymName}} as a Diet Plan Trainer. 
+                This could be due to various reasons such as current commitments, scheduling conflicts, or other opportunities.
+            </p>
+
+            <div class="next-steps">
+                <h4 style="color: #0c5460; margin-top: 0;">💡 What you can do next:</h4>
+                <ul style="margin-bottom: 0;">
+                    <li>Consider inviting other qualified trainers</li>
+                    <li>Review your trainer requirements and job description</li>
+                    <li>Reach out to local nutrition and fitness professionals</li>
+                    <li>Post the opportunity on professional networks</li>
+                </ul>
+            </div>
+
+            <p>
+                Don't worry - you can continue to invite other trainers to help provide diet planning services for your gym members. 
+                Finding the right trainer is important for your members' success.
+            </p>
+
+            <p style="font-size: 14px; color: #666; margin-top: 30px;">
+                You can send new trainer invitations through your owner dashboard at any time.
+            </p>
+        </div>
+
+        <div class="footer">
+            <p style="margin: 0;">
+                This notification was sent from {{gymName}}<br>
+                Gym Management System
+            </p>
+        </div>
+    </div>
+</body>
+</html>

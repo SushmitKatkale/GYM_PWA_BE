@@ -1,0 +1,167 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Trainer Invitation Accepted</title>
+    <style>
+        body {
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            line-height: 1.6;
+            color: #333;
+            background-color: #f4f4f4;
+            margin: 0;
+            padding: 20px;
+        }
+        .container {
+            max-width: 600px;
+            margin: 0 auto;
+            background-color: #ffffff;
+            border-radius: 10px;
+            box-shadow: 0 4px 6px rgba(0, 0, 0, 0.1);
+            overflow: hidden;
+        }
+        .header {
+            background: linear-gradient(135deg, #28a745 0%, #20c997 100%);
+            color: white;
+            padding: 30px;
+            text-align: center;
+        }
+        .header h1 {
+            margin: 0;
+            font-size: 28px;
+            font-weight: 600;
+        }
+        .content {
+            padding: 40px 30px;
+        }
+        .success-message {
+            background-color: #d1edff;
+            border: 2px solid #28a745;
+            border-radius: 10px;
+            padding: 20px;
+            text-align: center;
+            margin: 20px 0;
+        }
+        .trainer-info {
+            background-color: #f8f9fa;
+            border-left: 4px solid #28a745;
+            padding: 20px;
+            margin: 20px 0;
+            border-radius: 5px;
+        }
+        .trainer-info h3 {
+            margin: 0 0 10px 0;
+            color: #28a745;
+            font-size: 18px;
+        }
+        .info-row {
+            display: flex;
+            justify-content: space-between;
+            margin-bottom: 8px;
+            padding: 5px 0;
+        }
+        .info-label {
+            font-weight: 600;
+            color: #666;
+        }
+        .info-value {
+            color: #333;
+        }
+        .footer {
+            background-color: #f8f9fa;
+            padding: 20px 30px;
+            text-align: center;
+            color: #666;
+            font-size: 14px;
+        }
+        @media (max-width: 600px) {
+            .container {
+                margin: 10px;
+                border-radius: 5px;
+            }
+            .content {
+                padding: 20px 15px;
+            }
+            .header {
+                padding: 20px 15px;
+            }
+            .info-row {
+                flex-direction: column;
+            }
+            .info-label {
+                margin-bottom: 2px;
+            }
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <div class="header">
+            <h1>🎉 Great News!</h1>
+            <p style="margin: 10px 0 0 0; opacity: 0.9;">
+                Your trainer invitation has been accepted!
+            </p>
+        </div>
+
+        <div class="content">
+            <p style="font-size: 16px; margin-bottom: 20px;">
+                Hi {{ownerName}},
+            </p>
+
+            <div class="success-message">
+                <h3 style="color: #28a745; margin: 0 0 10px 0;">✅ Invitation Accepted!</h3>
+                <p style="margin: 0; font-size: 16px;">
+                    <strong>{{trainerName}}</strong> has accepted your invitation to join <strong>{{gymName}}</strong> as a Diet Plan Trainer.
+                </p>
+            </div>
+
+            <div class="trainer-info">
+                <h3>👨‍⚕️ New Trainer Details</h3>
+                <div class="info-row">
+                    <span class="info-label">Name:</span>
+                    <span class="info-value">{{trainerName}}</span>
+                </div>
+                <div class="info-row">
+                    <span class="info-label">Email:</span>
+                    <span class="info-value">{{trainerEmail}}</span>
+                </div>
+                <div class="info-row">
+                    <span class="info-label">Joined:</span>
+                    <span class="info-value">{{formatDate acceptedAt}}</span>
+                </div>
+                <div class="info-row">
+                    <span class="info-label">Status:</span>
+                    <span class="info-value" style="color: #28a745; font-weight: 600;">Active</span>
+                </div>
+            </div>
+
+            <p>
+                Your new trainer is now ready to start creating personalized diet plans for your gym members. 
+                They can log into their trainer dashboard and begin working with clients right away.
+            </p>
+
+            <p style="font-size: 14px; color: #666; margin-top: 30px;">
+                <strong>What your trainer can do now:</strong>
+            </p>
+            <ul style="color: #666; font-size: 14px;">
+                <li>Access the trainer dashboard for {{gymName}}</li>
+                <li>Create and manage diet plans for gym members</li>
+                <li>Track member progress and make plan adjustments</li>
+                <li>Provide nutrition guidance and support</li>
+            </ul>
+
+            <p style="margin-top: 20px;">
+                You can manage your trainers, view their activity, and control their access through your owner dashboard.
+            </p>
+        </div>
+
+        <div class="footer">
+            <p style="margin: 0;">
+                This notification was sent from {{gymName}}<br>
+                Gym Management System
+            </p>
+        </div>
+    </div>
+</body>
+</html>

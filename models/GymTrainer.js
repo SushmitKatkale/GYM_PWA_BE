@@ -17,11 +17,37 @@ const GymTrainer = sequelize.define('GymTrainer', {
   },
   trainer_id: {
     type: DataTypes.BIGINT,
+    allowNull: true, // NULL until trainer accepts invitation
+    references: {
+      model: 'users',
+      key: 'id'
+    }
+  },
+  // email is now retrieved from User table via trainer_id relationship
+  status: {
+    type: DataTypes.ENUM('pending', 'active', 'inactive', 'declined'),
+    defaultValue: 'pending'
+  },
+  invitation_token: {
+    type: DataTypes.STRING(255),
+    unique: true,
+    allowNull: true
+  },
+  invited_by: {
+    type: DataTypes.BIGINT,
     allowNull: false,
     references: {
       model: 'users',
       key: 'id'
     }
+  },
+  invited_at: {
+    type: DataTypes.DATE,
+    defaultValue: DataTypes.NOW
+  },
+  expires_at: {
+    type: DataTypes.DATE,
+    allowNull: true
   },
   record_status: {
     type: DataTypes.TINYINT,
@@ -57,14 +83,77 @@ const GymTrainer = sequelize.define('GymTrainer', {
     },
     {
       fields: ['gym_id', 'trainer_id'],
-      unique: true
+      unique: true,
+      where: {
+        trainer_id: { [sequelize.Sequelize.Op.ne]: null }
+      }
+    },
+    // Removed email-based unique constraint since email is now in User table
+    {
+      fields: ['invitation_token']
+    },
+    {
+      fields: ['invited_by']
+    },
+    {
+      fields: ['status']
     }
   ]
 });
 
 // Instance methods
 GymTrainer.prototype.isActive = function() {
-  return this.record_status === 1;
+  return this.record_status === 1 && this.status === 'active';
+};
+
+GymTrainer.prototype.isExpired = function() {
+  if (!this.expires_at) return false;
+  return new Date() > this.expires_at;
+};
+
+GymTrainer.prototype.canAccept = function() {
+  return this.status === 'pending' && !this.isExpired() && this.record_status === 1;
+};
+
+GymTrainer.prototype.acceptInvitation = async function(trainerId) {
+  if (!this.canAccept()) {
+    throw new Error('Invitation cannot be accepted - expired or invalid status');
+  }
+  
+  this.trainer_id = trainerId;
+  this.status = 'active';
+  this.joined_at = new Date();
+  this.invitation_token = null; // Clear token after use
+  
+  await this.save();
+  return this;
+};
+
+GymTrainer.prototype.declineInvitation = async function() {
+  if (this.status !== 'pending') {
+    throw new Error('Only pending invitations can be declined');
+  }
+  
+  this.status = 'declined';
+  this.invitation_token = null; // Clear token
+  
+  await this.save();
+  return this;
+};
+
+GymTrainer.prototype.deactivate = async function() {
+  this.status = 'inactive';
+  await this.save();
+  return this;
+};
+
+GymTrainer.prototype.activate = async function() {
+  if (!this.trainer_id) {
+    throw new Error('Cannot activate - no trainer assigned');
+  }
+  this.status = 'active';
+  await this.save();
+  return this;
 };
 
 GymTrainer.prototype.getGymDetails = async function() {
@@ -119,6 +208,58 @@ GymTrainer.prototype.removeTrainer = async function() {
   );
   
   return this;
+};
+
+// Static methods for invitations
+GymTrainer.findByToken = async function(token) {
+  return await this.findOne({
+    where: { 
+      invitation_token: token,
+      record_status: 1 
+    },
+    include: [
+      { 
+        model: require('./Gym'), 
+        as: 'gym',
+        attributes: ['id', 'name', 'address', 'city', 'state']
+      },
+      { 
+        model: require('./User'), 
+        as: 'inviter',
+        attributes: ['id', 'firstName', 'lastName', 'email']
+      }
+    ]
+  });
+};
+
+GymTrainer.createInvitation = async function(gymId, email, invitedBy) {
+  const crypto = require('crypto');
+  const token = crypto.randomBytes(32).toString('hex');
+  const expiresAt = new Date();
+  expiresAt.setDate(expiresAt.getDate() + 7); // 7 days from now
+  
+  // Check if there's already a pending invitation for this email to this gym
+  const existingInvitation = await this.findOne({
+    where: {
+      gym_id: gymId,
+      email: email,
+      status: 'pending',
+      record_status: 1
+    }
+  });
+  
+  if (existingInvitation) {
+    throw new Error('An invitation is already pending for this email');
+  }
+  
+  return await this.create({
+    gym_id: gymId,
+    email: email,
+    invited_by: invitedBy,
+    invitation_token: token,
+    expires_at: expiresAt,
+    status: 'pending'
+  });
 };
 
 // Static methods

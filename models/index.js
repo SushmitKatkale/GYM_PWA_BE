@@ -392,21 +392,69 @@ SlotWaitlist.belongsTo(User, {
 });
 
 // Gym Trainers (Many-to-Many through GymTrainer)
+// Direct associations with the junction table
+Gym.hasMany(GymTrainer, {
+  foreignKey: 'gym_id',
+  as: 'gymTrainers',
+  onDelete: 'CASCADE'
+});
+
+GymTrainer.belongsTo(Gym, {
+  foreignKey: 'gym_id',
+  as: 'gym'
+});
+
+// Trainer (User with role 4)
+User.hasMany(GymTrainer, {
+  foreignKey: 'trainer_id',
+  as: 'trainerAssignments',
+  onDelete: 'SET NULL'
+});
+
+GymTrainer.belongsTo(User, {
+  foreignKey: 'trainer_id',
+  as: 'trainer'
+});
+
+// Inviter (User who invited - owner)
+User.hasMany(GymTrainer, {
+  foreignKey: 'invited_by',
+  as: 'sentInvitations',
+  onDelete: 'CASCADE'
+});
+
+GymTrainer.belongsTo(User, {
+  foreignKey: 'invited_by',
+  as: 'inviter'
+});
+
+// Many-to-Many convenience associations
 Gym.belongsToMany(User, {
-  through: GymTrainer,
-  foreignKey: 'gymId',
-  otherKey: 'trainerId',
-  as: 'trainers',
-  scope: {
-    role: 3 // Only users with trainer role
-  }
+  through: {
+    model: GymTrainer,
+    scope: {
+      status: 'active',
+      record_status: 1
+    }
+  },
+  foreignKey: 'gym_id',
+  otherKey: 'trainer_id',
+  as: 'activeTrainers',
+  constraints: false
 });
 
 User.belongsToMany(Gym, {
-  through: GymTrainer,
-  foreignKey: 'trainerId',
-  otherKey: 'gymId',
-  as: 'assignedGyms'
+  through: {
+    model: GymTrainer,
+    scope: {
+      status: 'active',
+      record_status: 1
+    }
+  },
+  foreignKey: 'trainer_id',
+  otherKey: 'gym_id',
+  as: 'assignedGyms',
+  constraints: false
 });
 
 // Diet Plans

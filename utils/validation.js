@@ -75,6 +75,19 @@ const validate = (schema) => {
   };
 };
 
+const validateEmail = (email) => {
+  const schema = Joi.string().email().required();
+  const { error } = schema.validate(email);
+  if (error) {
+    return {
+      success: false,
+      message: 'Invalid email format',
+      errors: error.details.map(detail => detail.message)
+    };
+  }
+  return { success: true };
+};
+
 module.exports = {
   registerSchema,
   loginSchema,
@@ -83,5 +96,6 @@ module.exports = {
   refreshTokenSchema,
   sendOtpSchema,
   verifyOtpSchema,
-  validate
+  validate,
+  validateEmail
 };
